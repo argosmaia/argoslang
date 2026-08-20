@@ -1,7 +1,10 @@
 add_library(argos_frontend STATIC
+    src/ast/ast_printer.cpp
     src/diagnostics/diagnostic_engine.cpp
     src/lexer/lexer.cpp
     src/lexer/token_kind.cpp
+    src/parser/parser.cpp
+    src/semantics/semantic_analyzer.cpp
     src/source/source_manager.cpp
 )
 

@@ -8,7 +8,7 @@
 namespace argos::lexer {
 
 struct Token final {
-    TokenKind kind{TokenKind::invalid};
+    TokenKind kind{TokenKind::Invalid};
     std::string lexeme;
     source::SourceSpan span{};
 

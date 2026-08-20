@@ -1,7 +1,13 @@
+# Build outputs
 /build/
 /out/
+/dist/
+
+# Cache & compile DB
 /.cache/
 compile_commands.json
+
+# Object files & libs
 *.o
 *.obj
 *.a
@@ -9,5 +15,12 @@ compile_commands.json
 *.dll
 *.dylib
 *.exe
+
+# IDE config
 .vscode/
 .idea/
+
+# Exclude docs, examples, tests from repo
+/docs/
+/examples/
+/tests/

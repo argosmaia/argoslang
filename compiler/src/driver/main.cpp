@@ -1,6 +1,9 @@
+#include "argos/ast/ast_printer.hpp"
 #include "argos/diagnostics/diagnostic_engine.hpp"
 #include "argos/lexer/lexer.hpp"
 #include "argos/lexer/token_kind.hpp"
+#include "argos/parser/parser.hpp"
+#include "argos/semantics/semantic_analyzer.hpp"
 #include "argos/source/source_manager.hpp"
 
 #include <filesystem>
@@ -15,7 +18,10 @@ void print_usage(std::string_view executable) {
     std::cerr
         << "ArgosLang compiler bootstrap\n\n"
         << "Uso:\n"
-        << "  " << executable << " lex <arquivo.argos>\n";
+        << "  " << executable << " lex <arquivo.argos>    - Analisa os tokens lexicais do arquivo\n"
+        << "  " << executable << " parse <arquivo.argos>  - Realiza o parsing gramatical da sintaxe (AST)\n"
+        << "  " << executable << " ast <arquivo.argos>    - Imprime a Árvore de Sintaxe Abstrata (AST) formatada\n"
+        << "  " << executable << " check <arquivo.argos>  - Executa a análise semântica (verificação de tipos e escopos)\n";
 }
 
 void print_diagnostics(
@@ -48,7 +54,7 @@ int main(int argc, char** argv) {
     const std::string_view command = argv[1];
     const std::filesystem::path source_path = argv[2];
 
-    if (command != "lex") {
+    if (command != "lex" && command != "parse" && command != "ast" && command != "check") {
         std::cerr << "comando desconhecido: " << command << '\n';
         print_usage(argv[0]);
         return 64;
@@ -69,20 +75,52 @@ int main(int argc, char** argv) {
 
     argos::diagnostics::DiagnosticEngine diagnostics;
     argos::lexer::Lexer lexer{*source_file, diagnostics};
-    const auto tokens = lexer.tokenize();
+    auto tokens = lexer.tokenize();
 
-    for (const auto& token : tokens) {
+    if (command == "lex") {
+        for (const auto& token : tokens) {
+            std::cout
+                << std::left
+                << std::setw(22)
+                << argos::lexer::token_kind_name(token.kind)
+                << "  "
+                << std::quoted(token.lexeme)
+                << "  @ "
+                << token.span.begin.line
+                << ':'
+                << token.span.begin.column
+                << '\n';
+        }
+        print_diagnostics(source_path, diagnostics);
+        return diagnostics.has_errors() ? 65 : 0;
+    }
+
+    argos::parser::Parser parser{std::move(tokens), diagnostics};
+    const auto program = parser.parse_program();
+
+    if (diagnostics.has_errors()) {
+        print_diagnostics(source_path, diagnostics);
+        return 65;
+    }
+
+    if (command == "parse") {
         std::cout
-            << std::left
-            << std::setw(22)
-            << argos::lexer::token_kind_name(token.kind)
-            << "  "
-            << std::quoted(token.lexeme)
-            << "  @ "
-            << token.span.begin.line
-            << ':'
-            << token.span.begin.column
-            << '\n';
+            << "[ArgosLang Compiler] Parsing concluído com sucesso para: "
+            << source_path.string() << '\n'
+            << "Total de declarações/instruções parsed no programa: "
+            << program.items.size() << '\n';
+    } else if (command == "ast") {
+        argos::ast::AstPrinter printer;
+        std::cout << printer.print(program);
+    } else if (command == "check") {
+        argos::semantics::SemanticAnalyzer analyzer{diagnostics};
+        const bool success = analyzer.analyze(program);
+
+        if (success && !diagnostics.has_errors()) {
+            std::cout
+                << "[ArgosLang Compiler] Análise semântica concluída com sucesso (0 erros) para: "
+                << source_path.string() << '\n';
+        }
     }
 
     print_diagnostics(source_path, diagnostics);

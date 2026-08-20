@@ -5,9 +5,9 @@ Initial C++23 compiler skeleton for ArgosLang.
 Current vertical slice:
 
 ```text
-source file → SourceManager → Lexer → Token stream → terminal
-                                  ↓
-                            diagnostics
+source file → SourceManager → Lexer → Parser → AST → SemanticAnalyzer (Type Checker)
+                                          ↓                 ↓
+                                      AST Printer      diagnostics
 ```
 
 ## Requirements on Ubuntu/Pop!_OS
@@ -42,61 +42,23 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-## Run the first compiler command
+## Run the compiler CLI commands
 
 ```bash
+# 1. Analisar a sequência de tokens lexicais
 ./build/bin/argosc lex examples/null_safety.argos
+
+# 2. Analisar a sintaxe (parsing da AST)
+./build/bin/argosc parse examples/null_safety.argos
+
+# 3. Visualizar a Árvore de Sintaxe Abstrata (AST) formatada
+./build/bin/argosc ast examples/null_safety.argos
+
+# 4. Executar a Análise Semântica e Validação de Tipos (Type Checker)
+./build/bin/argosc check examples/null_safety.argos
 ```
 
-## Build with sanitizers
+## Documentation & Guides
 
-```bash
-cmake -S . -B build-sanitize -G Ninja \
-  -DCMAKE_BUILD_TYPE=Debug \
-  -DARGOS_BUILD_TESTS=ON \
-  -DARGOS_ENABLE_SANITIZERS=ON
-
-cmake --build build-sanitize
-ctest --test-dir build-sanitize --output-on-failure
-```
-
-## Module map
-
-```text
-compiler/
-├── include/argos/
-│   ├── diagnostics/
-│   ├── lexer/
-│   └── source/
-└── src/
-    ├── diagnostics/
-    ├── driver/
-    ├── lexer/
-    └── source/
-
-tests/
-└── lexer/
-
-docs/
-├── architecture.md
-└── adr/
-```
-
-## Next increment
-
-The next vertical slice should add:
-
-```text
-tokens → parser → expression AST → AST printer
-```
-
-It should initially parse:
-
-- identifiers and literals;
-- postfix `!` and `!!`;
-- member access `.` and safe member access `?.`;
-- coalescing `??`;
-- assignment operators `=`, `?=` and `??=`;
-- parenthesized expressions.
-
-Do not add LLVM before this grammar has tests and stable diagnostics.
+- [docs/grammar-spec.md](file:///home/dgti/Downloads/argoslang-bootstrap/docs/grammar-spec.md): Especificação formal EBNF, tipos primitivos de tamanho fixo, sem GC e modelo bare-metal.
+- [docs/testing-and-compiler-guide.md](file:///home/dgti/Downloads/argoslang-bootstrap/docs/testing-and-compiler-guide.md): Guia de testes e arquitetura de compilação.
