@@ -1,0 +1,10 @@
+func choose(_ flag: Bool, fallback value: Int?) -> Int {
+    let resolved: Int = value ?? 0;
+    if flag {
+        return resolved;
+    } else {
+        return 1;
+    }
+}
+
+let result: Int = choose(true, fallback: 7);

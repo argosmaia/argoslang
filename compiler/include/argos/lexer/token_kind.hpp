@@ -33,6 +33,18 @@ enum class TokenKind : std::uint16_t {
     KwClass,
     KwStruct,
     KwInterface,
+    KwProtocol,
+    KwModule,
+    KwType,
+    KwInit,
+    KwDeinit,
+    KwGet,
+    KwSet,
+    KwWhere,
+    KwExtern,
+    KwInOut,
+    KwThreadLocal,
+    KwNative,
     KwEnum,
     KwRecord,
     KwFunction,
@@ -61,6 +73,9 @@ enum class TokenKind : std::uint16_t {
     KwIf,
     KwElse,
     KwWhile,
+    KwDo,
+    KwMatch,
+    KwDefer,
     KwWhen,
     KwFor,
     KwIn,
@@ -99,6 +114,11 @@ enum class TokenKind : std::uint16_t {
     KwString,
     KwUSize,
     KwISize,
+    KwSByte,
+    KwUShort,
+    KwUInt,
+    KwULong,
+    KwNever,
 
     // Delimitadores e pontuação
     LeftParen,       // (
@@ -113,6 +133,8 @@ enum class TokenKind : std::uint16_t {
     Dot,             // .
     Range,           // ..
     Ellipsis,        // ...
+    RangeInclusive,  // ..=
+    ColonColon,      // ::
     At,              // @
     Hash,            // #
     Arrow,           // ->
@@ -172,12 +194,6 @@ enum class TokenKind : std::uint16_t {
     NullCoalescingAssign, // ??=
     ForceUnwrap,          // !!
     ForceUnwrapAssign,    // !!=
-};
-
-struct LexerOptions {
-    bool emitNewLines{true};
-    bool allowNestedBlockComments{true};
-    bool allowUtf8Identifiers{true};
 };
 
 std::string_view token_kind_name(TokenKind kind) noexcept;

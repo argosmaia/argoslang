@@ -37,6 +37,9 @@ private:
     Token scan_identifier_or_keyword();
     Token scan_number();
     Token scan_string();
+    Token scan_character();
+    Token scan_escaped_identifier();
+    Token scan_multiline_string();
 
     Token make_token(
         TokenKind kind,
@@ -58,6 +61,10 @@ private:
     std::size_t offset_{0};
     std::size_t line_{1};
     std::size_t column_{1};
+    std::size_t delimiter_depth_{0};
+    TokenKind previous_kind_{TokenKind::Invalid};
+    bool pending_semicolon_{false};
+    source::SourceLocation pending_location_{};
 };
 
 } // namespace argos::lexer

@@ -125,7 +125,7 @@ void AstPrinter::write_node(const Node &node) {
             const auto &value = static_cast<const Parameter &>(node);
             write_line("Parameter " + value.name);
             IndentGuard indent{*this};
-            write_type(*value.type);
+            if (value.type) write_type(*value.type);
             return;
         }
 
@@ -135,7 +135,7 @@ void AstPrinter::write_node(const Node &node) {
                        std::string{mutability_name(value.mutability)} + " " +
                        value.name);
             IndentGuard indent{*this};
-            write_type(*value.type);
+            if (value.type) write_type(*value.type);
             if (value.initializer != nullptr) {
                 write_label("initializer");
                 IndentGuard nested{*this};
@@ -172,6 +172,14 @@ void AstPrinter::write_node(const Node &node) {
                 IndentGuard nested{*this};
                 write_node(*value.body);
             }
+            return;
+        }
+
+        case NodeKind::protocol_declaration: {
+            const auto &value = static_cast<const ProtocolDeclaration &>(node);
+            write_line("ProtocolDeclaration " + value.name);
+            IndentGuard indent{*this};
+            for (const auto &component : value.components) write_node(*component);
             return;
         }
 
@@ -268,6 +276,16 @@ void AstPrinter::write_node(const Node &node) {
         case NodeKind::integer_literal_expression: {
             const auto &value = static_cast<const IntegerLiteralExpression &>(node);
             write_line("IntegerLiteralExpression " + value.spelling);
+            return;
+        }
+        case NodeKind::float_literal_expression: {
+            const auto &value = static_cast<const FloatLiteralExpression &>(node);
+            write_line("FloatLiteralExpression " + value.spelling);
+            return;
+        }
+        case NodeKind::character_literal_expression: {
+            const auto &value = static_cast<const CharacterLiteralExpression &>(node);
+            write_line("CharacterLiteralExpression " + value.spelling);
             return;
         }
 

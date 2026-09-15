@@ -1,5 +1,7 @@
 add_library(argos_frontend STATIC
     src/ast/ast_printer.cpp
+    src/codegen/ir/ir_generator.cpp
+    src/codegen/ir/executable_ir_generator.cpp
     src/diagnostics/diagnostic_engine.cpp
     src/lexer/lexer.cpp
     src/lexer/token_kind.cpp
@@ -7,6 +9,8 @@ add_library(argos_frontend STATIC
     src/semantics/semantic_analyzer.cpp
     src/source/source_manager.cpp
 )
+
+find_package(ICU REQUIRED COMPONENTS uc)
 
 target_include_directories(argos_frontend
     PUBLIC
@@ -16,12 +20,15 @@ target_include_directories(argos_frontend
 target_link_libraries(argos_frontend
     PUBLIC
         argos_project_options
+        ICU::uc
     PRIVATE
         argos_project_warnings
 )
 
 add_executable(argosc
     src/driver/main.cpp
+    src/driver/native_compile.cpp
+    src/codegen/native/x86_64/x86_64_codegen.cpp
 )
 
 target_link_libraries(argosc

@@ -1,0 +1,5 @@
+// Resultado esperado: 14
+func main() -> Int {
+    let base: Int = 3
+    return base * 4 + 2
+}

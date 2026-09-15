@@ -12,26 +12,44 @@ namespace argos::parser {
 namespace {
 
 constexpr std::uint8_t assignment_precedence = 10;
-constexpr std::uint8_t logical_or_precedence = 15;
-constexpr std::uint8_t logical_and_precedence = 18;
 constexpr std::uint8_t coalescing_precedence = 20;
-constexpr std::uint8_t equality_precedence = 30;
-constexpr std::uint8_t relational_precedence = 35;
-constexpr std::uint8_t additive_precedence = 40;
-constexpr std::uint8_t multiplicative_precedence = 50;
-constexpr std::uint8_t prefix_precedence = 60;
-constexpr std::uint8_t postfix_precedence = 70;
+constexpr std::uint8_t logical_or_precedence = 25;
+constexpr std::uint8_t logical_and_precedence = 30;
+constexpr std::uint8_t equality_precedence = 35;
+constexpr std::uint8_t relational_precedence = 40;
+constexpr std::uint8_t additive_precedence = 50;
+constexpr std::uint8_t multiplicative_precedence = 60;
+constexpr std::uint8_t prefix_precedence = 70;
+constexpr std::uint8_t postfix_precedence = 80;
 
 bool is_assignment_operator(lexer::TokenKind kind) noexcept {
     return kind == lexer::TokenKind::Equal
+        || kind == lexer::TokenKind::PlusEqual
+        || kind == lexer::TokenKind::MinusEqual
+        || kind == lexer::TokenKind::StarEqual
+        || kind == lexer::TokenKind::SlashEqual
+        || kind == lexer::TokenKind::PercentEqual
         || kind == lexer::TokenKind::SafeAssign
         || kind == lexer::TokenKind::NullCoalescingAssign;
 }
 
 bool is_postfix_operator(lexer::TokenKind kind) noexcept {
-    return kind == lexer::TokenKind::Question
-        || kind == lexer::TokenKind::Bang
-        || kind == lexer::TokenKind::ForceUnwrap;
+    return kind == lexer::TokenKind::ForceUnwrap
+        || kind == lexer::TokenKind::PlusPlus
+        || kind == lexer::TokenKind::MinusMinus;
+}
+
+bool is_type_token(lexer::TokenKind kind) noexcept {
+    using K = lexer::TokenKind;
+    switch (kind) {
+    case K::Identifier: case K::EscapedIdentifier: case K::KwBool:
+    case K::KwByte: case K::KwSByte: case K::KwShort: case K::KwUShort:
+    case K::KwInt: case K::KwUInt: case K::KwLong: case K::KwULong:
+    case K::KwISize: case K::KwUSize: case K::KwFloat: case K::KwDouble:
+    case K::KwChar: case K::KwString: case K::KwVoid: case K::KwNever:
+      return true;
+    default: return false;
+    }
 }
 
 } // namespace
@@ -147,6 +165,13 @@ lexer::Token Parser::consume(
     if (check(kind)) {
         return advance();
     }
+    if (kind == lexer::TokenKind::Identifier &&
+        check(lexer::TokenKind::EscapedIdentifier)) {
+        auto token = advance();
+        token.kind = lexer::TokenKind::Identifier;
+        token.lexeme = token.lexeme.substr(1, token.lexeme.size() - 2);
+        return token;
+    }
 
     report(current(), std::move(message));
     return synthetic_token(kind);
@@ -186,18 +211,37 @@ void Parser::synchronize() {
     }
 }
 
+void Parser::skip_unsupported_construct() {
+    std::size_t braces = 0;
+    while (!is_at_end()) {
+        if (check(lexer::TokenKind::Semicolon) && braces == 0) {
+            advance();
+            return;
+        }
+        if (match(lexer::TokenKind::LeftBrace)) {
+            ++braces;
+            continue;
+        }
+        if (match(lexer::TokenKind::RightBrace)) {
+            if (braces == 0) return;
+            --braces;
+            if (braces == 0) return;
+            continue;
+        }
+        advance();
+    }
+}
+
 void Parser::consume_statement_terminator(std::string context) {
-    if (match(lexer::TokenKind::Semicolon)) {
+    if (match(lexer::TokenKind::Semicolon)
+        || check(lexer::TokenKind::RightBrace)
+        || check(lexer::TokenKind::KwElse)
+        || is_at_end()) {
         return;
     }
-
-    if (can_finish_statement()) {
-        return;
-    }
-
     report(
         current(),
-        "esperado ';' ou quebra de linha após " + std::move(context)
+        "esperado ';' ou newline elegível após " + std::move(context)
     );
 }
 
@@ -207,12 +251,6 @@ bool Parser::has_line_break_before_current() const noexcept {
     }
 
     return previous().span.end.line < current().span.begin.line;
-}
-
-bool Parser::can_finish_statement() const noexcept {
-    return is_at_end()
-        || check(lexer::TokenKind::RightBrace)
-        || has_line_break_before_current();
 }
 
 ast::BlockItemPtr Parser::parse_block_item() {
@@ -226,6 +264,34 @@ ast::BlockItemPtr Parser::parse_block_item() {
 
     if (match(lexer::TokenKind::KwFunction)) {
         return parse_function_declaration(previous());
+    }
+    if (match(lexer::TokenKind::KwProtocol)) {
+        return parse_protocol_declaration(previous());
+    }
+
+    switch (current().kind) {
+    case lexer::TokenKind::KwClass:
+    case lexer::TokenKind::KwInterface:
+    case lexer::TokenKind::KwEnum:
+    case lexer::TokenKind::KwModule:
+    case lexer::TokenKind::KwImport:
+    case lexer::TokenKind::KwType:
+    case lexer::TokenKind::KwExtern:
+    case lexer::TokenKind::KwThreadLocal:
+    case lexer::TokenKind::KwNative:
+    case lexer::TokenKind::KwOperator:
+    case lexer::TokenKind::KwInit:
+    case lexer::TokenKind::KwDeinit:
+    case lexer::TokenKind::KwWhere:
+    case lexer::TokenKind::KwPublic:
+    case lexer::TokenKind::KwPrivate:
+    case lexer::TokenKind::KwProtected:
+    case lexer::TokenKind::KwInternal:
+    case lexer::TokenKind::At:
+      report(current(), "declaração ainda não suportada pelo frontend");
+      skip_unsupported_construct();
+      return nullptr;
+    default: break;
     }
 
     return parse_statement();
@@ -243,17 +309,14 @@ ast::BlockItemPtr Parser::parse_variable_declaration(
         "esperado nome após 'let' ou 'var'"
     );
 
-    consume(
-        lexer::TokenKind::Colon,
-        "esperado ':' após o nome da variável; ArgosLang exige tipo explícito"
-    );
-
-    auto type = parse_type();
+    ast::TypeSyntaxPtr type;
+    if (match(lexer::TokenKind::Colon)) type = parse_type();
     ast::ExpressionPtr initializer;
 
     if (match(lexer::TokenKind::Equal)) {
         initializer = parse_expression();
     }
+    if (!type && !initializer) report(current(), "declaração sem tipo exige inicializador");
 
     consume_statement_terminator("a declaração de variável");
 
@@ -285,10 +348,18 @@ ast::BlockItemPtr Parser::parse_function_declaration(
 
     if (!check(lexer::TokenKind::RightParen)) {
         while (!is_at_end()) {
-            const lexer::Token parameter_name = consume(
+            const lexer::Token first_name = consume(
                 lexer::TokenKind::Identifier,
                 "esperado nome do parâmetro"
             );
+            lexer::Token parameter_name = first_name;
+            std::string external_label = first_name.lexeme == "_" ? "" : first_name.lexeme;
+            if ((check(lexer::TokenKind::Identifier) ||
+                 check(lexer::TokenKind::EscapedIdentifier)) &&
+                peek(1).kind == lexer::TokenKind::Colon) {
+                parameter_name = consume(lexer::TokenKind::Identifier, "esperado nome do parâmetro");
+                external_label = first_name.lexeme == "_" ? "" : first_name.lexeme;
+            }
 
             consume(
                 lexer::TokenKind::Colon,
@@ -301,11 +372,13 @@ ast::BlockItemPtr Parser::parse_function_declaration(
                 parameter_type->span.end
             );
 
-            parameters.push_back(std::make_unique<ast::Parameter>(
+            auto parameter = std::make_unique<ast::Parameter>(
                 parameter_name.lexeme,
                 std::move(parameter_type),
                 parameter_span
-            ));
+            );
+            parameter->external_label = std::move(external_label);
+            parameters.push_back(std::move(parameter));
 
             if (!match(lexer::TokenKind::Comma)) {
                 break;
@@ -328,8 +401,8 @@ ast::BlockItemPtr Parser::parse_function_declaration(
         return_type = parse_type();
     }
 
-    auto body = parse_required_block(
-        "esperado '{' para iniciar o corpo da função"
+    auto body = parse_simple_body(
+        "esperado corpo após a assinatura da função"
     );
 
     const auto end = body->span.end;
@@ -343,7 +416,67 @@ ast::BlockItemPtr Parser::parse_function_declaration(
     );
 }
 
+ast::BlockItemPtr Parser::parse_protocol_declaration(const lexer::Token& keyword) {
+    const auto name = consume(lexer::TokenKind::Identifier,
+                              "esperado nome após 'protocol'");
+    if (check(lexer::TokenKind::Less)) {
+        report(current(), "protocol genérico ainda não é suportado");
+        skip_unsupported_construct();
+        return nullptr;
+    }
+    consume(lexer::TokenKind::LeftParen, "esperado '(' após o nome do protocol");
+    std::vector<std::unique_ptr<ast::VariableDeclaration>> components;
+    while (!check(lexer::TokenKind::RightParen) && !is_at_end()) {
+        const auto component_name = consume(lexer::TokenKind::Identifier,
+                                             "esperado nome do componente");
+        consume(lexer::TokenKind::Colon, "esperado ':' após o componente");
+        auto type = parse_type();
+        ast::ExpressionPtr initializer;
+        if (match(lexer::TokenKind::Equal)) initializer = parse_expression();
+        const auto end = initializer ? initializer->span.end : type->span.end;
+        components.push_back(std::make_unique<ast::VariableDeclaration>(
+            ast::Mutability::immutable, component_name.lexeme, std::move(type),
+            std::move(initializer), span_from(component_name.span.begin, end)));
+        if (!match(lexer::TokenKind::Comma)) break;
+    }
+    const auto closing = consume(lexer::TokenKind::RightParen,
+                                  "esperado ')' após componentes do protocol");
+    if (check(lexer::TokenKind::Colon) || check(lexer::TokenKind::KwType)) {
+        report(current(), "conformidade e constraints de protocol ainda não são suportadas");
+        skip_unsupported_construct();
+        return nullptr;
+    }
+    source::SourceLocation end = closing.span.end;
+    if (match(lexer::TokenKind::LeftBrace)) {
+        if (!check(lexer::TokenKind::RightBrace)) {
+            report(current(), "membros no corpo de protocol ainda não são suportados");
+            while (!check(lexer::TokenKind::RightBrace) && !is_at_end()) advance();
+        }
+        end = consume(lexer::TokenKind::RightBrace,
+                      "esperado '}' após o corpo do protocol").span.end;
+    } else {
+        consume_statement_terminator("declaração de protocol");
+        end = previous().span.end;
+    }
+    return std::make_unique<ast::ProtocolDeclaration>(
+        name.lexeme, std::move(components), span_from(keyword.span.begin, end));
+}
+
 ast::StatementPtr Parser::parse_statement() {
+    switch (current().kind) {
+    case lexer::TokenKind::KwFor:
+    case lexer::TokenKind::KwDo:
+    case lexer::TokenKind::KwMatch:
+    case lexer::TokenKind::KwDefer:
+    case lexer::TokenKind::KwBreak:
+    case lexer::TokenKind::KwContinue:
+    case lexer::TokenKind::KwThrow:
+    case lexer::TokenKind::KwTry:
+      report(current(), "instrução ainda não suportada pelo frontend");
+      skip_unsupported_construct();
+      return nullptr;
+    default: break;
+    }
     if (match(lexer::TokenKind::LeftBrace)) {
         return parse_block_statement(previous());
     }
@@ -380,6 +513,33 @@ std::unique_ptr<ast::BlockStatement> Parser::parse_required_block(
     return std::make_unique<ast::BlockStatement>(
         std::vector<ast::BlockItemPtr>{},
         span_from(location, location)
+    );
+}
+
+std::unique_ptr<ast::BlockStatement> Parser::parse_simple_body(
+    std::string message
+) {
+    match(lexer::TokenKind::Semicolon);
+    if (match(lexer::TokenKind::LeftBrace)) {
+        return parse_block_statement(previous());
+    }
+
+    const auto begin = current().span.begin;
+    if (is_at_end() || check(lexer::TokenKind::RightBrace)
+        || check(lexer::TokenKind::KwElse)) {
+        report(current(), std::move(message));
+        return std::make_unique<ast::BlockStatement>(
+            std::vector<ast::BlockItemPtr>{}, span_from(begin, begin)
+        );
+    }
+
+    std::vector<ast::BlockItemPtr> items;
+    auto item = parse_block_item();
+    if (item != nullptr) {
+        items.push_back(std::move(item));
+    }
+    return std::make_unique<ast::BlockStatement>(
+        std::move(items), span_from(begin, previous().span.end)
     );
 }
 
@@ -449,8 +609,8 @@ ast::StatementPtr Parser::parse_if_statement(
     const lexer::Token& keyword
 ) {
     auto condition = parse_expression();
-    auto then_branch = parse_required_block(
-        "esperado '{' após a condição do 'if'"
+    auto then_branch = parse_simple_body(
+        "esperado corpo após a condição do 'if'"
     );
 
     ast::StatementPtr else_branch;
@@ -459,8 +619,8 @@ ast::StatementPtr Parser::parse_if_statement(
         if (match(lexer::TokenKind::KwIf)) {
             else_branch = parse_if_statement(previous());
         } else {
-            else_branch = parse_required_block(
-                "esperado '{' ou 'if' após 'else'"
+            else_branch = parse_simple_body(
+                "esperado corpo ou 'if' após 'else'"
             );
         }
     }
@@ -481,8 +641,8 @@ ast::StatementPtr Parser::parse_while_statement(
     const lexer::Token& keyword
 ) {
     auto condition = parse_expression();
-    auto body = parse_required_block(
-        "esperado '{' para iniciar o corpo do 'while'"
+    auto body = parse_simple_body(
+        "esperado corpo após a condição do 'while'"
     );
 
     const auto end = body->span.end;
@@ -522,16 +682,20 @@ ast::StatementPtr Parser::parse_expression_statement() {
 }
 
 ast::TypeSyntaxPtr Parser::parse_type() {
-    const lexer::Token name = consume(
-        lexer::TokenKind::Identifier,
-        "esperado nome de tipo"
-    );
+    lexer::Token name = synthetic_token(lexer::TokenKind::Identifier);
+    if (is_type_token(current().kind)) {
+        name = current().kind == lexer::TokenKind::EscapedIdentifier
+                   ? consume(lexer::TokenKind::Identifier, "esperado nome de tipo")
+                   : advance();
+    }
+    else report(current(), "esperado nome de tipo");
 
     std::size_t nullable_depth = 0;
     source::SourceLocation end = name.span.end;
 
-    while (match(lexer::TokenKind::Question)) {
-        ++nullable_depth;
+    while (check(lexer::TokenKind::Question) || check(lexer::TokenKind::NullCoalescing)) {
+        nullable_depth += check(lexer::TokenKind::NullCoalescing) ? 2 : 1;
+        advance();
         end = previous().span.end;
     }
 
@@ -645,10 +809,11 @@ ast::ExpressionPtr Parser::parse_prefix_expression() {
 }
 
 ast::ExpressionPtr Parser::parse_primary_expression() {
-    if (match(lexer::TokenKind::Identifier)) {
+    if (match({lexer::TokenKind::Identifier, lexer::TokenKind::EscapedIdentifier})) {
         const lexer::Token token = previous();
         return std::make_unique<ast::IdentifierExpression>(
-            token.lexeme,
+            token.kind == lexer::TokenKind::EscapedIdentifier
+                ? token.lexeme.substr(1, token.lexeme.size() - 2) : token.lexeme,
             token.span
         );
     }
@@ -661,7 +826,17 @@ ast::ExpressionPtr Parser::parse_primary_expression() {
         );
     }
 
-    if (match(lexer::TokenKind::StringLiteral)) {
+    if (match(lexer::TokenKind::FloatLiteral)) {
+        const lexer::Token token = previous();
+        return std::make_unique<ast::FloatLiteralExpression>(token.lexeme, token.span);
+    }
+
+    if (match(lexer::TokenKind::CharacterLiteral)) {
+        const lexer::Token token = previous();
+        return std::make_unique<ast::CharacterLiteralExpression>(token.lexeme, token.span);
+    }
+
+    if (match({lexer::TokenKind::StringLiteral, lexer::TokenKind::MultilineStringLiteral})) {
         const lexer::Token token = previous();
         return std::make_unique<ast::StringLiteralExpression>(
             token.lexeme,
@@ -720,9 +895,22 @@ ast::ExpressionPtr Parser::parse_primary_expression() {
 
 ast::ExpressionPtr Parser::finish_call(ast::ExpressionPtr callee) {
     std::vector<ast::ExpressionPtr> arguments;
+    std::vector<std::string> labels;
+    bool saw_named = false;
 
     if (!check(lexer::TokenKind::RightParen)) {
         while (!is_at_end()) {
+            std::string label;
+            if ((check(lexer::TokenKind::Identifier) ||
+                 check(lexer::TokenKind::EscapedIdentifier)) &&
+                peek(1).kind == lexer::TokenKind::Colon) {
+                label = consume(lexer::TokenKind::Identifier, "esperado rótulo").lexeme;
+                advance();
+                saw_named = true;
+            } else if (saw_named) {
+                report(current(), "argumentos posicionais devem preceder argumentos nomeados");
+            }
+            labels.push_back(std::move(label));
             arguments.push_back(parse_expression());
 
             if (!match(lexer::TokenKind::Comma)) {
@@ -745,11 +933,13 @@ ast::ExpressionPtr Parser::finish_call(ast::ExpressionPtr callee) {
         right_parenthesis.span.end
     );
 
-    return std::make_unique<ast::CallExpression>(
+    auto call = std::make_unique<ast::CallExpression>(
         std::move(callee),
         std::move(arguments),
         span
     );
+    call->argument_labels = std::move(labels);
+    return call;
 }
 
 ast::ExpressionPtr Parser::finish_member_access(
@@ -792,6 +982,11 @@ std::optional<Parser::BindingPower> Parser::infix_binding_power(
 ) noexcept {
     switch (kind) {
         case lexer::TokenKind::Equal:
+        case lexer::TokenKind::PlusEqual:
+        case lexer::TokenKind::MinusEqual:
+        case lexer::TokenKind::StarEqual:
+        case lexer::TokenKind::SlashEqual:
+        case lexer::TokenKind::PercentEqual:
         case lexer::TokenKind::SafeAssign:
         case lexer::TokenKind::NullCoalescingAssign:
             return BindingPower{
@@ -916,6 +1111,11 @@ ast::AssignmentOperator Parser::assignment_operator(
     switch (kind) {
         case lexer::TokenKind::Equal:
             return ast::AssignmentOperator::assign;
+        case lexer::TokenKind::PlusEqual: return ast::AssignmentOperator::add_assign;
+        case lexer::TokenKind::MinusEqual: return ast::AssignmentOperator::subtract_assign;
+        case lexer::TokenKind::StarEqual: return ast::AssignmentOperator::multiply_assign;
+        case lexer::TokenKind::SlashEqual: return ast::AssignmentOperator::divide_assign;
+        case lexer::TokenKind::PercentEqual: return ast::AssignmentOperator::modulo_assign;
         case lexer::TokenKind::SafeAssign:
             return ast::AssignmentOperator::conditional_assign;
         case lexer::TokenKind::NullCoalescingAssign:
@@ -930,12 +1130,10 @@ ast::PostfixOperator Parser::postfix_operator(
     lexer::TokenKind kind
 ) noexcept {
     switch (kind) {
-        case lexer::TokenKind::Question:
-            return ast::PostfixOperator::propagate;
-        case lexer::TokenKind::Bang:
-            return ast::PostfixOperator::checked_unwrap;
         case lexer::TokenKind::ForceUnwrap:
             return ast::PostfixOperator::force_unwrap;
+        case lexer::TokenKind::PlusPlus: return ast::PostfixOperator::increment;
+        case lexer::TokenKind::MinusMinus: return ast::PostfixOperator::decrement;
         default:
             assert(false && "token não representa operador postfix");
             return ast::PostfixOperator::propagate;

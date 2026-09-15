@@ -1,0 +1,5 @@
+// Resultado esperado: 9
+func main() -> Int {
+    let value: Int? = null
+    return value ?? 9
+}

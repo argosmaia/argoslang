@@ -20,7 +20,13 @@ compile_commands.json
 .vscode/
 .idea/
 
-# Exclude docs, examples, tests from repo
-/docs/
-/examples/
-/tests/
+# Exclude other docs and examples from repo
+/docs/*
+!/docs/architecture.md
+!/docs/grammar-spec.md
+!/docs/teachings/
+!/docs/teachings/*.md
+/examples/*
+!/examples/frontend_core.argos
+!/examples/null_safety.argos
+!/examples/minimal_*.argos

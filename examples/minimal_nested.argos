@@ -1,0 +1,8 @@
+// Resultado esperado: 11
+func main() -> Int {
+    var count: Int = 0
+    while count < 3 {
+        if count == 1 count = count + 2 else count = count + 1
+    }
+    if count == 3 return 11 else return 22
+}

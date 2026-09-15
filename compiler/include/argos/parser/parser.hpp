@@ -49,11 +49,11 @@ private:
     );
 
     void synchronize();
+    void skip_unsupported_construct();
 
     void consume_statement_terminator(std::string context);
 
     [[nodiscard]] bool has_line_break_before_current() const noexcept;
-    [[nodiscard]] bool can_finish_statement() const noexcept;
 
     ast::BlockItemPtr parse_block_item();
     ast::BlockItemPtr parse_variable_declaration(
@@ -62,9 +62,13 @@ private:
     ast::BlockItemPtr parse_function_declaration(
         const lexer::Token& keyword
     );
+    ast::BlockItemPtr parse_protocol_declaration(const lexer::Token& keyword);
 
     ast::StatementPtr parse_statement();
     std::unique_ptr<ast::BlockStatement> parse_required_block(
+        std::string message
+    );
+    std::unique_ptr<ast::BlockStatement> parse_simple_body(
         std::string message
     );
     std::unique_ptr<ast::BlockStatement> parse_block_statement(

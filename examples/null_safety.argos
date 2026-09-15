@@ -1,0 +1,17 @@
+protocol Profile(name: String);
+protocol User(profile: Profile?);
+
+func loadUser() -> User? {
+    return null;
+}
+
+func displayName(user: User?) -> String {
+    let name: String = user?.profile?.name ?? "Anonymous";
+    return name;
+}
+
+var cachedUser: User? = null;
+cachedUser ??= loadUser();
+
+var preferredName: String = "Unknown";
+preferredName ?= cachedUser?.profile?.name;

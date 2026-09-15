@@ -17,6 +17,7 @@ namespace argos::ast {
         
         variable_declaration,
         function_declaration,
+        protocol_declaration,
 
         block_statement,
         expression_statement,
@@ -28,6 +29,8 @@ namespace argos::ast {
         binary_expression,
         unary_expression,
         integer_literal_expression,
+        float_literal_expression,
+        character_literal_expression,
         string_literal_expression,
         boolean_literal_expression,
         null_literal_expression,
@@ -162,6 +165,7 @@ namespace argos::ast {
 
     struct Parameter final : Node {
         std::string name;
+        std::string external_label;
         TypeSyntaxPtr type;
 
         Parameter(
@@ -171,6 +175,7 @@ namespace argos::ast {
         )
             : Node(NodeKind::parameter, std::move(span_value)),
                 name(std::move(name_value)),
+                external_label(name),
                 type(std::move(type_value)) {
         }
     };
@@ -241,6 +246,17 @@ namespace argos::ast {
                 return_type(std::move(return_type_value)),
                 body(std::move(body_value)) {
         }
+    };
+
+    struct ProtocolDeclaration final : Declaration {
+        std::string name;
+        std::vector<std::unique_ptr<VariableDeclaration>> components;
+
+        ProtocolDeclaration(std::string name_value,
+                            std::vector<std::unique_ptr<VariableDeclaration>> components_value,
+                            source::SourceSpan span_value)
+            : Declaration(NodeKind::protocol_declaration, std::move(span_value)),
+              name(std::move(name_value)), components(std::move(components_value)) {}
     };
 
     struct ExpressionStatement final : Statement {
@@ -343,6 +359,20 @@ namespace argos::ast {
             ),
             spelling(std::move(spelling_value)) {
         }
+    };
+
+    struct FloatLiteralExpression final : Expression {
+        std::string spelling;
+        FloatLiteralExpression(std::string value, source::SourceSpan span_value)
+            : Expression(NodeKind::float_literal_expression, std::move(span_value)),
+              spelling(std::move(value)) {}
+    };
+
+    struct CharacterLiteralExpression final : Expression {
+        std::string spelling;
+        CharacterLiteralExpression(std::string value, source::SourceSpan span_value)
+            : Expression(NodeKind::character_literal_expression, std::move(span_value)),
+              spelling(std::move(value)) {}
     };
 
     struct StringLiteralExpression final : Expression {
@@ -477,6 +507,7 @@ namespace argos::ast {
     struct CallExpression final : Expression {
         ExpressionPtr callee;
         std::vector<ExpressionPtr> arguments;
+        std::vector<std::string> argument_labels;
 
         CallExpression(
             ExpressionPtr callee_value,
@@ -486,6 +517,7 @@ namespace argos::ast {
             : Expression(NodeKind::call_expression, std::move(span_value)),
             callee(std::move(callee_value)),
             arguments(std::move(arguments_value)) {
+            argument_labels.resize(arguments.size());
         }
     };
 

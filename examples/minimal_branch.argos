@@ -1,0 +1,5 @@
+// Resultado esperado: 7
+func main() -> Int {
+    let enabled: Bool = true
+    if enabled return 7 else return 0
+}
