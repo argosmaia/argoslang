@@ -1,5 +1,5 @@
 // Resultado esperado: 14
-func main() -> Int {
-    let base: Int = 3
+func main() -> int {
+    var base: int = 3
     return base * 4 + 2
 }

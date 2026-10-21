@@ -125,10 +125,24 @@ compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.s: 
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.s"
 	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/dgti/Projetos/argoslang/compiler/src/diagnostics/diagnostic_engine.cpp -o CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.s
 
+compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o: compiler/CMakeFiles/argos_frontend.dir/flags.make
+compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o: /home/dgti/Projetos/argoslang/compiler/src/diagnostics/diagnostic_printer.cpp
+compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o: compiler/CMakeFiles/argos_frontend.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o"
+	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o -MF CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o.d -o CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o -c /home/dgti/Projetos/argoslang/compiler/src/diagnostics/diagnostic_printer.cpp
+
+compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.i"
+	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/dgti/Projetos/argoslang/compiler/src/diagnostics/diagnostic_printer.cpp > CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.i
+
+compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.s"
+	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/dgti/Projetos/argoslang/compiler/src/diagnostics/diagnostic_printer.cpp -o CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.s
+
 compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o: compiler/CMakeFiles/argos_frontend.dir/flags.make
 compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o: /home/dgti/Projetos/argoslang/compiler/src/lexer/lexer.cpp
 compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o: compiler/CMakeFiles/argos_frontend.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o"
 	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o -MF CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o.d -o CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o -c /home/dgti/Projetos/argoslang/compiler/src/lexer/lexer.cpp
 
 compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.i: cmake_force
@@ -142,7 +156,7 @@ compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.s: cmake_force
 compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o: compiler/CMakeFiles/argos_frontend.dir/flags.make
 compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o: /home/dgti/Projetos/argoslang/compiler/src/lexer/token_kind.cpp
 compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o: compiler/CMakeFiles/argos_frontend.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o"
 	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o -MF CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o.d -o CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o -c /home/dgti/Projetos/argoslang/compiler/src/lexer/token_kind.cpp
 
 compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.i: cmake_force
@@ -156,7 +170,7 @@ compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.s: cmake_force
 compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o: compiler/CMakeFiles/argos_frontend.dir/flags.make
 compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o: /home/dgti/Projetos/argoslang/compiler/src/parser/parser.cpp
 compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o: compiler/CMakeFiles/argos_frontend.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o"
 	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o -MF CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o.d -o CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o -c /home/dgti/Projetos/argoslang/compiler/src/parser/parser.cpp
 
 compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.i: cmake_force
@@ -170,7 +184,7 @@ compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.s: cmake_force
 compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o: compiler/CMakeFiles/argos_frontend.dir/flags.make
 compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o: /home/dgti/Projetos/argoslang/compiler/src/semantics/semantic_analyzer.cpp
 compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o: compiler/CMakeFiles/argos_frontend.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building CXX object compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o"
 	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o -MF CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o.d -o CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o -c /home/dgti/Projetos/argoslang/compiler/src/semantics/semantic_analyzer.cpp
 
 compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.i: cmake_force
@@ -184,7 +198,7 @@ compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.s: cm
 compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o: compiler/CMakeFiles/argos_frontend.dir/flags.make
 compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o: /home/dgti/Projetos/argoslang/compiler/src/source/source_manager.cpp
 compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o: compiler/CMakeFiles/argos_frontend.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building CXX object compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Building CXX object compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o"
 	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o -MF CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o.d -o CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o -c /home/dgti/Projetos/argoslang/compiler/src/source/source_manager.cpp
 
 compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.i: cmake_force
@@ -195,17 +209,33 @@ compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.s: cmake_fo
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.s"
 	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/dgti/Projetos/argoslang/compiler/src/source/source_manager.cpp -o CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.s
 
+compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o: compiler/CMakeFiles/argos_frontend.dir/flags.make
+compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o: /home/dgti/Projetos/argoslang/compiler/src/vm/vm.cpp
+compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o: compiler/CMakeFiles/argos_frontend.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Building CXX object compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o"
+	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o -MF CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o.d -o CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o -c /home/dgti/Projetos/argoslang/compiler/src/vm/vm.cpp
+
+compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.i"
+	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/dgti/Projetos/argoslang/compiler/src/vm/vm.cpp > CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.i
+
+compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.s"
+	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/dgti/Projetos/argoslang/compiler/src/vm/vm.cpp -o CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.s
+
 # Object files for target argos_frontend
 argos_frontend_OBJECTS = \
 "CMakeFiles/argos_frontend.dir/src/ast/ast_printer.cpp.o" \
 "CMakeFiles/argos_frontend.dir/src/codegen/ir/ir_generator.cpp.o" \
 "CMakeFiles/argos_frontend.dir/src/codegen/ir/executable_ir_generator.cpp.o" \
 "CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.o" \
+"CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o" \
 "CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o" \
 "CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o" \
 "CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o" \
 "CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o" \
-"CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o"
+"CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o" \
+"CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o"
 
 # External object files for target argos_frontend
 argos_frontend_EXTERNAL_OBJECTS =
@@ -214,14 +244,16 @@ compiler/libargos_frontend.a: compiler/CMakeFiles/argos_frontend.dir/src/ast/ast
 compiler/libargos_frontend.a: compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/ir_generator.cpp.o
 compiler/libargos_frontend.a: compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/executable_ir_generator.cpp.o
 compiler/libargos_frontend.a: compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.o
+compiler/libargos_frontend.a: compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o
 compiler/libargos_frontend.a: compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o
 compiler/libargos_frontend.a: compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o
 compiler/libargos_frontend.a: compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o
 compiler/libargos_frontend.a: compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o
 compiler/libargos_frontend.a: compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o
+compiler/libargos_frontend.a: compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o
 compiler/libargos_frontend.a: compiler/CMakeFiles/argos_frontend.dir/build.make
 compiler/libargos_frontend.a: compiler/CMakeFiles/argos_frontend.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Linking CXX static library libargos_frontend.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Linking CXX static library libargos_frontend.a"
 	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && $(CMAKE_COMMAND) -P CMakeFiles/argos_frontend.dir/cmake_clean_target.cmake
 	cd /home/dgti/Projetos/argoslang/build-no-tests/compiler && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/argos_frontend.dir/link.txt --verbose=$(VERBOSE)
 

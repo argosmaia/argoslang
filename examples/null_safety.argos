@@ -1,17 +1,17 @@
-protocol Profile(name: String);
+protocol Profile(name: string);
 protocol User(profile: Profile?);
 
 func loadUser() -> User? {
-    return null;
+    return nil;
 }
 
-func displayName(user: User?) -> String {
-    let name: String = user?.profile?.name ?? "Anonymous";
+func displayName(user: User?) -> string {
+    var name: string = user?.profile?.name ?? "Anonymous";
     return name;
 }
 
-var cachedUser: User? = null;
+var mut cachedUser: User? = nil;
 cachedUser ??= loadUser();
 
-var preferredName: String = "Unknown";
+var mut preferredName: string = "Unknown";
 preferredName ?= cachedUser?.profile?.name;

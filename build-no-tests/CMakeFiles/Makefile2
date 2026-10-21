@@ -98,12 +98,12 @@ compiler/clean: compiler/CMakeFiles/argosc.dir/clean
 compiler/CMakeFiles/argos_frontend.dir/all:
 	$(MAKE) $(MAKESILENT) -f compiler/CMakeFiles/argos_frontend.dir/build.make compiler/CMakeFiles/argos_frontend.dir/depend
 	$(MAKE) $(MAKESILENT) -f compiler/CMakeFiles/argos_frontend.dir/build.make compiler/CMakeFiles/argos_frontend.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10 "Built target argos_frontend"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=1,2,3,4,5,6,7,8,9,10,11,12 "Built target argos_frontend"
 .PHONY : compiler/CMakeFiles/argos_frontend.dir/all
 
 # Build rule for subdir invocation for target.
 compiler/CMakeFiles/argos_frontend.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles 10
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles 12
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 compiler/CMakeFiles/argos_frontend.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles 0
 .PHONY : compiler/CMakeFiles/argos_frontend.dir/rule
@@ -124,12 +124,12 @@ compiler/CMakeFiles/argos_frontend.dir/clean:
 compiler/CMakeFiles/argosc.dir/all: compiler/CMakeFiles/argos_frontend.dir/all
 	$(MAKE) $(MAKESILENT) -f compiler/CMakeFiles/argosc.dir/build.make compiler/CMakeFiles/argosc.dir/depend
 	$(MAKE) $(MAKESILENT) -f compiler/CMakeFiles/argosc.dir/build.make compiler/CMakeFiles/argosc.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=11,12,13,14 "Built target argosc"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles --progress-num=13,14,15,16 "Built target argosc"
 .PHONY : compiler/CMakeFiles/argosc.dir/all
 
 # Build rule for subdir invocation for target.
 compiler/CMakeFiles/argosc.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles 14
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles 16
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 compiler/CMakeFiles/argosc.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/dgti/Projetos/argoslang/build-no-tests/CMakeFiles 0
 .PHONY : compiler/CMakeFiles/argosc.dir/rule

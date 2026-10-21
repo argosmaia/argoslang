@@ -5,14 +5,18 @@
 #include "argos/lexer/lexer.hpp"
 #include "argos/lexer/token_kind.hpp"
 #include "argos/parser/parser.hpp"
+#include "argos/repl/repl_session.hpp"
 #include "argos/semantics/semantic_analyzer.hpp"
 #include "argos/source/source_manager.hpp"
+#include "argos/vm/vm.hpp"
 
 #include <filesystem>
+#include <exception>
 #include <iomanip>
 #include <iostream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -24,17 +28,19 @@ void print_usage(std::string_view executable) {
         << "  " << executable << " parse <arquivo.argos>  - Realiza o parsing gramatical da sintaxe (AST)\n"
         << "  " << executable << " ast <arquivo.argos>    - Imprime a Árvore de Sintaxe Abstrata (AST) formatada\n"
         << "  " << executable << " check <arquivo.argos>  - Executa a análise semântica (verificação de tipos e escopos)\n"
+        << "  " << executable << " run <arquivo.argos>    - Executa pela VM o subconjunto suportado\n"
+        << "  " << executable << " repl                 - Abre o interpretador interativo\n"
         << "  " << executable << " <arquivo.argos> [-o executável] - Compila no host x86-64/Linux\n"
         << "  " << executable << " compile <arquivo.argos> [-o executável] - Mesmo comando explícito\n";
 }
 
 void print_diagnostics(
-    const std::filesystem::path& path,
+    const argos::source::SourceFile& source_file,
     const argos::diagnostics::DiagnosticEngine& diagnostics
 ) {
     for (const auto& diagnostic : diagnostics.diagnostics()) {
         std::cerr
-            << path.string()
+            << source_file.path.string()
             << ':'
             << diagnostic.span.begin.line
             << ':'
@@ -44,7 +50,49 @@ void print_diagnostics(
             << "]: "
             << diagnostic.message
             << '\n';
+        std::size_t line_begin = 0;
+        for (std::size_t line = 1; line < diagnostic.span.begin.line && line_begin < source_file.content.size(); ++line) {
+            const auto newline = source_file.content.find('\n', line_begin);
+            line_begin = newline == std::string::npos ? source_file.content.size() : newline + 1;
+        }
+        const auto line_end = source_file.content.find('\n', line_begin);
+        std::cerr << "  " << source_file.content.substr(line_begin, line_end - line_begin) << '\n'
+                  << "  " << std::string(diagnostic.span.begin.column > 0 ? diagnostic.span.begin.column - 1 : 0, ' ') << "^\n";
+        if (!diagnostic.help.empty()) std::cerr << "  ajuda: " << diagnostic.help << '\n';
     }
+}
+
+int run_repl() {
+    std::cout << "ArgosLang REPL. Use :help ou :quit.\n";
+    std::string line;
+    argos::repl::ReplSession session;
+    while (std::cout << ">>> " && std::getline(std::cin, line)) {
+        if (line == ":quit" || line == ":q") return 0;
+        if (line == ":reset") {
+            session.reset();
+            std::cout << "Sessão reiniciada.\n";
+            continue;
+        }
+        if (line == ":help") {
+            std::cout << "Digite uma expressão, instrução ou função, por exemplo:\n"
+                      << "  6 * 7\n"
+                      << "  print(\"Oi\")\n"
+                      << "  var total: int = 10\n"
+                      << "  if true { print(\"ok\") }\n"
+                      << "  function twice(_ value: int) -> int { return value * 2 }\n"
+                      << "Use :reset para limpar a sessão.\n";
+            continue;
+        }
+        if (line.empty()) continue;
+        argos::source::SourceFile source_file{
+            .path = "<repl>",
+            .content = {},
+        };
+        argos::diagnostics::DiagnosticEngine diagnostics;
+        (void)session.execute(line, std::cout, source_file, diagnostics);
+        print_diagnostics(source_file, diagnostics);
+    }
+    return 0;
 }
 
 } // namespace
@@ -56,6 +104,13 @@ int main(int argc, char** argv) {
     }
 
     std::string_view command = argv[1];
+    if (command == "repl") {
+        if (argc != 2) {
+            print_usage(argv[0]);
+            return 64;
+        }
+        return run_repl();
+    }
     std::filesystem::path source_path;
     std::filesystem::path output_path;
     if (command == "compile") {
@@ -72,7 +127,7 @@ int main(int argc, char** argv) {
             output_path = argv[4];
         }
     } else if (command == "lex" || command == "parse" ||
-               command == "ast" || command == "check") {
+               command == "ast" || command == "check" || command == "run") {
         if (argc != 3) {
             print_usage(argv[0]);
             return 64;
@@ -85,7 +140,7 @@ int main(int argc, char** argv) {
     }
 
     if (command != "lex" && command != "parse" && command != "ast" &&
-        command != "check" && command != "compile") {
+        command != "check" && command != "run" && command != "compile") {
         std::cerr << "comando desconhecido: " << command << '\n';
         print_usage(argv[0]);
         return 64;
@@ -139,7 +194,7 @@ int main(int argc, char** argv) {
                 << token.span.begin.column
                 << '\n';
         }
-        print_diagnostics(source_path, diagnostics);
+        print_diagnostics(*source_file, diagnostics);
         return diagnostics.has_errors() ? 65 : 0;
     }
 
@@ -147,7 +202,7 @@ int main(int argc, char** argv) {
     const auto program = parser.parse_program();
 
     if (diagnostics.has_errors()) {
-        print_diagnostics(source_path, diagnostics);
+        print_diagnostics(*source_file, diagnostics);
         return 65;
     }
 
@@ -160,7 +215,7 @@ int main(int argc, char** argv) {
     } else if (command == "ast") {
         argos::ast::AstPrinter printer;
         std::cout << printer.print(program);
-    } else if (command == "check" || command == "compile") {
+    } else if (command == "check" || command == "run" || command == "compile") {
         argos::semantics::SemanticAnalyzer analyzer{diagnostics};
         const bool success = analyzer.analyze(program);
 
@@ -182,8 +237,23 @@ int main(int argc, char** argv) {
                 std::cout << "Executável gerado: " << output_path.string() << '\n';
             }
         }
+        if (command == "run" && success && !diagnostics.has_errors()) {
+            argos::codegen::ir::ExecutableIrGenerator generator{diagnostics};
+            const auto module = generator.generate(program);
+            if (!diagnostics.has_errors()) {
+                try {
+                    argos::vm::VM vm;
+                    vm.load(module);
+                    const auto result = vm.run();
+                    std::cout << "Resultado da VM: " << result << '\n';
+                } catch (const std::exception& error) {
+                    std::cerr << "argosc: erro de execução da VM: " << error.what() << '\n';
+                    return 70;
+                }
+            }
+        }
     }
 
-    print_diagnostics(source_path, diagnostics);
+    print_diagnostics(*source_file, diagnostics);
     return diagnostics.has_errors() ? 65 : 0;
 }

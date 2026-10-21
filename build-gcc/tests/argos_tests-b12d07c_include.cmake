@@ -1,0 +1,5 @@
+if(EXISTS "/home/dgti/Projetos/argoslang/build-gcc/tests/argos_tests-b12d07c_tests.cmake")
+  include("/home/dgti/Projetos/argoslang/build-gcc/tests/argos_tests-b12d07c_tests.cmake")
+else()
+  add_test(argos_tests_NOT_BUILT-b12d07c argos_tests_NOT_BUILT-b12d07c)
+endif()

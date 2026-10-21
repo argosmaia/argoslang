@@ -1,5 +1,5 @@
-func choose(_ flag: Bool, fallback value: Int?) -> Int {
-    let resolved: Int = value ?? 0;
+func choose(_ flag: bool, fallback value: int?) -> int {
+    var resolved: int = value ?? 0;
     if flag {
         return resolved;
     } else {
@@ -7,4 +7,4 @@ func choose(_ flag: Bool, fallback value: Int?) -> Int {
     }
 }
 
-let result: Int = choose(true, fallback: 7);
+var result: int = choose(true, fallback: 7);

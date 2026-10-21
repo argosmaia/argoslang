@@ -196,7 +196,6 @@ void Parser::synchronize() {
         }
 
         switch (current().kind) {
-            case lexer::TokenKind::KwLet:
             case lexer::TokenKind::KwVar:
             case lexer::TokenKind::KwFunction:
             case lexer::TokenKind::KwIf:
@@ -236,7 +235,8 @@ void Parser::consume_statement_terminator(std::string context) {
     if (match(lexer::TokenKind::Semicolon)
         || check(lexer::TokenKind::RightBrace)
         || check(lexer::TokenKind::KwElse)
-        || is_at_end()) {
+        || is_at_end()
+        || has_line_break_before_current()) {
         return;
     }
     report(
@@ -254,10 +254,6 @@ bool Parser::has_line_break_before_current() const noexcept {
 }
 
 ast::BlockItemPtr Parser::parse_block_item() {
-    if (match(lexer::TokenKind::KwLet)) {
-        return parse_variable_declaration(previous());
-    }
-
     if (match(lexer::TokenKind::KwVar)) {
         return parse_variable_declaration(previous());
     }
@@ -300,13 +296,13 @@ ast::BlockItemPtr Parser::parse_block_item() {
 ast::BlockItemPtr Parser::parse_variable_declaration(
     const lexer::Token& keyword
 ) {
-    const auto mutability = keyword.kind == lexer::TokenKind::KwVar
+    const auto mutability = match(lexer::TokenKind::KwMut)
         ? ast::Mutability::mutable_
         : ast::Mutability::immutable;
 
     const lexer::Token name = consume(
         lexer::TokenKind::Identifier,
-        "esperado nome após 'let' ou 'var'"
+        "esperado nome após 'var' ou 'var mut'"
     );
 
     ast::TypeSyntaxPtr type;
@@ -336,7 +332,7 @@ ast::BlockItemPtr Parser::parse_function_declaration(
 ) {
     const lexer::Token name = consume(
         lexer::TokenKind::Identifier,
-        "esperado nome após 'func'"
+        "esperado nome após 'function'"
     );
 
     consume(
@@ -468,8 +464,6 @@ ast::StatementPtr Parser::parse_statement() {
     case lexer::TokenKind::KwDo:
     case lexer::TokenKind::KwMatch:
     case lexer::TokenKind::KwDefer:
-    case lexer::TokenKind::KwBreak:
-    case lexer::TokenKind::KwContinue:
     case lexer::TokenKind::KwThrow:
     case lexer::TokenKind::KwTry:
       report(current(), "instrução ainda não suportada pelo frontend");
@@ -493,11 +487,25 @@ ast::StatementPtr Parser::parse_statement() {
         return parse_while_statement(previous());
     }
 
+    if (match(lexer::TokenKind::KwBreak)) {
+        return parse_break_statement(previous());
+    }
+    if (match(lexer::TokenKind::KwContinue)) return parse_continue_statement(previous());
+
     if (match(lexer::TokenKind::KwUnsafe)) {
         return parse_unsafe_statement(previous());
     }
 
     return parse_expression_statement();
+}
+
+ast::StatementPtr Parser::parse_break_statement(const lexer::Token& keyword) {
+    consume_statement_terminator("'break'");
+    return std::make_unique<ast::BreakStatement>(keyword.span);
+}
+ast::StatementPtr Parser::parse_continue_statement(const lexer::Token& keyword) {
+    consume_statement_terminator("'continue'");
+    return std::make_unique<ast::ContinueStatement>(keyword.span);
 }
 
 std::unique_ptr<ast::BlockStatement> Parser::parse_required_block(

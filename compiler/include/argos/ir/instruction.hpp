@@ -2,6 +2,7 @@
 #include "argos/ir/value.hpp"
 #include <cstdint>
 #include <string>
+#include <vector>
 namespace argos::ir {
 enum class Opcode {
   nop,
@@ -24,6 +25,10 @@ enum class Opcode {
   jmp,
   jmp_if_false,
   call,
+  print_int,
+  print_bool,
+  print_string,
+  print_newline,
   ret,
   unwrap_check,
   c_embed
@@ -36,6 +41,7 @@ struct Instruction {
   FunctionId function{};
   LabelId label{};
   std::uint32_t count{};
+  std::vector<Register> arguments;
   std::string embedded_code;
 };
 const char *opcode_name(Opcode) noexcept;

@@ -15,6 +15,7 @@ struct Diagnostic final {
     Severity severity{Severity::error};
     std::string code;
     std::string message;
+    std::string help;
     source::SourceSpan span{};
 };
 

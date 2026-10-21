@@ -14,7 +14,8 @@ public:
     void error(
         std::string code,
         std::string message,
-        source::SourceSpan span
+        source::SourceSpan span,
+        std::string help = {}
     );
 
     [[nodiscard]]

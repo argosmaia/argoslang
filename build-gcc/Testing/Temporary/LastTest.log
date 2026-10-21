@@ -1,0 +1,1209 @@
+Start testing: Oct 21 12:49 -03
+----------------------------------------------------------
+1/66 Testing: rejects malformed UTF-8 identifiers
+1/66 Test: rejects malformed UTF-8 identifiers
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "rejects malformed UTF-8 identifiers"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"rejects malformed UTF-8 identifiers" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "rejects malformed UTF-8 identifiers"
+Randomness seeded to: 1103035547
+===============================================================================
+All tests passed (2 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"rejects malformed UTF-8 identifiers" end time: Oct 21 12:49 -03
+"rejects malformed UTF-8 identifiers" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/66 Testing: uses normative coalescing precedence
+2/66 Test: uses normative coalescing precedence
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "uses normative coalescing precedence"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"uses normative coalescing precedence" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "uses normative coalescing precedence"
+Randomness seeded to: 769836614
+===============================================================================
+All tests passed (6 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"uses normative coalescing precedence" end time: Oct 21 12:49 -03
+"uses normative coalescing precedence" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/66 Testing: uses maximal munch for nullable operators
+3/66 Test: uses maximal munch for nullable operators
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "uses maximal munch for nullable operators"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"uses maximal munch for nullable operators" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "uses maximal munch for nullable operators"
+Randomness seeded to: 2619118907
+===============================================================================
+All tests passed (2 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"uses maximal munch for nullable operators" end time: Oct 21 12:49 -03
+"uses maximal munch for nullable operators" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/66 Testing: parses function declaration with return type and body
+4/66 Test: parses function declaration with return type and body
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "parses function declaration with return type and body"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"parses function declaration with return type and body" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "parses function declaration with return type and body"
+Randomness seeded to: 4047033088
+===============================================================================
+All tests passed (11 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"parses function declaration with return type and body" end time: Oct 21 12:49 -03
+"parses function declaration with return type and body" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/66 Testing: rejects nominal member access until nominal types exist
+5/66 Test: rejects nominal member access until nominal types exist
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "rejects nominal member access until nominal types exist"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"rejects nominal member access until nominal types exist" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "rejects nominal member access until nominal types exist"
+Randomness seeded to: 2303013973
+===============================================================================
+All tests passed (1 assertion in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"rejects nominal member access until nominal types exist" end time: Oct 21 12:49 -03
+"rejects nominal member access until nominal types exist" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/66 Testing: merges initialization across branches and loops
+6/66 Test: merges initialization across branches and loops
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "merges initialization across branches and loops"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"merges initialization across branches and loops" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "merges initialization across branches and loops"
+Randomness seeded to: 1766194596
+===============================================================================
+All tests passed (3 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"merges initialization across branches and loops" end time: Oct 21 12:49 -03
+"merges initialization across branches and loops" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/66 Testing: inserts terminators only at eligible newlines
+7/66 Test: inserts terminators only at eligible newlines
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "inserts terminators only at eligible newlines"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"inserts terminators only at eligible newlines" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "inserts terminators only at eligible newlines"
+Randomness seeded to: 2262154041
+===============================================================================
+All tests passed (2 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"inserts terminators only at eligible newlines" end time: Oct 21 12:49 -03
+"inserts terminators only at eligible newlines" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/66 Testing: retains resolved symbol bindings for later phases
+8/66 Test: retains resolved symbol bindings for later phases
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "retains resolved symbol bindings for later phases"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"retains resolved symbol bindings for later phases" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "retains resolved symbol bindings for later phases"
+Randomness seeded to: 2091376335
+===============================================================================
+All tests passed (6 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"retains resolved symbol bindings for later phases" end time: Oct 21 12:49 -03
+"retains resolved symbol bindings for later phases" time elapsed: 00:00:00
+----------------------------------------------------------
+
+9/66 Testing: tracks initialization and one assignment to let
+9/66 Test: tracks initialization and one assignment to let
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "tracks initialization and one assignment to let"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"tracks initialization and one assignment to let" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "tracks initialization and one assignment to let"
+Randomness seeded to: 2713484732
+===============================================================================
+All tests passed (4 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"tracks initialization and one assignment to let" end time: Oct 21 12:49 -03
+"tracks initialization and one assignment to let" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/66 Testing: keeps multiline signatures and operator continuations together
+10/66 Test: keeps multiline signatures and operator continuations together
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "keeps multiline signatures and operator continuations together"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"keeps multiline signatures and operator continuations together" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "keeps multiline signatures and operator continuations together"
+Randomness seeded to: 3762250992
+===============================================================================
+All tests passed (3 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"keeps multiline signatures and operator continuations together" end time: Oct 21 12:49 -03
+"keeps multiline signatures and operator continuations together" time elapsed: 00:00:00
+----------------------------------------------------------
+
+11/66 Testing: fits integer literals contextually without widening variables
+11/66 Test: fits integer literals contextually without widening variables
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "fits integer literals contextually without widening variables"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"fits integer literals contextually without widening variables" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "fits integer literals contextually without widening variables"
+Randomness seeded to: 2166653052
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+argos_tests is a Catch2 v3.11.0 host application.
+Run with -? for options
+
+-------------------------------------------------------------------------------
+fits integer literals contextually without widening variables
+-------------------------------------------------------------------------------
+/home/dgti/Projetos/argoslang/tests/semantics/semantic_tests.cpp:48
+...............................................................................
+
+/home/dgti/Projetos/argoslang/tests/semantics/semantic_tests.cpp:49: FAILED:
+  REQUIRE( check_source("let byte: Byte = 255; let value: UInt = 4294967295;" "let sum: Byte = byte + 1;").valid )
+with expansion:
+  false
+
+===============================================================================
+test cases: 1 | 1 failed
+assertions: 1 | 1 failed
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Failed.
+"fits integer literals contextually without widening variables" end time: Oct 21 12:49 -03
+"fits integer literals contextually without widening variables" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/66 Testing: reports unterminated strings
+12/66 Test: reports unterminated strings
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "reports unterminated strings"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"reports unterminated strings" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "reports unterminated strings"
+Randomness seeded to: 889736558
+===============================================================================
+All tests passed (2 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"reports unterminated strings" end time: Oct 21 12:49 -03
+"reports unterminated strings" time elapsed: 00:00:00
+----------------------------------------------------------
+
+13/66 Testing: rejects legacy postfix bang
+13/66 Test: rejects legacy postfix bang
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "rejects legacy postfix bang"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"rejects legacy postfix bang" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "rejects legacy postfix bang"
+Randomness seeded to: 943441597
+===============================================================================
+All tests passed (1 assertion in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"rejects legacy postfix bang" end time: Oct 21 12:49 -03
+"rejects legacy postfix bang" time elapsed: 00:00:00
+----------------------------------------------------------
+
+14/66 Testing: parses while loops and unsafe blocks
+14/66 Test: parses while loops and unsafe blocks
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "parses while loops and unsafe blocks"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"parses while loops and unsafe blocks" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "parses while loops and unsafe blocks"
+Randomness seeded to: 199005503
+===============================================================================
+All tests passed (8 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"parses while loops and unsafe blocks" end time: Oct 21 12:49 -03
+"parses while loops and unsafe blocks" time elapsed: 00:00:00
+----------------------------------------------------------
+
+15/66 Testing: parses operator precedence and null-safety operators
+15/66 Test: parses operator precedence and null-safety operators
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "parses operator precedence and null-safety operators"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"parses operator precedence and null-safety operators" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "parses operator precedence and null-safety operators"
+Randomness seeded to: 1022212788
+===============================================================================
+All tests passed (7 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"parses operator precedence and null-safety operators" end time: Oct 21 12:49 -03
+"parses operator precedence and null-safety operators" time elapsed: 00:00:00
+----------------------------------------------------------
+
+16/66 Testing: parses variable declarations
+16/66 Test: parses variable declarations
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "parses variable declarations"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"parses variable declarations" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "parses variable declarations"
+Randomness seeded to: 2225759809
+===============================================================================
+All tests passed (12 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"parses variable declarations" end time: Oct 21 12:49 -03
+"parses variable declarations" time elapsed: 00:00:00
+----------------------------------------------------------
+
+17/66 Testing: rejects invalid character escapes
+17/66 Test: rejects invalid character escapes
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "rejects invalid character escapes"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"rejects invalid character escapes" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "rejects invalid character escapes"
+Randomness seeded to: 4277009402
+===============================================================================
+All tests passed (2 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"rejects invalid character escapes" end time: Oct 21 12:49 -03
+"rejects invalid character escapes" time elapsed: 00:00:00
+----------------------------------------------------------
+
+18/66 Testing: rejects unknown and uninferrable types
+18/66 Test: rejects unknown and uninferrable types
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "rejects unknown and uninferrable types"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"rejects unknown and uninferrable types" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "rejects unknown and uninferrable types"
+Randomness seeded to: 379496657
+===============================================================================
+All tests passed (3 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"rejects unknown and uninferrable types" end time: Oct 21 12:49 -03
+"rejects unknown and uninferrable types" time elapsed: 00:00:00
+----------------------------------------------------------
+
+19/66 Testing: same-line statements still require a separator
+19/66 Test: same-line statements still require a separator
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "same-line statements still require a separator"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"same-line statements still require a separator" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "same-line statements still require a separator"
+Randomness seeded to: 3756647160
+===============================================================================
+All tests passed (1 assertion in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"same-line statements still require a separator" end time: Oct 21 12:49 -03
+"same-line statements still require a separator" time elapsed: 00:00:00
+----------------------------------------------------------
+
+20/66 Testing: lexes Swift-like null-safety chain
+20/66 Test: lexes Swift-like null-safety chain
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "lexes Swift-like null-safety chain"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"lexes Swift-like null-safety chain" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "lexes Swift-like null-safety chain"
+Randomness seeded to: 2597745605
+===============================================================================
+All tests passed (2 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"lexes Swift-like null-safety chain" end time: Oct 21 12:49 -03
+"lexes Swift-like null-safety chain" time elapsed: 00:00:00
+----------------------------------------------------------
+
+21/66 Testing: treats newlines inside block comments as eligible terminators
+21/66 Test: treats newlines inside block comments as eligible terminators
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "treats newlines inside block comments as eligible terminators"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"treats newlines inside block comments as eligible terminators" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "treats newlines inside block comments as eligible terminators"
+Randomness seeded to: 237599053
+===============================================================================
+All tests passed (2 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"treats newlines inside block comments as eligible terminators" end time: Oct 21 12:49 -03
+"treats newlines inside block comments as eligible terminators" time elapsed: 00:00:00
+----------------------------------------------------------
+
+22/66 Testing: single statement bodies may omit braces
+22/66 Test: single statement bodies may omit braces
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "single statement bodies may omit braces"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"single statement bodies may omit braces" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "single statement bodies may omit braces"
+Randomness seeded to: 2877635701
+===============================================================================
+All tests passed (2 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"single statement bodies may omit braces" end time: Oct 21 12:49 -03
+"single statement bodies may omit braces" time elapsed: 00:00:00
+----------------------------------------------------------
+
+23/66 Testing: semicolon is optional before a closing brace or EOF
+23/66 Test: semicolon is optional before a closing brace or EOF
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "semicolon is optional before a closing brace or EOF"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"semicolon is optional before a closing brace or EOF" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "semicolon is optional before a closing brace or EOF"
+Randomness seeded to: 2996057877
+===============================================================================
+All tests passed (2 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"semicolon is optional before a closing brace or EOF" end time: Oct 21 12:49 -03
+"semicolon is optional before a closing brace or EOF" time elapsed: 00:00:00
+----------------------------------------------------------
+
+24/66 Testing: reserves declaration and control keywords from the grammar
+24/66 Test: reserves declaration and control keywords from the grammar
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "reserves declaration and control keywords from the grammar"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"reserves declaration and control keywords from the grammar" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "reserves declaration and control keywords from the grammar"
+Randomness seeded to: 3215921467
+===============================================================================
+All tests passed (5 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"reserves declaration and control keywords from the grammar" end time: Oct 21 12:49 -03
+"reserves declaration and control keywords from the grammar" time elapsed: 00:00:00
+----------------------------------------------------------
+
+25/66 Testing: resolves intrinsic String and inferred variables
+25/66 Test: resolves intrinsic String and inferred variables
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "resolves intrinsic String and inferred variables"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"resolves intrinsic String and inferred variables" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "resolves intrinsic String and inferred variables"
+Randomness seeded to: 3279130996
+===============================================================================
+All tests passed (2 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"resolves intrinsic String and inferred variables" end time: Oct 21 12:49 -03
+"resolves intrinsic String and inferred variables" time elapsed: 00:00:00
+----------------------------------------------------------
+
+26/66 Testing: records contextual coercions without changing source types
+26/66 Test: records contextual coercions without changing source types
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "records contextual coercions without changing source types"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"records contextual coercions without changing source types" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "records contextual coercions without changing source types"
+Randomness seeded to: 231190629
+===============================================================================
+All tests passed (9 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"records contextual coercions without changing source types" end time: Oct 21 12:49 -03
+"records contextual coercions without changing source types" time elapsed: 00:00:00
+----------------------------------------------------------
+
+27/66 Testing: checks external parameter labels
+27/66 Test: checks external parameter labels
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "checks external parameter labels"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"checks external parameter labels" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "checks external parameter labels"
+Randomness seeded to: 2265903286
+===============================================================================
+All tests passed (3 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"checks external parameter labels" end time: Oct 21 12:49 -03
+"checks external parameter labels" time elapsed: 00:00:00
+----------------------------------------------------------
+
+28/66 Testing: requires return on every reachable branch
+28/66 Test: requires return on every reachable branch
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "requires return on every reachable branch"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"requires return on every reachable branch" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "requires return on every reachable branch"
+Randomness seeded to: 3270254497
+===============================================================================
+All tests passed (3 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"requires return on every reachable branch" end time: Oct 21 12:49 -03
+"requires return on every reachable branch" time elapsed: 00:00:00
+----------------------------------------------------------
+
+29/66 Testing: preserves optional depth and rejects implicit unwrap
+29/66 Test: preserves optional depth and rejects implicit unwrap
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "preserves optional depth and rejects implicit unwrap"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"preserves optional depth and rejects implicit unwrap" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "preserves optional depth and rejects implicit unwrap"
+Randomness seeded to: 3754681978
+===============================================================================
+All tests passed (3 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"preserves optional depth and rejects implicit unwrap" end time: Oct 21 12:49 -03
+"preserves optional depth and rejects implicit unwrap" time elapsed: 00:00:00
+----------------------------------------------------------
+
+30/66 Testing: parses a non-generic data protocol
+30/66 Test: parses a non-generic data protocol
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "parses a non-generic data protocol"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"parses a non-generic data protocol" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "parses a non-generic data protocol"
+Randomness seeded to: 3290142330
+===============================================================================
+All tests passed (5 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"parses a non-generic data protocol" end time: Oct 21 12:49 -03
+"parses a non-generic data protocol" time elapsed: 00:00:00
+----------------------------------------------------------
+
+31/66 Testing: supports nested block comments
+31/66 Test: supports nested block comments
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "supports nested block comments"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"supports nested block comments" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "supports nested block comments"
+Randomness seeded to: 2032498208
+===============================================================================
+All tests passed (2 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"supports nested block comments" end time: Oct 21 12:49 -03
+"supports nested block comments" time elapsed: 00:00:00
+----------------------------------------------------------
+
+32/66 Testing: resolves protocol components and safe member chains
+32/66 Test: resolves protocol components and safe member chains
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "resolves protocol components and safe member chains"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"resolves protocol components and safe member chains" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "resolves protocol components and safe member chains"
+Randomness seeded to: 694233670
+===============================================================================
+All tests passed (3 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"resolves protocol components and safe member chains" end time: Oct 21 12:49 -03
+"resolves protocol components and safe member chains" time elapsed: 00:00:00
+----------------------------------------------------------
+
+33/66 Testing: rejects malformed UTF-8 even inside strings
+33/66 Test: rejects malformed UTF-8 even inside strings
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "rejects malformed UTF-8 even inside strings"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"rejects malformed UTF-8 even inside strings" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "rejects malformed UTF-8 even inside strings"
+Randomness seeded to: 1365277884
+===============================================================================
+All tests passed (1 assertion in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"rejects malformed UTF-8 even inside strings" end time: Oct 21 12:49 -03
+"rejects malformed UTF-8 even inside strings" time elapsed: 00:00:00
+----------------------------------------------------------
+
+34/66 Testing: reports unsupported match statements
+34/66 Test: reports unsupported match statements
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "reports unsupported match statements"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"reports unsupported match statements" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "reports unsupported match statements"
+Randomness seeded to: 3319841154
+===============================================================================
+All tests passed (2 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"reports unsupported match statements" end time: Oct 21 12:49 -03
+"reports unsupported match statements" time elapsed: 00:00:00
+----------------------------------------------------------
+
+35/66 Testing: lexes Unicode identifiers and new literal forms
+35/66 Test: lexes Unicode identifiers and new literal forms
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "lexes Unicode identifiers and new literal forms"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"lexes Unicode identifiers and new literal forms" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "lexes Unicode identifiers and new literal forms"
+Randomness seeded to: 3083984282
+===============================================================================
+All tests passed (5 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"lexes Unicode identifiers and new literal forms" end time: Oct 21 12:49 -03
+"lexes Unicode identifiers and new literal forms" time elapsed: 00:00:00
+----------------------------------------------------------
+
+36/66 Testing: checks the null-safety example with explicit nominal definitions
+36/66 Test: checks the null-safety example with explicit nominal definitions
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "checks the null-safety example with explicit nominal definitions"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"checks the null-safety example with explicit nominal definitions" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "checks the null-safety example with explicit nominal definitions"
+Randomness seeded to: 374083518
+===============================================================================
+All tests passed (1 assertion in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"checks the null-safety example with explicit nominal definitions" end time: Oct 21 12:49 -03
+"checks the null-safety example with explicit nominal definitions" time elapsed: 00:00:00
+----------------------------------------------------------
+
+37/66 Testing: accepts escaped identifiers in declarations
+37/66 Test: accepts escaped identifiers in declarations
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "accepts escaped identifiers in declarations"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"accepts escaped identifiers in declarations" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "accepts escaped identifiers in declarations"
+Randomness seeded to: 106978336
+===============================================================================
+All tests passed (3 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"accepts escaped identifiers in declarations" end time: Oct 21 12:49 -03
+"accepts escaped identifiers in declarations" time elapsed: 00:00:00
+----------------------------------------------------------
+
+38/66 Testing: reports unsupported nominal declarations
+38/66 Test: reports unsupported nominal declarations
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argos_tests" "reports unsupported nominal declarations"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"reports unsupported nominal declarations" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+Filters: "reports unsupported nominal declarations"
+Randomness seeded to: 2196246382
+===============================================================================
+All tests passed (2 assertions in 1 test case)
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"reports unsupported nominal declarations" end time: Oct 21 12:49 -03
+"reports unsupported nominal declarations" time elapsed: 00:00:00
+----------------------------------------------------------
+
+39/66 Testing: example_minimal_literal_check
+39/66 Test: example_minimal_literal_check
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "check" "/home/dgti/Projetos/argoslang/examples/minimal_literal.argos"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_literal_check" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+[ArgosLang Compiler] Análise semântica concluída com sucesso (0 erros) para: /home/dgti/Projetos/argoslang/examples/minimal_literal.argos
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_literal_check" end time: Oct 21 12:49 -03
+"example_minimal_literal_check" time elapsed: 00:00:00
+----------------------------------------------------------
+
+40/66 Testing: example_minimal_arithmetic_check
+40/66 Test: example_minimal_arithmetic_check
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "check" "/home/dgti/Projetos/argoslang/examples/minimal_arithmetic.argos"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_arithmetic_check" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+[ArgosLang Compiler] Análise semântica concluída com sucesso (0 erros) para: /home/dgti/Projetos/argoslang/examples/minimal_arithmetic.argos
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_arithmetic_check" end time: Oct 21 12:49 -03
+"example_minimal_arithmetic_check" time elapsed: 00:00:00
+----------------------------------------------------------
+
+41/66 Testing: example_minimal_branch_check
+41/66 Test: example_minimal_branch_check
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "check" "/home/dgti/Projetos/argoslang/examples/minimal_branch.argos"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_branch_check" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+[ArgosLang Compiler] Análise semântica concluída com sucesso (0 erros) para: /home/dgti/Projetos/argoslang/examples/minimal_branch.argos
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_branch_check" end time: Oct 21 12:49 -03
+"example_minimal_branch_check" time elapsed: 00:00:00
+----------------------------------------------------------
+
+42/66 Testing: example_minimal_loop_check
+42/66 Test: example_minimal_loop_check
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "check" "/home/dgti/Projetos/argoslang/examples/minimal_loop.argos"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_loop_check" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+[ArgosLang Compiler] Análise semântica concluída com sucesso (0 erros) para: /home/dgti/Projetos/argoslang/examples/minimal_loop.argos
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_loop_check" end time: Oct 21 12:49 -03
+"example_minimal_loop_check" time elapsed: 00:00:00
+----------------------------------------------------------
+
+43/66 Testing: example_minimal_optional_check
+43/66 Test: example_minimal_optional_check
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "check" "/home/dgti/Projetos/argoslang/examples/minimal_optional.argos"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_optional_check" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+[ArgosLang Compiler] Análise semântica concluída com sucesso (0 erros) para: /home/dgti/Projetos/argoslang/examples/minimal_optional.argos
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_optional_check" end time: Oct 21 12:49 -03
+"example_minimal_optional_check" time elapsed: 00:00:00
+----------------------------------------------------------
+
+44/66 Testing: example_minimal_call_check
+44/66 Test: example_minimal_call_check
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "check" "/home/dgti/Projetos/argoslang/examples/minimal_call.argos"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_call_check" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+[ArgosLang Compiler] Análise semântica concluída com sucesso (0 erros) para: /home/dgti/Projetos/argoslang/examples/minimal_call.argos
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_call_check" end time: Oct 21 12:49 -03
+"example_minimal_call_check" time elapsed: 00:00:00
+----------------------------------------------------------
+
+45/66 Testing: example_minimal_nested_check
+45/66 Test: example_minimal_nested_check
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "check" "/home/dgti/Projetos/argoslang/examples/minimal_nested.argos"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_nested_check" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+[ArgosLang Compiler] Análise semântica concluída com sucesso (0 erros) para: /home/dgti/Projetos/argoslang/examples/minimal_nested.argos
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_nested_check" end time: Oct 21 12:49 -03
+"example_minimal_nested_check" time elapsed: 00:00:00
+----------------------------------------------------------
+
+46/66 Testing: example_minimal_signed_check
+46/66 Test: example_minimal_signed_check
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "check" "/home/dgti/Projetos/argoslang/examples/minimal_signed.argos"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_signed_check" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+[ArgosLang Compiler] Análise semântica concluída com sucesso (0 erros) para: /home/dgti/Projetos/argoslang/examples/minimal_signed.argos
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_signed_check" end time: Oct 21 12:49 -03
+"example_minimal_signed_check" time elapsed: 00:00:00
+----------------------------------------------------------
+
+47/66 Testing: example_minimal_parameters_check
+47/66 Test: example_minimal_parameters_check
+Command: "/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "check" "/home/dgti/Projetos/argoslang/examples/minimal_parameters.argos"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_parameters_check" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+[ArgosLang Compiler] Análise semântica concluída com sucesso (0 erros) para: /home/dgti/Projetos/argoslang/examples/minimal_parameters.argos
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_parameters_check" end time: Oct 21 12:49 -03
+"example_minimal_parameters_check" time elapsed: 00:00:00
+----------------------------------------------------------
+
+48/66 Testing: example_minimal_literal_vm
+48/66 Test: example_minimal_literal_vm
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_literal.argos" "-DEXPECTED=42" "-P" "/home/dgti/Projetos/argoslang/tests/run_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_literal_vm" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_literal_vm" end time: Oct 21 12:49 -03
+"example_minimal_literal_vm" time elapsed: 00:00:00
+----------------------------------------------------------
+
+49/66 Testing: example_minimal_arithmetic_vm
+49/66 Test: example_minimal_arithmetic_vm
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_arithmetic.argos" "-DEXPECTED=14" "-P" "/home/dgti/Projetos/argoslang/tests/run_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_arithmetic_vm" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_arithmetic_vm" end time: Oct 21 12:49 -03
+"example_minimal_arithmetic_vm" time elapsed: 00:00:00
+----------------------------------------------------------
+
+50/66 Testing: example_minimal_branch_vm
+50/66 Test: example_minimal_branch_vm
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_branch.argos" "-DEXPECTED=7" "-P" "/home/dgti/Projetos/argoslang/tests/run_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_branch_vm" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_branch_vm" end time: Oct 21 12:49 -03
+"example_minimal_branch_vm" time elapsed: 00:00:00
+----------------------------------------------------------
+
+51/66 Testing: example_minimal_loop_vm
+51/66 Test: example_minimal_loop_vm
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_loop.argos" "-DEXPECTED=6" "-P" "/home/dgti/Projetos/argoslang/tests/run_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_loop_vm" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_loop_vm" end time: Oct 21 12:49 -03
+"example_minimal_loop_vm" time elapsed: 00:00:00
+----------------------------------------------------------
+
+52/66 Testing: example_minimal_call_vm
+52/66 Test: example_minimal_call_vm
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_call.argos" "-DEXPECTED=42" "-P" "/home/dgti/Projetos/argoslang/tests/run_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_call_vm" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_call_vm" end time: Oct 21 12:49 -03
+"example_minimal_call_vm" time elapsed: 00:00:00
+----------------------------------------------------------
+
+53/66 Testing: example_minimal_nested_vm
+53/66 Test: example_minimal_nested_vm
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_nested.argos" "-DEXPECTED=11" "-P" "/home/dgti/Projetos/argoslang/tests/run_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_nested_vm" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_nested_vm" end time: Oct 21 12:49 -03
+"example_minimal_nested_vm" time elapsed: 00:00:00
+----------------------------------------------------------
+
+54/66 Testing: example_minimal_signed_vm
+54/66 Test: example_minimal_signed_vm
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_signed.argos" "-DEXPECTED=2" "-P" "/home/dgti/Projetos/argoslang/tests/run_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_signed_vm" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_signed_vm" end time: Oct 21 12:49 -03
+"example_minimal_signed_vm" time elapsed: 00:00:00
+----------------------------------------------------------
+
+55/66 Testing: example_minimal_parameters_vm
+55/66 Test: example_minimal_parameters_vm
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_parameters.argos" "-DEXPECTED=42" "-P" "/home/dgti/Projetos/argoslang/tests/run_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_parameters_vm" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_parameters_vm" end time: Oct 21 12:49 -03
+"example_minimal_parameters_vm" time elapsed: 00:00:00
+----------------------------------------------------------
+
+56/66 Testing: example_minimal_literal_native
+56/66 Test: example_minimal_literal_native
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_literal.argos" "-DBINARY=/home/dgti/Projetos/argoslang/build-gcc/bin/minimal_literal-test" "-DEXPECTED=42" "-P" "/home/dgti/Projetos/argoslang/tests/compile_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_literal_native" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_literal_native" end time: Oct 21 12:49 -03
+"example_minimal_literal_native" time elapsed: 00:00:00
+----------------------------------------------------------
+
+57/66 Testing: example_minimal_arithmetic_native
+57/66 Test: example_minimal_arithmetic_native
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_arithmetic.argos" "-DBINARY=/home/dgti/Projetos/argoslang/build-gcc/bin/minimal_arithmetic-test" "-DEXPECTED=14" "-P" "/home/dgti/Projetos/argoslang/tests/compile_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_arithmetic_native" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.08 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_arithmetic_native" end time: Oct 21 12:49 -03
+"example_minimal_arithmetic_native" time elapsed: 00:00:00
+----------------------------------------------------------
+
+58/66 Testing: example_minimal_branch_native
+58/66 Test: example_minimal_branch_native
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_branch.argos" "-DBINARY=/home/dgti/Projetos/argoslang/build-gcc/bin/minimal_branch-test" "-DEXPECTED=7" "-P" "/home/dgti/Projetos/argoslang/tests/compile_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_branch_native" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_branch_native" end time: Oct 21 12:49 -03
+"example_minimal_branch_native" time elapsed: 00:00:00
+----------------------------------------------------------
+
+59/66 Testing: example_minimal_loop_native
+59/66 Test: example_minimal_loop_native
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_loop.argos" "-DBINARY=/home/dgti/Projetos/argoslang/build-gcc/bin/minimal_loop-test" "-DEXPECTED=6" "-P" "/home/dgti/Projetos/argoslang/tests/compile_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_loop_native" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_loop_native" end time: Oct 21 12:49 -03
+"example_minimal_loop_native" time elapsed: 00:00:00
+----------------------------------------------------------
+
+60/66 Testing: example_minimal_call_native
+60/66 Test: example_minimal_call_native
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_call.argos" "-DBINARY=/home/dgti/Projetos/argoslang/build-gcc/bin/minimal_call-test" "-DEXPECTED=42" "-P" "/home/dgti/Projetos/argoslang/tests/compile_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_call_native" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_call_native" end time: Oct 21 12:49 -03
+"example_minimal_call_native" time elapsed: 00:00:00
+----------------------------------------------------------
+
+61/66 Testing: example_minimal_nested_native
+61/66 Test: example_minimal_nested_native
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_nested.argos" "-DBINARY=/home/dgti/Projetos/argoslang/build-gcc/bin/minimal_nested-test" "-DEXPECTED=11" "-P" "/home/dgti/Projetos/argoslang/tests/compile_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_nested_native" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.11 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_nested_native" end time: Oct 21 12:49 -03
+"example_minimal_nested_native" time elapsed: 00:00:00
+----------------------------------------------------------
+
+62/66 Testing: example_minimal_signed_native
+62/66 Test: example_minimal_signed_native
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_signed.argos" "-DBINARY=/home/dgti/Projetos/argoslang/build-gcc/bin/minimal_signed-test" "-DEXPECTED=2" "-P" "/home/dgti/Projetos/argoslang/tests/compile_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_signed_native" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_signed_native" end time: Oct 21 12:49 -03
+"example_minimal_signed_native" time elapsed: 00:00:00
+----------------------------------------------------------
+
+63/66 Testing: example_minimal_parameters_native
+63/66 Test: example_minimal_parameters_native
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_parameters.argos" "-DBINARY=/home/dgti/Projetos/argoslang/build-gcc/bin/minimal_parameters-test" "-DEXPECTED=42" "-P" "/home/dgti/Projetos/argoslang/tests/compile_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_parameters_native" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_parameters_native" end time: Oct 21 12:49 -03
+"example_minimal_parameters_native" time elapsed: 00:00:00
+----------------------------------------------------------
+
+64/66 Testing: example_minimal_literal_short_form
+64/66 Test: example_minimal_literal_short_form
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_literal.argos" "-DBINARY=/home/dgti/Projetos/argoslang/build-gcc/bin/minimal-literal-short-test" "-DEXPECTED=42" "-DSHORT_FORM=ON" "-P" "/home/dgti/Projetos/argoslang/tests/compile_example.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_literal_short_form" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.09 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_literal_short_form" end time: Oct 21 12:49 -03
+"example_minimal_literal_short_form" time elapsed: 00:00:00
+----------------------------------------------------------
+
+65/66 Testing: example_minimal_optional_native_rejected
+65/66 Test: example_minimal_optional_native_rejected
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/minimal_optional.argos" "-DBINARY=/home/dgti/Projetos/argoslang/build-gcc/bin/minimal_optional-unsupported-test" "-P" "/home/dgti/Projetos/argoslang/tests/compile_rejection.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_minimal_optional_native_rejected" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"example_minimal_optional_native_rejected" end time: Oct 21 12:49 -03
+"example_minimal_optional_native_rejected" time elapsed: 00:00:00
+----------------------------------------------------------
+
+66/66 Testing: example_null_safety_native_rejected
+66/66 Test: example_null_safety_native_rejected
+Command: "/usr/bin/cmake" "-DARGOSC=/home/dgti/Projetos/argoslang/build-gcc/bin/argosc" "-DSOURCE=/home/dgti/Projetos/argoslang/examples/null_safety.argos" "-DBINARY=/home/dgti/Projetos/argoslang/build-gcc/bin/null_safety-unsupported-test" "-P" "/home/dgti/Projetos/argoslang/tests/compile_rejection.cmake"
+Directory: /home/dgti/Projetos/argoslang/build-gcc/tests
+"example_null_safety_native_rejected" start time: Oct 21 12:49 -03
+Output:
+----------------------------------------------------------
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"example_null_safety_native_rejected" end time: Oct 21 12:49 -03
+"example_null_safety_native_rejected" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 21 12:49 -03

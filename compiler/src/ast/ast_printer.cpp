@@ -7,7 +7,7 @@ namespace argos::ast {
 namespace {
 
 std::string_view mutability_name(Mutability mutability) noexcept {
-    return mutability == Mutability::mutable_ ? "var" : "let";
+    return mutability == Mutability::mutable_ ? "var mut" : "var";
 }
 
 std::string_view unary_operator_name(UnaryOperator op) noexcept {
@@ -254,6 +254,14 @@ void AstPrinter::write_node(const Node &node) {
             }
             return;
         }
+
+        case NodeKind::break_statement:
+            write_line("BreakStatement");
+            return;
+
+        case NodeKind::continue_statement:
+            write_line("ContinueStatement");
+            return;
 
         case NodeKind::unsafe_block_statement: {
             const auto &value = static_cast<const UnsafeBlockStatement &>(node);

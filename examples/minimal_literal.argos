@@ -1,2 +1,2 @@
 // Resultado esperado: 42
-func main() -> Int return 42
+function main() -> int return 42

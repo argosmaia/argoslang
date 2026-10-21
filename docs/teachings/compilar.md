@@ -48,11 +48,11 @@ Para `arquivo.argos`, a forma curta pedida é:
 echo $?
 ```
 
-O nome da saída é o nome do fonte sem a extensão `.argos`. O arquivo precisa conter uma entrada `func main() -> Int`; por exemplo:
+O nome da saída é o nome do fonte sem a extensão `.argos`. O arquivo precisa conter uma entrada `func main() -> int`; por exemplo:
 
 ```argos
-func main() -> Int {
-    let answer: Int = 6 * 7
+func main() -> int {
+    let answer: int = 6 * 7
     return answer
 }
 ```
@@ -71,7 +71,7 @@ echo $?
 
 Nesse caso o status esperado é `14`. O linker escreve uma saída temporária e só instala o executável após sucesso; `-o` não pode apontar para o próprio arquivo-fonte. Em sistemas Unix, o status do processo preserva apenas os oito bits baixos do retorno de `main()`: não use `echo $?` para verificar resultados fora de `0..255`. Ainda não há impressão automática do valor de retorno. Rode `echo $?` **imediatamente** após o executável, antes de outro comando alterar o status do shell.
 
-**Limites atuais:** apenas x86-64/Linux, `func main() -> Int`, funções sem parâmetros, variáveis locais `Int`/`Bool`, literais decimais, aritmética, comparações, atribuição simples, `if`, `while`, chamadas sem argumentos e `return`. O backend emite assembly diretamente da IR e usa `cc` apenas para assembler/linker, não para transpilar ArgosLang para C. Divisão por zero e overflow ainda não têm uma política de runtime própria.
+**Limites atuais:** apenas x86-64/Linux, `func main() -> int`, funções sem parâmetros, variáveis locais `int`/`bool`, literais decimais, aritmética, comparações, atribuição simples, `if`, `while`, chamadas sem argumentos e `return`. O backend emite assembly diretamente da IR e usa `cc` apenas para assembler/linker, não para transpilar ArgosLang para C. Divisão por zero e overflow ainda não têm uma política de runtime própria.
 
 `examples/null_safety.argos` **ainda não compila para executável**: não define `main()` e usa protocolos, strings, opcionais e variáveis de topo, que não têm lowering nesse backend. `argosc check examples/null_safety.argos` pode validar o frontend, mas `argosc examples/null_safety.argos` termina com diagnóstico `ARGOS-C0001`/`ARGOS-C0002`, sem criar binário. O exemplo `minimal_optional.argos` também passa em `check`, porém ainda não compila para máquina.
 

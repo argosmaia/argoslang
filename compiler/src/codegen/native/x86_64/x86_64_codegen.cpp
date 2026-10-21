@@ -2,6 +2,7 @@
 
 #include <sstream>
 #include <stdexcept>
+#include <unordered_set>
 
 namespace argos::codegen::native::x86_64 {
 
@@ -64,7 +65,15 @@ void validate(const argos::ir::Module &module, const argos::ir::Function &functi
   case Opcode::call:
     valid_reg(instruction.dst);
     if (instruction.function >= module.functions.size()) throw std::runtime_error("IR: função inválida");
+    if (instruction.arguments.size() > 6) throw std::runtime_error("IR: argumentos demais");
+    for (const auto reg : instruction.arguments) valid_reg(reg);
     break;
+  case Opcode::print_int: valid_reg(instruction.src1); break;
+  case Opcode::print_bool: valid_reg(instruction.src1); break;
+  case Opcode::print_string:
+    if (instruction.constant >= module.constants.size()) throw std::runtime_error("IR: constante inválida");
+    break;
+  case Opcode::print_newline: break;
   case Opcode::ret: valid_reg(instruction.src1); break;
   default: throw std::runtime_error("IR: opcode não suportado pelo backend x86-64");
   }
@@ -73,6 +82,26 @@ void validate(const argos::ir::Module &module, const argos::ir::Function &functi
 
 std::string CodeGenerator::generate(const argos::ir::Module &m) {
   std::ostringstream o;
+  std::unordered_set<argos::ir::ConstantId> string_constants;
+  bool prints_boolean = false;
+  for (const auto &function : m.functions)
+    for (const auto &block : function.blocks)
+      for (const auto &instruction : block.instructions)
+        if (instruction.opcode == argos::ir::Opcode::print_string)
+          string_constants.insert(instruction.constant);
+        else if (instruction.opcode == argos::ir::Opcode::print_bool)
+          prints_boolean = true;
+  if (!string_constants.empty() || prints_boolean) {
+    o << ".section .rodata\n"
+      << ".Largos_print_int_format:\n  .string \"%d\"\n"
+      << ".Largos_print_string_format:\n  .string \"%s\"\n";
+    if (prints_boolean)
+      o << ".Largos_true:\n  .string \"true\"\n"
+        << ".Largos_false:\n  .string \"false\"\n";
+    for (const auto constant : string_constants)
+      o << ".Largos_string_" << constant << ":\n  .string "
+        << m.constants[constant].value << "\n";
+  }
   o << ".text\n";
   for (const auto &f : m.functions) {
     const auto name = symbol(f);
@@ -82,6 +111,9 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
     o << ".type " << name << ", @function\n"
       << name << ":\n  pushq %rbp\n  movq %rsp, %rbp\n";
     if (aligned != 0) o << "  subq $" << aligned << ", %rsp\n";
+    static constexpr const char* argument_registers[] = {"%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d"};
+    for (std::uint32_t index = 0; index < f.parameter_count; ++index)
+      o << "  movl " << argument_registers[index] << ", %eax\n  movslq %eax, %rax\n  movq %rax, " << slot_address(index) << "\n";
     for (const auto &b : f.blocks) {
       o << label(f.id, b.label) << ":\n";
       for (const auto &i : b.instructions) {
@@ -154,8 +186,32 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
             << "  testl %eax, %eax\n  je " << label(f.id, i.label) << "\n";
           break;
         case Opcode::call:
+          for (std::size_t index = 0; index < i.arguments.size(); ++index)
+            o << "  movl " << register_address(f, i.arguments[index]) << ", " << argument_registers[index] << "\n";
           o << "  call " << symbol(m.functions[i.function]) << "\n"
             << "  movslq %eax, %rax\n  movq %rax, " << register_address(f, i.dst) << "\n";
+          break;
+        case Opcode::print_int:
+          o << "  movl " << register_address(f, i.src1) << ", %esi\n"
+            << "  leaq .Largos_print_int_format(%rip), %rdi\n"
+            << "  xorl %eax, %eax\n  call printf@PLT\n";
+          break;
+        case Opcode::print_bool:
+          o << "  movl " << register_address(f, i.src1) << ", %eax\n"
+            << "  leaq .Largos_false(%rip), %rsi\n"
+            << "  testl %eax, %eax\n"
+            << "  leaq .Largos_true(%rip), %rax\n"
+            << "  cmovne %rax, %rsi\n"
+            << "  leaq .Largos_print_string_format(%rip), %rdi\n"
+            << "  xorl %eax, %eax\n  call printf@PLT\n";
+          break;
+        case Opcode::print_string:
+          o << "  leaq .Largos_string_" << i.constant << "(%rip), %rsi\n"
+            << "  leaq .Largos_print_string_format(%rip), %rdi\n"
+            << "  xorl %eax, %eax\n  call printf@PLT\n";
+          break;
+        case Opcode::print_newline:
+          o << "  movl $10, %edi\n  call putchar@PLT\n";
           break;
         case Opcode::ret:
           o << "  movl " << register_address(f, i.src1) << ", %eax\n"

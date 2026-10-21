@@ -165,6 +165,8 @@ bool SemanticAnalyzer::analyze(const ast::Program &program) {
     case ast::NodeKind::return_statement:
     case ast::NodeKind::if_statement:
     case ast::NodeKind::while_statement:
+    case ast::NodeKind::break_statement:
+    case ast::NodeKind::continue_statement:
     case ast::NodeKind::unsafe_block_statement:
       analyze_statement(static_cast<const ast::Statement &>(*item));
       break;
@@ -249,6 +251,8 @@ void SemanticAnalyzer::analyze_block_item(const ast::BlockItem &item) {
   case ast::NodeKind::return_statement:
   case ast::NodeKind::if_statement:
   case ast::NodeKind::while_statement:
+  case ast::NodeKind::break_statement:
+  case ast::NodeKind::continue_statement:
   case ast::NodeKind::unsafe_block_statement:
     analyze_statement(static_cast<const ast::Statement &>(item));
     break;
@@ -468,10 +472,18 @@ void SemanticAnalyzer::analyze_statement(const ast::Statement &statement) {
     (void)require_boolean(condition, while_stmt.condition->span,
                           "condição de 'while'");
     const auto before_loop = scopes_;
+    ++loop_depth_;
     analyze_block(*while_stmt.body);
+    --loop_depth_;
     scopes_ = before_loop;
     break;
   }
+  case ast::NodeKind::break_statement:
+    if (loop_depth_ == 0) report("ARGOS-S0200", statement.span, "'break' só pode ser usado dentro de um laço");
+    break;
+  case ast::NodeKind::continue_statement:
+    if (loop_depth_ == 0) report("ARGOS-S0201", statement.span, "'continue' só pode ser usado dentro de um laço");
+    break;
   case ast::NodeKind::unsafe_block_statement: {
     const auto &unsafe_stmt =
         static_cast<const ast::UnsafeBlockStatement &>(statement);
@@ -621,8 +633,9 @@ Type SemanticAnalyzer::analyze_identifier(
   }
   if (!analyzing_assignment_target_ &&
       symbol->kind != Symbol::Kind::function && !symbol->initialized) {
-    report("ARGOS-S0301", expression.span,
-           "variável " + quoted(expression.name) + " usada antes da inicialização");
+    diagnostics_.error("ARGOS-S0301", "variável " + quoted(expression.name) +
+        " usada antes da inicialização", expression.span,
+        "inicialize-a antes do uso: var " + expression.name + ": int = 0");
   }
   expression_symbols_[&expression] = symbol->id;
   if (symbol->kind == Symbol::Kind::type) {
@@ -861,6 +874,11 @@ Type SemanticAnalyzer::analyze_call(const ast::CallExpression &expression) {
     return error_type();
   }
 
+  if (identifier->name == "print") {
+    for (const auto &argument : expression.arguments) (void)analyze_expression(*argument);
+    return Type{TypeKind::void_type, 0};
+  }
+
   const Symbol *function = lookup(identifier->name);
   if (function == nullptr || function->kind != Symbol::Kind::function) {
     report("ARGOS-S0341", expression.callee->span,
@@ -1000,34 +1018,34 @@ Type SemanticAnalyzer::resolve_type(const ast::TypeSyntax &syntax) {
   TypeKind kind = TypeKind::unknown;
   const std::string_view name = syntax.name;
 
-  if (name == "Bool")
+  if (name == "bool" || name == "Bool")
     kind = TypeKind::bool_type;
-  else if (name == "Byte")
+  else if (name == "byte" || name == "Byte")
     kind = TypeKind::byte;
-  else if (name == "SByte") kind = TypeKind::sbyte;
-  else if (name == "Short")
+  else if (name == "sbyte" || name == "SByte") kind = TypeKind::sbyte;
+  else if (name == "short" || name == "Short")
     kind = TypeKind::short_type;
-  else if (name == "UShort") kind = TypeKind::ushort_type;
-  else if (name == "Int")
+  else if (name == "ushort" || name == "UShort") kind = TypeKind::ushort_type;
+  else if (name == "int" || name == "Int")
     kind = TypeKind::int_type;
-  else if (name == "UInt") kind = TypeKind::uint_type;
-  else if (name == "Long")
+  else if (name == "uint" || name == "UInt") kind = TypeKind::uint_type;
+  else if (name == "long" || name == "Long")
     kind = TypeKind::long_type;
-  else if (name == "ULong") kind = TypeKind::ulong_type;
-  else if (name == "USize")
+  else if (name == "ulong" || name == "ULong") kind = TypeKind::ulong_type;
+  else if (name == "usize" || name == "USize")
     kind = TypeKind::usize;
-  else if (name == "ISize")
+  else if (name == "isize" || name == "ISize")
     kind = TypeKind::isize;
-  else if (name == "Float")
+  else if (name == "float" || name == "Float")
     kind = TypeKind::float_type;
-  else if (name == "Double")
+  else if (name == "double" || name == "Double")
     kind = TypeKind::double_type;
-  else if (name == "Char")
+  else if (name == "char" || name == "Char")
     kind = TypeKind::char_type;
-  else if (name == "String") kind = TypeKind::string_type;
-  else if (name == "Void")
+  else if (name == "string" || name == "String") kind = TypeKind::string_type;
+  else if (name == "void" || name == "Void")
     kind = TypeKind::void_type;
-  else if (name == "Never") kind = TypeKind::never_type;
+  else if (name == "never" || name == "Never") kind = TypeKind::never_type;
   else {
     if (const Symbol *symbol = lookup(name);
         symbol && symbol->kind == Symbol::Kind::type) {

@@ -36,11 +36,35 @@ foreach(example IN ITEMS
     minimal_call
     minimal_nested
     minimal_signed
+    minimal_parameters
 )
     add_test(
         NAME "example_${example}_check"
         COMMAND $<TARGET_FILE:argosc> check
                 "${PROJECT_SOURCE_DIR}/examples/${example}.argos"
+    )
+endforeach()
+
+foreach(example_expected IN ITEMS
+    "minimal_literal:42"
+    "minimal_arithmetic:14"
+    "minimal_branch:7"
+    "minimal_loop:6"
+    "minimal_call:42"
+    "minimal_nested:11"
+    "minimal_signed:2"
+    "minimal_parameters:42"
+)
+    string(REPLACE ":" ";" example_parts "${example_expected}")
+    list(GET example_parts 0 example)
+    list(GET example_parts 1 expected)
+    add_test(
+        NAME "example_${example}_vm"
+        COMMAND "${CMAKE_COMMAND}"
+            "-DARGOSC=$<TARGET_FILE:argosc>"
+            "-DSOURCE=${PROJECT_SOURCE_DIR}/examples/${example}.argos"
+            "-DEXPECTED=${expected}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/run_example.cmake"
     )
 endforeach()
 
@@ -54,6 +78,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
         "minimal_call:42"
         "minimal_nested:11"
         "minimal_signed:2"
+        "minimal_parameters:42"
     )
         string(REPLACE ":" ";" example_parts "${example_expected}")
         list(GET example_parts 0 example)

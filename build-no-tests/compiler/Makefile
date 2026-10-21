@@ -264,6 +264,30 @@ src/diagnostics/diagnostic_engine.cpp.s:
 	cd /home/dgti/Projetos/argoslang/build-no-tests && $(MAKE) $(MAKESILENT) -f compiler/CMakeFiles/argos_frontend.dir/build.make compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.s
 .PHONY : src/diagnostics/diagnostic_engine.cpp.s
 
+src/diagnostics/diagnostic_printer.o: src/diagnostics/diagnostic_printer.cpp.o
+.PHONY : src/diagnostics/diagnostic_printer.o
+
+# target to build an object file
+src/diagnostics/diagnostic_printer.cpp.o:
+	cd /home/dgti/Projetos/argoslang/build-no-tests && $(MAKE) $(MAKESILENT) -f compiler/CMakeFiles/argos_frontend.dir/build.make compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o
+.PHONY : src/diagnostics/diagnostic_printer.cpp.o
+
+src/diagnostics/diagnostic_printer.i: src/diagnostics/diagnostic_printer.cpp.i
+.PHONY : src/diagnostics/diagnostic_printer.i
+
+# target to preprocess a source file
+src/diagnostics/diagnostic_printer.cpp.i:
+	cd /home/dgti/Projetos/argoslang/build-no-tests && $(MAKE) $(MAKESILENT) -f compiler/CMakeFiles/argos_frontend.dir/build.make compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.i
+.PHONY : src/diagnostics/diagnostic_printer.cpp.i
+
+src/diagnostics/diagnostic_printer.s: src/diagnostics/diagnostic_printer.cpp.s
+.PHONY : src/diagnostics/diagnostic_printer.s
+
+# target to generate assembly for a file
+src/diagnostics/diagnostic_printer.cpp.s:
+	cd /home/dgti/Projetos/argoslang/build-no-tests && $(MAKE) $(MAKESILENT) -f compiler/CMakeFiles/argos_frontend.dir/build.make compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.s
+.PHONY : src/diagnostics/diagnostic_printer.cpp.s
+
 src/driver/main.o: src/driver/main.cpp.o
 .PHONY : src/driver/main.o
 
@@ -432,6 +456,30 @@ src/source/source_manager.cpp.s:
 	cd /home/dgti/Projetos/argoslang/build-no-tests && $(MAKE) $(MAKESILENT) -f compiler/CMakeFiles/argos_frontend.dir/build.make compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.s
 .PHONY : src/source/source_manager.cpp.s
 
+src/vm/vm.o: src/vm/vm.cpp.o
+.PHONY : src/vm/vm.o
+
+# target to build an object file
+src/vm/vm.cpp.o:
+	cd /home/dgti/Projetos/argoslang/build-no-tests && $(MAKE) $(MAKESILENT) -f compiler/CMakeFiles/argos_frontend.dir/build.make compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o
+.PHONY : src/vm/vm.cpp.o
+
+src/vm/vm.i: src/vm/vm.cpp.i
+.PHONY : src/vm/vm.i
+
+# target to preprocess a source file
+src/vm/vm.cpp.i:
+	cd /home/dgti/Projetos/argoslang/build-no-tests && $(MAKE) $(MAKESILENT) -f compiler/CMakeFiles/argos_frontend.dir/build.make compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.i
+.PHONY : src/vm/vm.cpp.i
+
+src/vm/vm.s: src/vm/vm.cpp.s
+.PHONY : src/vm/vm.s
+
+# target to generate assembly for a file
+src/vm/vm.cpp.s:
+	cd /home/dgti/Projetos/argoslang/build-no-tests && $(MAKE) $(MAKESILENT) -f compiler/CMakeFiles/argos_frontend.dir/build.make compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.s
+.PHONY : src/vm/vm.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -457,6 +505,9 @@ help:
 	@echo "... src/diagnostics/diagnostic_engine.o"
 	@echo "... src/diagnostics/diagnostic_engine.i"
 	@echo "... src/diagnostics/diagnostic_engine.s"
+	@echo "... src/diagnostics/diagnostic_printer.o"
+	@echo "... src/diagnostics/diagnostic_printer.i"
+	@echo "... src/diagnostics/diagnostic_printer.s"
 	@echo "... src/driver/main.o"
 	@echo "... src/driver/main.i"
 	@echo "... src/driver/main.s"
@@ -478,6 +529,9 @@ help:
 	@echo "... src/source/source_manager.o"
 	@echo "... src/source/source_manager.i"
 	@echo "... src/source/source_manager.s"
+	@echo "... src/vm/vm.o"
+	@echo "... src/vm/vm.i"
+	@echo "... src/vm/vm.s"
 .PHONY : help
 
 

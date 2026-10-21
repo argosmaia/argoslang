@@ -11,12 +11,14 @@ void DiagnosticEngine::report(Diagnostic diagnostic) {
 void DiagnosticEngine::error(
     std::string code,
     std::string message,
-    source::SourceSpan span
+    source::SourceSpan span,
+    std::string help
 ) {
     report(Diagnostic{
         .severity = Severity::error,
         .code = std::move(code),
         .message = std::move(message),
+        .help = std::move(help),
         .span = span,
     });
 }

@@ -165,6 +165,7 @@ private:
   diagnostics::DiagnosticEngine &diagnostics_;
   std::vector<Scope> scopes_;
   std::vector<FunctionContext> functions_;
+  std::size_t loop_depth_{0};
   std::unordered_map<const ast::Expression *, Type> expression_types_;
   std::unordered_map<const ast::Expression *, Type> expression_coercions_;
   std::unordered_map<const ast::Expression *, SymbolId> expression_symbols_;

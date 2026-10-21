@@ -7,6 +7,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/argos_frontend.dir/src/codegen/ir/ir_generator.cpp.o.d"
   "CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.o"
   "CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.o.d"
+  "CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o"
+  "CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o.d"
   "CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o"
   "CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o.d"
   "CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o"
@@ -17,6 +19,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o.d"
   "CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o"
   "CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o.d"
+  "CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o"
+  "CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o.d"
   "libargos_frontend.a"
   "libargos_frontend.pdb"
 )

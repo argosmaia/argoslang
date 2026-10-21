@@ -23,6 +23,8 @@ namespace argos::ast {
         expression_statement,
         if_statement,
         while_statement,
+        break_statement,
+        continue_statement,
         unsafe_block_statement,
         return_statement,
 
@@ -314,6 +316,15 @@ namespace argos::ast {
                 condition(std::move(condition_value)),
                 body(std::move(body_value)) {
         }
+    };
+
+    struct BreakStatement final : Statement {
+        explicit BreakStatement(source::SourceSpan span_value)
+            : Statement(NodeKind::break_statement, std::move(span_value)) {}
+    };
+    struct ContinueStatement final : Statement {
+        explicit ContinueStatement(source::SourceSpan span_value)
+            : Statement(NodeKind::continue_statement, std::move(span_value)) {}
     };
 
     struct UnsafeBlockStatement final : Statement {

@@ -83,6 +83,8 @@ private:
     ast::StatementPtr parse_while_statement(
         const lexer::Token& keyword
     );
+    ast::StatementPtr parse_break_statement(const lexer::Token& keyword);
+    ast::StatementPtr parse_continue_statement(const lexer::Token& keyword);
     ast::StatementPtr parse_unsafe_statement(
         const lexer::Token& keyword
     );

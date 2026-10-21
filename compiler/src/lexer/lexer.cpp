@@ -859,30 +859,34 @@ TokenKind Lexer::keyword_kind(std::string_view lexeme) noexcept {
       std::pair{"super", TokenKind::KwSuper},
       std::pair{"as", TokenKind::KwAs},
       std::pair{"is", TokenKind::KwIs},
-      std::pair{"Bool", TokenKind::KwBool},
-      std::pair{"Byte", TokenKind::KwByte},
-      std::pair{"SByte", TokenKind::KwSByte},
-      std::pair{"Short", TokenKind::KwShort},
-      std::pair{"UShort", TokenKind::KwUShort},
-      std::pair{"Int", TokenKind::KwInt},
-      std::pair{"UInt", TokenKind::KwUInt},
-      std::pair{"Long", TokenKind::KwLong},
-      std::pair{"ULong", TokenKind::KwULong},
-      std::pair{"ISize", TokenKind::KwISize},
-      std::pair{"USize", TokenKind::KwUSize},
-      std::pair{"Float", TokenKind::KwFloat},
-      std::pair{"Double", TokenKind::KwDouble},
-      std::pair{"Char", TokenKind::KwChar},
-      std::pair{"String", TokenKind::KwString},
-      std::pair{"Void", TokenKind::KwVoid},
-      std::pair{"Never", TokenKind::KwNever},
+      std::pair{"bool", TokenKind::KwBool},
+      std::pair{"Bool", TokenKind::KwBool}, // legacy spelling
+      std::pair{"byte", TokenKind::KwByte},
+      std::pair{"Byte", TokenKind::KwByte}, // legacy spelling
+      std::pair{"sbyte", TokenKind::KwSByte},
+      std::pair{"short", TokenKind::KwShort},
+      std::pair{"ushort", TokenKind::KwUShort},
+      std::pair{"int", TokenKind::KwInt},
+      std::pair{"Int", TokenKind::KwInt}, // legacy spelling
+      std::pair{"uint", TokenKind::KwUInt},
+      std::pair{"long", TokenKind::KwLong},
+      std::pair{"ulong", TokenKind::KwULong},
+      std::pair{"isize", TokenKind::KwISize},
+      std::pair{"usize", TokenKind::KwUSize},
+      std::pair{"float", TokenKind::KwFloat},
+      std::pair{"double", TokenKind::KwDouble},
+      std::pair{"char", TokenKind::KwChar},
+      std::pair{"Char", TokenKind::KwChar}, // legacy spelling
+      std::pair{"string", TokenKind::KwString},
+      std::pair{"String", TokenKind::KwString}, // legacy spelling
+      std::pair{"void", TokenKind::KwVoid},
+      std::pair{"Void", TokenKind::KwVoid}, // legacy spelling
+      std::pair{"never", TokenKind::KwNever},
   };
   for (const auto &[word, kind] : keywords) if (lexeme == word) return kind;
-  if (lexeme == "let")
-    return TokenKind::KwLet;
   if (lexeme == "var")
     return TokenKind::KwVar;
-  if (lexeme == "func")
+  if (lexeme == "function" || lexeme == "func")
     return TokenKind::KwFunction;
   if (lexeme == "return")
     return TokenKind::KwReturn;
@@ -894,7 +898,7 @@ TokenKind Lexer::keyword_kind(std::string_view lexeme) noexcept {
     return TokenKind::KwWhile;
   if (lexeme == "unsafe")
     return TokenKind::KwUnsafe;
-  if (lexeme == "null")
+  if (lexeme == "nil" || lexeme == "null")
     return TokenKind::KwNull;
   if (lexeme == "true")
     return TokenKind::KwTrue;

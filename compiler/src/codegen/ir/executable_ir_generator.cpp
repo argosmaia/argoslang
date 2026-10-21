@@ -19,7 +19,28 @@ using argos::ir::LabelId;
 
 bool supported_type(const ast::TypeSyntax *type) {
   return type && type->nullable_depth == 0 &&
-         (type->name == "Int" || type->name == "Bool");
+         (type->name == "int" || type->name == "bool" ||
+          type->name == "Int" || type->name == "Bool");
+}
+
+bool supported_return_type(const ast::TypeSyntax *type) {
+  return supported_type(type) ||
+         (type && type->nullable_depth == 0 && type->name == "void");
+}
+
+bool is_boolean_expression(const ast::Expression &expression) {
+  if (dynamic_cast<const ast::BooleanLiteralExpression *>(&expression)) return true;
+  if (const auto *group = dynamic_cast<const ast::GroupingExpression *>(&expression))
+    return is_boolean_expression(*group->expression);
+  if (const auto *unary = dynamic_cast<const ast::UnaryExpression *>(&expression))
+    return unary->op == ast::UnaryOperator::not_;
+  if (const auto *binary = dynamic_cast<const ast::BinaryExpression *>(&expression)) {
+    using Operator = ast::BinaryOperator;
+    return binary->op == Operator::equal || binary->op == Operator::not_equal ||
+           binary->op == Operator::less_than || binary->op == Operator::less_than_or_equal ||
+           binary->op == Operator::greater_than || binary->op == Operator::greater_than_or_equal;
+  }
+  return false;
 }
 
 class Lowerer final {
@@ -27,8 +48,9 @@ public:
   Lowerer(argos::ir::Module &module, diagnostics::DiagnosticEngine &diagnostics,
           const ast::FunctionDeclaration &source,
           const std::unordered_map<std::string, argos::ir::FunctionId> &ids,
+          const std::unordered_map<std::string, std::size_t> &arities,
           argos::ir::FunctionId id)
-      : module_(module), diagnostics_(diagnostics), source_(source), ids_(ids) {
+      : module_(module), diagnostics_(diagnostics), source_(source), ids_(ids), arities_(arities) {
     function_.id = id;
     function_.name = source.name;
     scopes_.emplace_back();
@@ -36,9 +58,14 @@ public:
   }
 
   argos::ir::Function lower() {
-    if (!source_.parameters.empty() || !supported_type(source_.return_type.get())) {
-      error(source_, "somente funções sem parâmetros com retorno Int ou Bool são compiláveis");
+    if (source_.parameters.size() > 6 || !supported_return_type(source_.return_type.get())) {
+      error(source_, "somente funções com até seis parâmetros int/bool e retorno int/bool/void são compiláveis");
     } else {
+      function_.parameter_count = static_cast<std::uint32_t>(source_.parameters.size());
+      for (const auto& parameter : source_.parameters) {
+        if (!supported_type(parameter->type.get())) error(*parameter, "parâmetro deve ser int ou bool");
+        scopes_.back().insert_or_assign(parameter->name, function_.slot_count++);
+      }
       block(*source_.body);
     }
     return std::move(function_);
@@ -172,14 +199,43 @@ private:
     }
     if (const auto *call = dynamic_cast<const ast::CallExpression *>(&node)) {
       const auto *callee = dynamic_cast<const ast::IdentifierExpression *>(call->callee.get());
-      if (!callee || !call->arguments.empty() || !ids_.contains(callee->name)) {
-        error(node, "somente chamadas de funções locais sem argumentos são compiláveis");
+      if (callee && callee->name == "print") {
+        for (const auto &argument : call->arguments) {
+          Instruction instruction;
+          if (const auto *string = dynamic_cast<const ast::StringLiteralExpression *>(argument.get())) {
+            const auto id = static_cast<argos::ir::ConstantId>(module_.constants.size());
+            module_.constants.push_back({id, string->spelling});
+            instruction.opcode = Opcode::print_string;
+            instruction.constant = id;
+          } else {
+            const auto value = expression(*argument);
+            if (!value) return std::nullopt;
+            instruction.opcode = is_boolean_expression(*argument)
+                ? Opcode::print_bool : Opcode::print_int;
+            instruction.src1 = *value;
+          }
+          emit(std::move(instruction));
+        }
+        Instruction newline;
+        newline.opcode = Opcode::print_newline;
+        emit(std::move(newline));
+        return constant("0");
+      }
+      if (!callee || !ids_.contains(callee->name) || call->arguments.size() > 6 ||
+          call->arguments.size() != arities_.at(callee->name)) {
+        error(node, "somente chamadas locais com até seis argumentos são compiláveis");
         return std::nullopt;
       }
       Instruction instruction;
       instruction.opcode = Opcode::call;
       instruction.dst = reg();
       instruction.function = ids_.at(callee->name);
+      for (std::size_t index = 0; index < call->arguments.size(); ++index) {
+        if (!call->argument_labels[index].empty()) { error(node, "argumentos nomeados ainda não são compiláveis"); return std::nullopt; }
+        const auto value = expression(*call->arguments[index]);
+        if (!value) return std::nullopt;
+        instruction.arguments.push_back(*value);
+      }
       const auto result = instruction.dst;
       emit(std::move(instruction));
       return result;
@@ -223,8 +279,15 @@ private:
     }
     if (const auto *statement = dynamic_cast<const ast::ReturnStatement *>(&node)) {
       if (!statement->expression) {
-        error(node, "retorno sem valor ainda não é compilável");
-        return false;
+        if (source_.return_type->name != "void") {
+          error(node, "retorno sem valor só é permitido em funções void");
+          return false;
+        }
+        Instruction instruction;
+        instruction.opcode = Opcode::ret;
+        instruction.src1 = constant("0");
+        emit(std::move(instruction));
+        return true;
       }
       const auto value = expression(*statement->expression);
       if (!value) return false;
@@ -272,9 +335,23 @@ private:
         jump(body_label);
       }
       current_ = body_label;
+      break_targets_.push_back(end_label);
+      continue_targets_.push_back(test_label);
       if (!block(*statement->body)) jump(test_label);
+      continue_targets_.pop_back();
+      break_targets_.pop_back();
       current_ = end_label;
       return false;
+    }
+    if (dynamic_cast<const ast::BreakStatement *>(&node)) {
+      if (break_targets_.empty()) { error(node, "'break' fora de laço"); return false; }
+      jump(break_targets_.back());
+      return true;
+    }
+    if (dynamic_cast<const ast::ContinueStatement *>(&node)) {
+      if (continue_targets_.empty()) { error(node, "'continue' fora de laço"); return false; }
+      jump(continue_targets_.back());
+      return true;
     }
     error(node, "instrução ou declaração ainda não é compilável");
     return false;
@@ -284,9 +361,12 @@ private:
   diagnostics::DiagnosticEngine &diagnostics_;
   const ast::FunctionDeclaration &source_;
   const std::unordered_map<std::string, argos::ir::FunctionId> &ids_;
+  const std::unordered_map<std::string, std::size_t> &arities_;
   argos::ir::Function function_;
   LabelId current_{};
   std::vector<std::unordered_map<std::string, Slot>> scopes_;
+  std::vector<LabelId> break_targets_;
+  std::vector<LabelId> continue_targets_;
 };
 
 } // namespace
@@ -295,6 +375,7 @@ argos::ir::Module ExecutableIrGenerator::generate(const ast::Program &program) {
   argos::ir::Module module;
   std::vector<const ast::FunctionDeclaration *> functions;
   std::unordered_map<std::string, argos::ir::FunctionId> ids;
+  std::unordered_map<std::string, std::size_t> arities;
   for (const auto &item : program.items) {
     const auto *function = dynamic_cast<const ast::FunctionDeclaration *>(item.get());
     if (!function) {
@@ -302,19 +383,22 @@ argos::ir::Module ExecutableIrGenerator::generate(const ast::Program &program) {
       continue;
     }
     ids.emplace(function->name, static_cast<argos::ir::FunctionId>(functions.size()));
+    arities.emplace(function->name, function->parameters.size());
     functions.push_back(function);
   }
   if (!ids.contains("main")) {
-    diagnostics_.error("ARGOS-C0002", "executável requer func main() -> Int", program.span);
+    diagnostics_.error("ARGOS-C0002", "executável requer function main() -> int ou void", program.span);
   } else {
     const auto *entry = functions[ids.at("main")];
     if (!entry->parameters.empty() || !entry->return_type ||
-        entry->return_type->name != "Int" || entry->return_type->nullable_depth != 0)
-      diagnostics_.error("ARGOS-C0002", "entrada deve ser func main() -> Int", entry->span);
+        (entry->return_type->name != "int" && entry->return_type->name != "Int" &&
+         entry->return_type->name != "void") ||
+        entry->return_type->nullable_depth != 0)
+      diagnostics_.error("ARGOS-C0002", "entrada deve ser function main() -> int ou void", entry->span);
   }
   if (diagnostics_.has_errors()) return module;
   for (std::size_t id = 0; id < functions.size(); ++id) {
-    Lowerer lowerer{module, diagnostics_, *functions[id], ids,
+    Lowerer lowerer{module, diagnostics_, *functions[id], ids, arities,
                     static_cast<argos::ir::FunctionId>(id)};
     module.functions.push_back(lowerer.lower());
   }

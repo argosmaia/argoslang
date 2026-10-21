@@ -80,3 +80,6 @@ echo $?  # 42
 - [docs/teachings/compilar.md](docs/teachings/compilar.md): Compilação de `.argos` e execução nativa do subconjunto disponível.
 - [docs/teachings/interpretar.md](docs/teachings/interpretar.md): Estado e fluxo planejado da VM.
 - [docs/teachings/executar-em-maquinas.md](docs/teachings/executar-em-maquinas.md): Hosts, alvos e portabilidade.
+- [docs/mvp.md](docs/mvp.md): Contrato do subconjunto executável, VM, nativo e REPL.
+- [docs/language-evolution.md](docs/language-evolution.md): Decisões e ordem de evolução após o MVP.
+- [docs/argoslang-v0.0.1.md](docs/argoslang-v0.0.1.md): Referência de instalação e uso da versão v0.0.1.

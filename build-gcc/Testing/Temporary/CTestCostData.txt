@@ -1,0 +1,106 @@
+uses 0 0
+lexes 0 0
+requires 0 0
+accepts 0 0
+parses 0 0
+inserts 0 0
+single 0 0
+tracks 0 0
+parses 0 0
+treats 0 0
+reports 0 0
+retains 0 0
+same-line 0 0
+lexes 0 0
+records 0 0
+preserves 0 0
+reserves 0 0
+merges 0 0
+checks 0 0
+checks 0 0
+fits 0 0
+reports 0 0
+keeps 0 0
+rejects 0 0
+supports 0 0
+rejects 0 0
+semicolon 0 0
+reports 0 0
+rejects 0 0
+parses 0 0
+rejects 0 0
+rejects 0 0
+uses 0 0
+resolves 0 0
+parses 0 0
+parses 0 0
+rejects 0 0
+resolves 0 0
+example_minimal_literal_check 2 0.00295157
+example_minimal_arithmetic_check 2 0.0029188
+example_minimal_branch_check 2 0.0034638
+example_minimal_loop_check 2 0.0030087
+example_minimal_optional_check 2 0.00358206
+example_minimal_call_check 2 0.00274904
+example_minimal_nested_check 2 0.00288518
+example_minimal_signed_check 2 0.00320009
+example_minimal_parameters_check 2 0.00297208
+example_minimal_literal_vm 2 0.0133967
+example_minimal_arithmetic_vm 2 0.0139904
+example_minimal_branch_vm 2 0.0134415
+example_minimal_loop_vm 2 0.0150024
+example_minimal_call_vm 2 0.0135769
+example_minimal_nested_vm 2 0.0134862
+example_minimal_signed_vm 2 0.0135147
+example_minimal_parameters_vm 2 0.0138513
+example_minimal_literal_native 2 0.0429183
+example_minimal_arithmetic_native 2 0.042288
+example_minimal_branch_native 2 0.0433004
+example_minimal_loop_native 2 0.0457468
+example_minimal_call_native 2 0.0440176
+example_minimal_nested_native 2 0.0526416
+example_minimal_signed_native 2 0.0467731
+example_minimal_parameters_native 2 0.0471755
+example_minimal_literal_short_form 2 0.0456913
+example_minimal_optional_native_rejected 2 0.0144231
+example_null_safety_native_rejected 2 0.0137705
+rejects malformed UTF-8 identifiers 1 0.00674567
+uses normative coalescing precedence 1 0.00811872
+uses maximal munch for nullable operators 1 0.00678809
+parses function declaration with return type and body 1 0.00810707
+rejects nominal member access until nominal types exist 1 0.00686706
+merges initialization across branches and loops 1 0.00781715
+inserts terminators only at eligible newlines 1 0.00646266
+retains resolved symbol bindings for later phases 1 0.00701504
+tracks initialization and one assignment to let 1 0.00713199
+keeps multiline signatures and operator continuations together 1 0.00663705
+fits integer literals contextually without widening variables 0 0
+reports unterminated strings 1 0.0064317
+rejects legacy postfix bang 1 0.00629895
+parses while loops and unsafe blocks 1 0.00644334
+parses operator precedence and null-safety operators 1 0.00695029
+parses variable declarations 1 0.00633778
+rejects invalid character escapes 1 0.00672741
+rejects unknown and uninferrable types 1 0.00711273
+same-line statements still require a separator 1 0.00724735
+lexes Swift-like null-safety chain 1 0.00680515
+treats newlines inside block comments as eligible terminators 1 0.00654118
+single statement bodies may omit braces 1 0.00733652
+semicolon is optional before a closing brace or EOF 1 0.00667016
+reserves declaration and control keywords from the grammar 1 0.00670453
+resolves intrinsic String and inferred variables 1 0.00664111
+records contextual coercions without changing source types 1 0.00809816
+checks external parameter labels 1 0.00757463
+requires return on every reachable branch 1 0.00742632
+preserves optional depth and rejects implicit unwrap 1 0.00717607
+parses a non-generic data protocol 1 0.00683613
+supports nested block comments 1 0.00668942
+resolves protocol components and safe member chains 1 0.00753767
+rejects malformed UTF-8 even inside strings 1 0.00732255
+reports unsupported match statements 1 0.00740531
+lexes Unicode identifiers and new literal forms 1 0.00645316
+checks the null-safety example with explicit nominal definitions 1 0.00747184
+accepts escaped identifiers in declarations 1 0.00716518
+reports unsupported nominal declarations 1 0.00670786
+---
+fits integer literals contextually without widening variables

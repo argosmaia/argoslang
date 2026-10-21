@@ -1,0 +1,9 @@
+// Resultado esperado: 7
+function main() -> int {
+    var mut value: int = 0
+    while true {
+        value = value + 1
+        if value == 7 break
+    }
+    return value
+}

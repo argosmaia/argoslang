@@ -242,4 +242,5 @@ compiler/CMakeFiles/argosc.dir/src/driver/main.cpp.o: \
  /usr/include/c++/13/bits/node_handle.h \
  /usr/include/c++/13/bits/erase_if.h \
  /home/dgti/Projetos/argoslang/compiler/include/argos/source/source_manager.hpp \
+ /home/dgti/Projetos/argoslang/compiler/include/argos/vm/vm.hpp \
  /usr/include/c++/13/iostream

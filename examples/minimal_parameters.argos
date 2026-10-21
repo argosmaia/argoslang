@@ -1,0 +1,8 @@
+// Resultado esperado: 42
+func scale(_ value: int, _ multiplier: int) -> int {
+    return value * multiplier
+}
+
+func main() -> int {
+    return scale(6, 7)
+}
