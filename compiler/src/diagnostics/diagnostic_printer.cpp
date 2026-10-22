@@ -10,7 +10,8 @@ void DiagnosticPrinter::print(const source::SourceFile& source_file,
                               std::ostream& output) const {
   for (const auto& diagnostic : diagnostics.diagnostics()) {
     output << source_file.path.string() << ':' << diagnostic.span.begin.line
-           << ':' << diagnostic.span.begin.column << ": error["
+           << ':' << diagnostic.span.begin.column << ": "
+           << severity_name(diagnostic.severity) << "["
            << diagnostic.code << "]: " << diagnostic.message << '\n';
     std::size_t begin = 0;
     for (std::size_t line = 1; line < diagnostic.span.begin.line && begin < source_file.content.size(); ++line) {

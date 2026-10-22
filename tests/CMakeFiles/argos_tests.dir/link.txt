@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/argos_tests.dir/lexer/lexer_tests.cpp.o CMakeFiles/argos_tests.dir/parser/parser_tests.cpp.o CMakeFiles/argos_tests.dir/semantics/semantic_tests.cpp.o -o ../bin/argos_tests  ../compiler/libargos_frontend.a ../_deps/catch2-build/src/libCatch2Main.a /usr/lib/x86_64-linux-gnu/libicuuc.so -ldl ../_deps/catch2-build/src/libCatch2.a 

@@ -8,6 +8,18 @@ void DiagnosticEngine::report(Diagnostic diagnostic) {
     diagnostics_.push_back(std::move(diagnostic));
 }
 
+void DiagnosticEngine::emit(const DiagnosticDefinition& definition,
+                            source::SourceSpan span, std::string message,
+                            std::string help) {
+    report(Diagnostic{
+        .severity = definition.severity,
+        .code = std::string(definition.code),
+        .message = message.empty() ? std::string(definition.title) : std::move(message),
+        .help = help.empty() ? std::string(definition.help) : std::move(help),
+        .span = span,
+    });
+}
+
 void DiagnosticEngine::error(
     std::string code,
     std::string message,
@@ -21,6 +33,18 @@ void DiagnosticEngine::error(
         .help = std::move(help),
         .span = span,
     });
+}
+
+void DiagnosticEngine::warning(std::string code, std::string message,
+                               source::SourceSpan span, std::string help) {
+    report(Diagnostic{.severity = Severity::warning, .code = std::move(code),
+                      .message = std::move(message), .help = std::move(help), .span = span});
+}
+
+void DiagnosticEngine::note(std::string code, std::string message,
+                            source::SourceSpan span) {
+    report(Diagnostic{.severity = Severity::note, .code = std::move(code),
+                      .message = std::move(message), .help = {}, .span = span});
 }
 
 bool DiagnosticEngine::has_errors() const noexcept {

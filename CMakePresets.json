@@ -1,0 +1,22 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "clang-system",
+      "displayName": "Clang 18 do sistema",
+      "description": "Evita o clang++ fornecido pelo Swift presente no PATH.",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-clang",
+      "cacheVariables": {
+        "ARGOS_BUILD_TESTS": "OFF",
+        "CMAKE_CXX_COMPILER": "/usr/bin/clang++"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "clang-system",
+      "configurePreset": "clang-system"
+    }
+  ]
+}

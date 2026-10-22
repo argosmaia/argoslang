@@ -5,6 +5,7 @@
 
 #include <iosfwd>
 #include <string>
+#include <vector>
 
 namespace argos::repl {
 
@@ -16,6 +17,7 @@ public:
                              source::SourceFile& source,
                              diagnostics::DiagnosticEngine& diagnostics);
   void reset();
+  [[nodiscard]] std::vector<std::string> completion_candidates() const;
 };
 
 } // namespace argos::repl

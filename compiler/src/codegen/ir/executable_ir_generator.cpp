@@ -1,4 +1,5 @@
 #include "argos/codegen/ir/executable_ir_generator.hpp"
+#include "argos/diagnostics/diagnostic_catalog.hpp"
 
 #include <charconv>
 #include <cstdint>
@@ -73,7 +74,8 @@ public:
 
 private:
   void error(const ast::Node &node, std::string message) {
-    diagnostics_.error("ARGOS-C0001", std::move(message), node.span);
+    diagnostics_.emit(diagnostics::catalog::compiler::unsupported_lowering,
+                      node.span, std::move(message));
   }
   LabelId make_block() {
     const auto id = static_cast<LabelId>(function_.blocks.size());
@@ -379,7 +381,8 @@ argos::ir::Module ExecutableIrGenerator::generate(const ast::Program &program) {
   for (const auto &item : program.items) {
     const auto *function = dynamic_cast<const ast::FunctionDeclaration *>(item.get());
     if (!function) {
-      diagnostics_.error("ARGOS-C0001", "somente funções são compiláveis no nível superior", item->span);
+      diagnostics_.emit(diagnostics::catalog::compiler::unsupported_lowering,
+                        item->span, "somente funções são compiláveis no nível superior");
       continue;
     }
     ids.emplace(function->name, static_cast<argos::ir::FunctionId>(functions.size()));
@@ -387,14 +390,16 @@ argos::ir::Module ExecutableIrGenerator::generate(const ast::Program &program) {
     functions.push_back(function);
   }
   if (!ids.contains("main")) {
-    diagnostics_.error("ARGOS-C0002", "executável requer function main() -> int ou void", program.span);
+    diagnostics_.emit(diagnostics::catalog::compiler::invalid_entry_point,
+                      program.span, "executável requer function main() -> int ou void");
   } else {
     const auto *entry = functions[ids.at("main")];
     if (!entry->parameters.empty() || !entry->return_type ||
         (entry->return_type->name != "int" && entry->return_type->name != "Int" &&
          entry->return_type->name != "void") ||
         entry->return_type->nullable_depth != 0)
-      diagnostics_.error("ARGOS-C0002", "entrada deve ser function main() -> int ou void", entry->span);
+      diagnostics_.emit(diagnostics::catalog::compiler::invalid_entry_point,
+                        entry->span, "entrada deve ser function main() -> int ou void");
   }
   if (diagnostics_.has_errors()) return module;
   for (std::size_t id = 0; id < functions.size(); ++id) {

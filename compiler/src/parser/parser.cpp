@@ -1,4 +1,5 @@
 #include "argos/parser/parser.hpp"
+#include "argos/diagnostics/diagnostic_catalog.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -50,6 +51,11 @@ bool is_type_token(lexer::TokenKind kind) noexcept {
       return true;
     default: return false;
     }
+}
+
+bool is_reserved_keyword(lexer::TokenKind kind) noexcept {
+    using K = lexer::TokenKind;
+    return kind >= K::KwVar && kind <= K::KwNever;
 }
 
 } // namespace
@@ -181,11 +187,8 @@ void Parser::report(
     const lexer::Token& token,
     std::string message
 ) {
-    diagnostics_.error(
-        "ARGOS-P0001",
-        std::move(message),
-        token.span
-    );
+    diagnostics_.emit(diagnostics::catalog::parser::unexpected_syntax,
+                      token.span, std::move(message));
 }
 
 void Parser::synchronize() {
@@ -254,6 +257,13 @@ bool Parser::has_line_break_before_current() const noexcept {
 }
 
 ast::BlockItemPtr Parser::parse_block_item() {
+    if (check(lexer::TokenKind::Identifier) && current().lexeme == "functio") {
+        const auto token = advance();
+        diagnostics_.emit(diagnostics::catalog::parser::incomplete_keyword,
+                          token.span, "'functio' não é uma palavra-chave; você quis dizer 'function'?");
+        skip_unsupported_construct();
+        return nullptr;
+    }
     if (match(lexer::TokenKind::KwVar)) {
         return parse_variable_declaration(previous());
     }
@@ -300,10 +310,25 @@ ast::BlockItemPtr Parser::parse_variable_declaration(
         ? ast::Mutability::mutable_
         : ast::Mutability::immutable;
 
-    const lexer::Token name = consume(
-        lexer::TokenKind::Identifier,
-        "esperado nome após 'var' ou 'var mut'"
-    );
+    lexer::Token name;
+    if (check(lexer::TokenKind::IntegerLiteral) || check(lexer::TokenKind::FloatLiteral)) {
+        name = advance();
+        if (check(lexer::TokenKind::Identifier) &&
+            name.span.end.offset == current().span.begin.offset) {
+            const auto suffix = advance();
+            name.lexeme += suffix.lexeme;
+            name.span.end = suffix.span.end;
+        }
+        diagnostics_.emit(diagnostics::catalog::parser::malformed_identifier,
+                          name.span, "identificador não pode começar por número");
+    } else if (is_reserved_keyword(current().kind)) {
+        name = advance();
+        diagnostics_.emit(diagnostics::catalog::parser::reserved_identifier,
+                          name.span, "palavra reservada '" + name.lexeme + "' não pode ser nome de variável");
+    } else {
+        name = consume(lexer::TokenKind::Identifier,
+                       "esperado nome após 'var' ou 'var mut'");
+    }
 
     ast::TypeSyntaxPtr type;
     if (match(lexer::TokenKind::Colon)) type = parse_type();
@@ -330,6 +355,10 @@ ast::BlockItemPtr Parser::parse_variable_declaration(
 ast::BlockItemPtr Parser::parse_function_declaration(
     const lexer::Token& keyword
 ) {
+    if (keyword.lexeme == "func") {
+        diagnostics_.emit(diagnostics::catalog::warning::legacy_function_keyword,
+                          keyword.span);
+    }
     const lexer::Token name = consume(
         lexer::TokenKind::Identifier,
         "esperado nome após 'function'"
@@ -817,6 +846,12 @@ ast::ExpressionPtr Parser::parse_prefix_expression() {
 }
 
 ast::ExpressionPtr Parser::parse_primary_expression() {
+    if (match(lexer::TokenKind::KwThis)) {
+        const lexer::Token token = previous();
+        report(token, "'this' é reservado para métodos de classes; POO ainda não está disponível");
+        return std::make_unique<ast::ErrorExpression>(token.span);
+    }
+
     if (match({lexer::TokenKind::Identifier, lexer::TokenKind::EscapedIdentifier})) {
         const lexer::Token token = previous();
         return std::make_unique<ast::IdentifierExpression>(
@@ -869,6 +904,10 @@ ast::ExpressionPtr Parser::parse_primary_expression() {
     }
 
     if (match(lexer::TokenKind::KwNull)) {
+        if (previous().lexeme == "null") {
+            diagnostics_.emit(diagnostics::catalog::warning::legacy_null_keyword,
+                              previous().span);
+        }
         return std::make_unique<ast::NullLiteralExpression>(
             previous().span
         );

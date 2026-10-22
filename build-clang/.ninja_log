@@ -1,0 +1,18 @@
+# ninja log v5
+4	2269	1792667463328387941	compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.o	92c9f3b2114930cb
+2270	3382	1792667464460366231	compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o	2e95e96bb2af64ea
+2	4153	1792667465221351637	compiler/CMakeFiles/argos_frontend.dir/src/ast/ast_printer.cpp.o	d9ab53f91330f404
+6	4315	1792667465388348435	compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o	add68c0d83c3940
+3	4460	1792667465519345922	compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/ir_generator.cpp.o	b4ec5e6ad9e1b314
+11	6411	1792667467466308583	compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o	45e5d23aa8b561a4
+4	7768	1792667468807282864	compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/executable_ir_generator.cpp.o	8bf6e8a67430ab4c
+4460	9062	1792667470121257662	compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o	7b97574ca2db9466
+6413	10547	1792667471593229431	compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o	266443ff1825d4b1
+9064	13874	1792667474930165428	compiler/CMakeFiles/argosc.dir/src/driver/native_compile.cpp.o	c60143c00aea52f8
+3384	14484	1792667475507154361	compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o	89f164f8964ace68
+4316	14584	1792667475634151925	compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o	ee0578efc067594f
+10547	14970	1792667476042144099	compiler/CMakeFiles/argosc.dir/src/codegen/native/x86_64/x86_64_codegen.cpp.o	b05ea57dc2cfb25e
+4154	15430	1792667476494135429	compiler/CMakeFiles/argos_frontend.dir/src/repl/repl_session.cpp.o	7f1e1430f6647d71
+7768	15464	1792667476526134816	compiler/CMakeFiles/argosc.dir/src/driver/main.cpp.o	37042f9191f6920f
+15430	15573	1792667476604133320	compiler/libargos_frontend.a	5aade5bfc1b2048a
+15573	15978	1792667477055124669	bin/argosc	54968e18882fac68

@@ -1,0 +1,23 @@
+site_name: ArgosLang Documentation
+site_description: Guia e referência da linguagem ArgosLang
+docs_dir: docs
+theme:
+  name: readthedocs
+nav:
+  - Guia da Linguagem:
+      - Início: guide/README.md
+      - Instalação: guide/01-instalacao-e-primeiros-passos.md
+      - Primeiro programa: guide/02-primeiro-programa.md
+      - Variáveis e tipos: guide/03-variaveis-e-tipos.md
+      - Expressões e operadores: guide/04-expressoes-e-operadores.md
+      - Funções: guide/05-funcoes.md
+      - Fluxo de controle: guide/06-fluxo-de-controle.md
+      - REPL: guide/07-repl.md
+      - Ferramentas e diagnósticos: guide/08-ferramentas-e-diagnosticos.md
+  - Referência v0.0.1: argoslang-v0.0.1.md
+  - Arquitetura: architecture.md
+  - Gramática: grammar-spec.md
+  - Diagnósticos:
+      - Visão geral: diagnostics/README.md
+      - Chamadas de função: diagnostics/semantic-calls.md
+  - MVP: mvp.md

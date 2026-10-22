@@ -14,6 +14,7 @@ add_library(argos_frontend STATIC
 )
 
 find_package(ICU REQUIRED COMPONENTS uc)
+find_library(ARGOS_READLINE_LIBRARY readline REQUIRED)
 
 target_include_directories(argos_frontend
     PUBLIC
@@ -39,4 +40,5 @@ target_link_libraries(argosc
         argos_frontend
         argos_project_options
         argos_project_warnings
+        ${ARGOS_READLINE_LIBRARY}
 )

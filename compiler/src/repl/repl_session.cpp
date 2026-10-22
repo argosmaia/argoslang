@@ -128,7 +128,10 @@ private:
   }
   static Value numeric(double value, bool floating) { return floating ? Value{value} : Value{static_cast<std::int64_t>(value)}; }
   Value binary_expression(const ast::BinaryExpression& expression) {
-    if (expression.op == ast::BinaryOperator::logical_and) { const Value left = this->expression(*expression.left); return Value{left.truthy() && this->expression(*expression.right).truthy()}; }
+    if (expression.op == ast::BinaryOperator::logical_and) {
+      const Value left = this->expression(*expression.left);
+      return Value{left.truthy() && this->expression(*expression.right).truthy()};
+    }
     if (expression.op == ast::BinaryOperator::logical_or) { const Value left = this->expression(*expression.left); return Value{left.truthy() || this->expression(*expression.right).truthy()}; }
     const Value left = this->expression(*expression.left);
     if (expression.op == ast::BinaryOperator::null_coalescing) return left.is_nil() ? this->expression(*expression.right) : left;
@@ -224,6 +227,21 @@ public:
     return true;
   }
   void reset() { bindings_.clear(); variables_.clear(); functions_.clear(); }
+  [[nodiscard]] std::vector<std::string> completion_candidates() const {
+    std::vector<std::string> result{
+        ":help", ":quit", ":q", ":reset", "function", "var", "mut",
+        "if", "else", "while", "break", "continue", "return", "print",
+        "true", "false", "nil", "int", "double", "bool", "char", "string", "void"};
+    for (const auto& [name, binding] : bindings_) result.push_back(name);
+    for (const auto& definition : functions_) {
+      const auto start = definition.find_first_not_of(" \t");
+      const auto name_start = definition.find(' ', start);
+      if (name_start == std::string::npos) continue;
+      const auto name_end = definition.find('(', name_start + 1);
+      if (name_end != std::string::npos) result.push_back(definition.substr(name_start + 1, name_end - name_start - 1));
+    }
+    return result;
+  }
 private:
   std::unordered_map<std::string, Binding> bindings_;
   std::vector<std::string> variables_;
@@ -234,4 +252,5 @@ private:
 static State session;
 bool ReplSession::execute(const std::string& input, std::ostream& output, source::SourceFile& source, diagnostics::DiagnosticEngine& diagnostics) { return session.execute(input, output, source, diagnostics); }
 void ReplSession::reset() { session.reset(); }
+std::vector<std::string> ReplSession::completion_candidates() const { return session.completion_candidates(); }
 } // namespace argos::repl

@@ -1,0 +1,6 @@
+/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/edit_cache.dir
+/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/rebuild_cache.dir
+/home/dgti/Projetos/argoslang/build-clang/compiler/CMakeFiles/argos_frontend.dir
+/home/dgti/Projetos/argoslang/build-clang/compiler/CMakeFiles/argosc.dir
+/home/dgti/Projetos/argoslang/build-clang/compiler/CMakeFiles/edit_cache.dir
+/home/dgti/Projetos/argoslang/build-clang/compiler/CMakeFiles/rebuild_cache.dir

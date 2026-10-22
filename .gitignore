@@ -24,6 +24,10 @@ compile_commands.json
 /docs/*
 !/docs/architecture.md
 !/docs/grammar-spec.md
+!/docs/guide/
+!/docs/guide/*.md
+!/docs/diagnostics/
+!/docs/diagnostics/*.md
 !/docs/teachings/
 !/docs/teachings/*.md
 /examples/*

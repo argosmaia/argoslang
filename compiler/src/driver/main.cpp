@@ -11,6 +11,8 @@
 #include "argos/vm/vm.hpp"
 
 #include <filesystem>
+#include <cstdlib>
+#include <cstring>
 #include <exception>
 #include <iomanip>
 #include <iostream>
@@ -18,7 +20,34 @@
 #include <string_view>
 #include <vector>
 
+#include <readline/history.h>
+#include <readline/readline.h>
+
 namespace {
+
+argos::repl::ReplSession* active_repl_session = nullptr;
+
+char* repl_completion_generator(const char* text, int state) {
+    static std::vector<std::string> candidates;
+    static std::size_t index = 0;
+    if (state == 0) {
+        candidates = active_repl_session ? active_repl_session->completion_candidates()
+                                         : std::vector<std::string>{};
+        index = 0;
+    }
+    const std::string_view prefix{text};
+    while (index < candidates.size()) {
+        const auto& candidate = candidates[index++];
+        if (candidate.starts_with(prefix)) return ::strdup(candidate.c_str());
+    }
+    return nullptr;
+}
+
+char** repl_completion(const char* text, int start, int end) {
+    (void)start;
+    (void)end;
+    return rl_completion_matches(text, repl_completion_generator);
+}
 
 void print_usage(std::string_view executable) {
     std::cerr
@@ -45,7 +74,7 @@ void print_diagnostics(
             << diagnostic.span.begin.line
             << ':'
             << diagnostic.span.begin.column
-            << ": error["
+            << ": " << argos::diagnostics::severity_name(diagnostic.severity) << "["
             << diagnostic.code
             << "]: "
             << diagnostic.message
@@ -64,10 +93,14 @@ void print_diagnostics(
 
 int run_repl() {
     std::cout << "ArgosLang REPL. Use :help ou :quit.\n";
-    std::string line;
     argos::repl::ReplSession session;
-    while (std::cout << ">>> " && std::getline(std::cin, line)) {
-        if (line == ":quit" || line == ":q") return 0;
+    active_repl_session = &session;
+    rl_attempted_completion_function = repl_completion;
+    while (char* raw_line = readline(">>> ")) {
+        std::string line{raw_line};
+        std::free(raw_line);
+        if (!line.empty()) add_history(line.c_str());
+        if (line == ":quit" || line == ":q") break;
         if (line == ":reset") {
             session.reset();
             std::cout << "Sessão reiniciada.\n";
@@ -92,6 +125,8 @@ int run_repl() {
         (void)session.execute(line, std::cout, source_file, diagnostics);
         print_diagnostics(source_file, diagnostics);
     }
+    clear_history();
+    active_repl_session = nullptr;
     return 0;
 }
 

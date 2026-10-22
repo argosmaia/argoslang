@@ -1,4 +1,5 @@
 #include "argos/semantics/semantic_analyzer.hpp"
+#include "argos/diagnostics/diagnostic_catalog.hpp"
 
 #include <utility>
 #include <algorithm>
@@ -285,7 +286,7 @@ void SemanticAnalyzer::analyze_declaration(
         labels.push_back(parameter->external_label);
         if (!parameter->external_label.empty() &&
             !used_labels.insert(parameter->external_label).second)
-          report("ARGOS-S0347", parameter->span,
+          report(diagnostics::catalog::semantic::calls::duplicate_parameter_label.code, parameter->span,
                  "rótulo de parâmetro " + quoted(parameter->external_label) +
                  " duplicado");
       }
@@ -479,10 +480,10 @@ void SemanticAnalyzer::analyze_statement(const ast::Statement &statement) {
     break;
   }
   case ast::NodeKind::break_statement:
-    if (loop_depth_ == 0) report("ARGOS-S0200", statement.span, "'break' só pode ser usado dentro de um laço");
+    if (loop_depth_ == 0) report(diagnostics::catalog::semantic::control::break_outside_loop.code, statement.span, "'break' só pode ser usado dentro de um laço");
     break;
   case ast::NodeKind::continue_statement:
-    if (loop_depth_ == 0) report("ARGOS-S0201", statement.span, "'continue' só pode ser usado dentro de um laço");
+    if (loop_depth_ == 0) report(diagnostics::catalog::semantic::control::continue_outside_loop.code, statement.span, "'continue' só pode ser usado dentro de um laço");
     break;
   case ast::NodeKind::unsafe_block_statement: {
     const auto &unsafe_stmt =
@@ -506,7 +507,7 @@ void SemanticAnalyzer::analyze_block(const ast::BlockStatement &block) {
 
 void SemanticAnalyzer::analyze_return(const ast::ReturnStatement &statement) {
   if (functions_.empty()) {
-    report("ARGOS-S0200", statement.span,
+    report(diagnostics::catalog::semantic::control::return_outside_function.code, statement.span,
            "'return' só pode aparecer dentro de uma função");
     return;
   }
@@ -522,7 +523,7 @@ void SemanticAnalyzer::analyze_return(const ast::ReturnStatement &statement) {
             : is_assignable(actual, expected);
   if (!return_assignable && !actual.is_error() &&
       !expected.is_error()) {
-    report("ARGOS-S0201", statement.span,
+    report(diagnostics::catalog::semantic::control::incompatible_return.code, statement.span,
            "retorno incompatível: função retorna " + type_name(expected) +
                ", mas a expressão possui tipo " + type_name(actual));
   }
@@ -866,7 +867,7 @@ Type SemanticAnalyzer::analyze_call(const ast::CallExpression &expression) {
   const auto *identifier =
       dynamic_cast<const ast::IdentifierExpression *>(expression.callee.get());
   if (identifier == nullptr) {
-    report("ARGOS-S0340", expression.callee->span,
+    report(diagnostics::catalog::semantic::calls::non_named_callee.code, expression.callee->span,
            "somente funções nomeadas podem ser chamadas nesta versão da "
            "linguagem");
     for (const auto &argument : expression.arguments)
@@ -881,7 +882,7 @@ Type SemanticAnalyzer::analyze_call(const ast::CallExpression &expression) {
 
   const Symbol *function = lookup(identifier->name);
   if (function == nullptr || function->kind != Symbol::Kind::function) {
-    report("ARGOS-S0341", expression.callee->span,
+    report(diagnostics::catalog::semantic::calls::undeclared_function.code, expression.callee->span,
            "'" + identifier->name + "' não é uma função declarada");
     for (const auto &argument : expression.arguments) (void)analyze_expression(*argument);
     return error_type();
@@ -899,32 +900,32 @@ Type SemanticAnalyzer::analyze_call(const ast::CallExpression &expression) {
       while (next_positional < bound.size() && bound[next_positional]) ++next_positional;
       if (next_positional < bound.size() &&
           function->parameter_labels[next_positional].empty()) parameter = next_positional++;
-      else report("ARGOS-S0344", expression.arguments[i]->span,
+      else report(diagnostics::catalog::semantic::calls::positional_argument_without_slot.code, expression.arguments[i]->span,
                   "argumento posicional não corresponde a parâmetro sem rótulo");
     } else {
       for (std::size_t j = 0; j < function->parameter_labels.size(); ++j) {
         if (function->parameter_labels[j] == label) { parameter = j; break; }
       }
       if (parameter == bound.size())
-        report("ARGOS-S0345", expression.arguments[i]->span,
+        report(diagnostics::catalog::semantic::calls::unknown_argument_label.code, expression.arguments[i]->span,
                "rótulo de argumento " + quoted(label) + " inexistente");
     }
     if (parameter < bound.size()) {
       if (bound[parameter])
-        report("ARGOS-S0346", expression.arguments[i]->span,
+        report(diagnostics::catalog::semantic::calls::duplicate_argument.code, expression.arguments[i]->span,
                "parâmetro recebeu argumento mais de uma vez");
       bound[parameter] = true;
       const bool assignable = is_assignable_expression(
           actual, function->parameter_types[parameter], *expression.arguments[i]);
       if (!assignable && !actual.is_error())
-        report("ARGOS-S0343", expression.arguments[i]->span,
+        report(diagnostics::catalog::semantic::calls::incompatible_argument.code, expression.arguments[i]->span,
                "tipo do argumento incompatível com o parâmetro correspondente");
       if (assignable) record_coercion(*expression.arguments[i], actual,
                                      function->parameter_types[parameter]);
     }
   }
   for (std::size_t i = 0; i < bound.size(); ++i)
-    if (!bound[i]) report("ARGOS-S0342", expression.span,
+    if (!bound[i]) report(diagnostics::catalog::semantic::calls::missing_argument.code, expression.span,
                           "faltou argumento para o parâmetro " +
                           quoted(function->parameter_labels[i].empty()
                                      ? std::to_string(i + 1) : function->parameter_labels[i]));
@@ -1189,7 +1190,7 @@ void SemanticAnalyzer::check_function_returns(
   const Type return_type = functions_.back().return_type;
   if (return_type.kind != TypeKind::void_type && !return_type.is_error() &&
       !block_guarantees_return(*declaration.body)) {
-    report("ARGOS-S0202", declaration.span,
+    report(diagnostics::catalog::semantic::control::missing_return.code, declaration.span,
            "função não-Void deve retornar em todos os caminhos");
   }
 }

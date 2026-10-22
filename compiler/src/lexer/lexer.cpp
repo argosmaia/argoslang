@@ -1,4 +1,5 @@
 #include "argos/lexer/lexer.hpp"
+#include "argos/diagnostics/diagnostic_catalog.hpp"
 
 #include <cctype>
 #include <cstddef>
@@ -136,9 +137,9 @@ std::vector<Token> Lexer::tokenize() {
     const auto point = decode_code_point(source_file_.content, byte_offset);
     const auto width = std::max<std::size_t>(point.width, 1);
     if (point.value < 0) {
-      diagnostics_.error("ARGOS-L0003", "sequência UTF-8 inválida",
-                         {{byte_offset, source_line, source_column},
-                          {byte_offset + width, source_line, source_column + 1}});
+      diagnostics_.emit(diagnostics::catalog::lexer::invalid_utf8,
+                        {{byte_offset, source_line, source_column},
+                         {byte_offset + width, source_line, source_column + 1}});
     }
     byte_offset += width;
     if (point.value == '\n') { ++source_line; source_column = 1; }
@@ -294,7 +295,7 @@ void Lexer::skip_block_comment() {
   }
 
   if (nesting_depth != 0) {
-    diagnostics_.error("ARGOS-L0001", "comentário de bloco não terminado",
+    diagnostics_.emit(diagnostics::catalog::lexer::unterminated_block_comment,
                        source::SourceSpan{
                            .begin = begin,
                            .end =
@@ -798,7 +799,8 @@ Token Lexer::make_invalid_token(source::SourceLocation begin,
           },
   };
 
-  diagnostics_.error("ARGOS-L0002", std::move(message), span);
+  diagnostics_.emit(diagnostics::catalog::lexer::invalid_token, span,
+                    std::move(message));
 
   return Token{
       .kind = TokenKind::Invalid,

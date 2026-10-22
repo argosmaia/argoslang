@@ -74,6 +74,7 @@ echo $?  # 42
 
 ## Documentation & Guides
 
+- [docs/guide/README.md](docs/guide/README.md): Guia principal por capítulos: instalação, sintaxe, tipos, funções, fluxo, REPL e diagnósticos.
 - [docs/architecture.md](docs/architecture.md): Direção arquitetural e limites das fases.
 - [docs/grammar-spec.md](docs/grammar-spec.md): Gramática e semântica planejadas.
 - [docs/testing-and-compiler-guide.md](docs/testing-and-compiler-guide.md): Guia de testes do compilador.
