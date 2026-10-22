@@ -1,0 +1,8 @@
+function is_even(_ value: int) -> bool {
+    return value % 2 == 0
+}
+
+function main() -> int {
+    print(is_even(42))
+    return 0
+}

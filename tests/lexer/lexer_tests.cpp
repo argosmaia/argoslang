@@ -39,14 +39,14 @@ TEST_CASE("lexes Swift-like null-safety chain") {
     argos::diagnostics::DiagnosticEngine diagnostics;
 
     const auto kinds = kinds_of(
-        R"(let name: String = user?.profile?.name ?? "Anonymous")",
+        R"(var name: string = user?.profile?.name ?? "Anonymous")",
         diagnostics
     );
 
     REQUIRE_FALSE(diagnostics.has_errors());
 
     REQUIRE(kinds == std::vector{
-        argos::lexer::TokenKind::KwLet,
+        argos::lexer::TokenKind::KwVar,
         argos::lexer::TokenKind::Identifier,
         argos::lexer::TokenKind::Colon,
         argos::lexer::TokenKind::KwString,
@@ -99,14 +99,14 @@ TEST_CASE("supports nested block comments") {
     argos::diagnostics::DiagnosticEngine diagnostics;
 
     const auto kinds = kinds_of(
-        "let /* outer /* inner */ outer */ value = null",
+        "var /* outer /* inner */ outer */ value = nil",
         diagnostics
     );
 
     REQUIRE_FALSE(diagnostics.has_errors());
 
     REQUIRE(kinds == std::vector{
-        argos::lexer::TokenKind::KwLet,
+        argos::lexer::TokenKind::KwVar,
         argos::lexer::TokenKind::Identifier,
         argos::lexer::TokenKind::Equal,
         argos::lexer::TokenKind::KwNull,
@@ -116,7 +116,7 @@ TEST_CASE("supports nested block comments") {
 
 TEST_CASE("treats newlines inside block comments as eligible terminators") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto kinds = kinds_of("let x = 1 /* note\n continued */ let y = 2", diagnostics);
+    const auto kinds = kinds_of("var x = 1 /* note\n continued */ var y = 2", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     REQUIRE(std::count(kinds.begin(), kinds.end(), argos::lexer::TokenKind::Semicolon) == 1);
 }
@@ -136,7 +136,7 @@ TEST_CASE("reports unterminated strings") {
 TEST_CASE("lexes Unicode identifiers and new literal forms") {
     argos::diagnostics::DiagnosticEngine diagnostics;
     const auto kinds = kinds_of(
-        "let café = 1.25e2; let letter: Char = 'á'; let text = \"\"\"a\nb\"\"\";",
+        "var café = 1.25e2; var letter: char = 'á'; var text = \"\"\"a\nb\"\"\";",
         diagnostics
     );
     REQUIRE_FALSE(diagnostics.has_errors());
@@ -148,14 +148,14 @@ TEST_CASE("lexes Unicode identifiers and new literal forms") {
 
 TEST_CASE("inserts terminators only at eligible newlines") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto kinds = kinds_of("let x = (1 +\n 2)\nlet y = 3", diagnostics);
+    const auto kinds = kinds_of("var x = (1 +\n 2)\nvar y = 3", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     REQUIRE(std::count(kinds.begin(), kinds.end(), argos::lexer::TokenKind::Semicolon) == 1);
 }
 
 TEST_CASE("keeps multiline signatures and operator continuations together") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto kinds = kinds_of("func f()\n -> Int { return\n1\n+ 2; }", diagnostics);
+    const auto kinds = kinds_of("function f()\n -> int { return\n1\n+ 2; }", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     REQUIRE(kinds[4] == argos::lexer::TokenKind::Arrow);
     REQUIRE(std::count(kinds.begin(), kinds.end(), argos::lexer::TokenKind::Semicolon) == 2);
@@ -163,7 +163,7 @@ TEST_CASE("keeps multiline signatures and operator continuations together") {
 
 TEST_CASE("rejects malformed UTF-8 identifiers") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto kinds = kinds_of(std::string{"let "} + static_cast<char>(0xC3) + " = 1", diagnostics);
+    const auto kinds = kinds_of(std::string{"var "} + static_cast<char>(0xC3) + " = 1", diagnostics);
     REQUIRE(diagnostics.has_errors());
     REQUIRE(std::find(kinds.begin(), kinds.end(), argos::lexer::TokenKind::Invalid) != kinds.end());
 }
@@ -183,7 +183,7 @@ TEST_CASE("rejects invalid character escapes") {
 
 TEST_CASE("reserves declaration and control keywords from the grammar") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto kinds = kinds_of("protocol User(); match value {} defer {} extern C func f();", diagnostics);
+    const auto kinds = kinds_of("protocol User(); match value {} defer {} extern C function f();", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     REQUIRE(kinds[0] == argos::lexer::TokenKind::KwProtocol);
     REQUIRE(std::find(kinds.begin(), kinds.end(), argos::lexer::TokenKind::KwMatch) != kinds.end());

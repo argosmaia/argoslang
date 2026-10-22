@@ -1,0 +1,11 @@
+function main() -> int {
+    var mut index: int = 0
+    var mut total: int = 0
+    while index < 6 {
+        index = index + 1
+        if index == 2 continue
+        if index == 5 break
+        total = total + index
+    }
+    return total
+}

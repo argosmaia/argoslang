@@ -1,256 +1,294 @@
 #include "argos/repl/repl_session.hpp"
 
 #include "argos/ast/ast.hpp"
+#include "argos/codegen/ir/ir_generator.hpp"
+#include "argos/diagnostics/diagnostic_catalog.hpp"
 #include "argos/lexer/lexer.hpp"
 #include "argos/parser/parser.hpp"
 #include "argos/semantics/semantic_analyzer.hpp"
+#include "argos/vm/vm.hpp"
 
-#include <charconv>
-#include <cmath>
-#include <memory>
+#include <algorithm>
 #include <optional>
 #include <ostream>
 #include <sstream>
+#include <string>
 #include <string_view>
-#include <unordered_map>
 #include <utility>
-#include <variant>
 #include <vector>
 
 namespace argos::repl {
 namespace {
 
-struct Value final {
-  using Data = std::variant<std::monostate, std::int64_t, double, bool, std::string>;
-  Data data{};
-  [[nodiscard]] bool is_nil() const { return std::holds_alternative<std::monostate>(data); }
-  [[nodiscard]] bool truthy() const {
-    if (const auto* value = std::get_if<bool>(&data)) return *value;
-    return !is_nil();
-  }
-  [[nodiscard]] std::string text() const {
-    if (is_nil()) return "nil";
-    if (const auto* value = std::get_if<std::int64_t>(&data)) return std::to_string(*value);
-    if (const auto* value = std::get_if<double>(&data)) { std::ostringstream out; out << *value; return out.str(); }
-    if (const auto* value = std::get_if<bool>(&data)) return *value ? "true" : "false";
-    return std::get<std::string>(data);
-  }
+constexpr std::string_view state_marker = "__argos_repl_state_9e2e6f15__";
+
+struct Variable final {
+  std::string name;
+  std::string type;
+  std::string value;
+  bool mutable_{false};
+  bool initialized{false};
 };
 
-struct Binding final { Value value; bool mutable_{false}; };
+std::string_view trim(std::string_view text) {
+  const auto first = text.find_first_not_of(" \t\r\n");
+  if (first == std::string_view::npos) return {};
+  const auto last = text.find_last_not_of(" \t\r\n");
+  return text.substr(first, last - first + 1);
+}
 
-class Interpreter final {
-public:
-  Interpreter(std::unordered_map<std::string, Binding>& globals, std::ostream& output)
-      : globals_(globals), output_(output) {}
+bool is_function_definition(std::string_view input) {
+  input = trim(input);
+  return input.starts_with("function ") || input.starts_with("func ");
+}
 
-  void functions(const ast::Program& program) {
-    functions_.clear();
-    for (const auto& item : program.items)
-      if (const auto* function = dynamic_cast<const ast::FunctionDeclaration*>(item.get()))
-        functions_.insert_or_assign(function->name, function);
-  }
+std::string variable_source(const Variable &variable) {
+  std::string source = "var " +
+      std::string(variable.mutable_ ? "mut " : "") + "`" + variable.name +
+      "`: " + variable.type;
+  if (variable.initialized) source += " = " + variable.value;
+  return source + ";\n";
+}
 
-  void declare(const ast::VariableDeclaration& declaration, bool only_if_missing = false) {
-    if (only_if_missing && globals_.contains(declaration.name)) return;
-    Value value{};
-    if (declaration.initializer) value = expression(*declaration.initializer);
-    globals_.insert_or_assign(declaration.name, Binding{std::move(value), declaration.mutability == ast::Mutability::mutable_});
-  }
+std::optional<std::string> executable_type(const semantics::Type &type) {
+  if (type.nullable_depth != 0) return std::nullopt;
+  if (type.kind == semantics::TypeKind::int_type) return "int";
+  if (type.kind == semantics::TypeKind::bool_type) return "bool";
+  if (type.kind == semantics::TypeKind::float_type) return "float";
+  if (type.kind == semantics::TypeKind::double_type) return "double";
+  return std::nullopt;
+}
 
-  void execute_item(const ast::BlockItem& item) {
-    if (const auto* declaration = dynamic_cast<const ast::VariableDeclaration*>(&item)) { declare(*declaration); return; }
-    if (const auto* statement = dynamic_cast<const ast::ExpressionStatement*>(&item)) { (void)expression(*statement->expression); return; }
-    if (const auto* block = dynamic_cast<const ast::BlockStatement*>(&item)) { execute_block(*block); return; }
-    if (const auto* conditional = dynamic_cast<const ast::IfStatement*>(&item)) {
-      if (expression(*conditional->condition).truthy()) execute_block(*conditional->then_branch);
-      else if (conditional->else_branch) execute_item(*conditional->else_branch);
-      return;
-    }
-    if (const auto* loop = dynamic_cast<const ast::WhileStatement*>(&item)) {
-      // A semântica já validou a condição; o limite protege o REPL de travar por acidente.
-      for (std::size_t iterations = 0; expression(*loop->condition).truthy() && iterations < 1'000'000; ++iterations)
-        execute_block(*loop->body);
-    }
-  }
+std::optional<std::string> executable_type(const ast::TypeSyntax &type) {
+  if (type.nullable_depth != 0) return std::nullopt;
+  if (type.name == "int" || type.name == "Int") return "int";
+  if (type.name == "bool" || type.name == "Bool") return "bool";
+  if (type.name == "float" || type.name == "Float") return "float";
+  if (type.name == "double" || type.name == "Double") return "double";
+  return std::nullopt;
+}
 
-  [[nodiscard]] Value expression(const ast::Expression& node) {
-    if (const auto* integer = dynamic_cast<const ast::IntegerLiteralExpression*>(&node)) {
-      std::string digits;
-      for (const char character : integer->spelling) if (character != '_') digits += character;
-      std::int64_t result{}; std::from_chars(digits.data(), digits.data() + digits.size(), result);
-      return Value{result};
+std::string compose_source(const std::vector<std::string> &functions,
+                           const std::vector<Variable> &variables,
+                           std::string_view input, bool echo_expression,
+                           bool function_definition,
+                           const std::vector<Variable> &snapshot_variables) {
+  std::string content;
+  for (const auto &function : functions) content += function + '\n';
+  content += "function main() -> int {\n";
+  for (const auto &variable : variables) content += variable_source(variable);
+  if (!function_definition) {
+    if (echo_expression) {
+      input = trim(input);
+      if (!input.empty() && input.back() == ';') input.remove_suffix(1);
+      content += "print(" + std::string(input) + ")\n";
+    } else {
+      content += input;
+      content += '\n';
     }
-    if (const auto* floating = dynamic_cast<const ast::FloatLiteralExpression*>(&node)) return Value{std::stod(floating->spelling)};
-    if (const auto* string = dynamic_cast<const ast::StringLiteralExpression*>(&node)) return Value{unquote(string->spelling)};
-    if (const auto* character = dynamic_cast<const ast::CharacterLiteralExpression*>(&node)) return Value{unquote(character->spelling)};
-    if (const auto* boolean = dynamic_cast<const ast::BooleanLiteralExpression*>(&node)) return Value{boolean->value};
-    if (dynamic_cast<const ast::NullLiteralExpression*>(&node)) return Value{};
-    if (const auto* group = dynamic_cast<const ast::GroupingExpression*>(&node)) return expression(*group->expression);
-    if (const auto* identifier = dynamic_cast<const ast::IdentifierExpression*>(&node)) {
-      const auto found = globals_.find(identifier->name);
-      return found == globals_.end() ? Value{} : found->second.value;
-    }
-    if (const auto* unary = dynamic_cast<const ast::UnaryExpression*>(&node)) {
-      const Value operand = expression(*unary->operand);
-      if (unary->op == ast::UnaryOperator::not_) return Value{!operand.truthy()};
-      if (const auto* integer = std::get_if<std::int64_t>(&operand.data)) return Value{unary->op == ast::UnaryOperator::minus ? -*integer : *integer};
-      if (const auto* floating = std::get_if<double>(&operand.data)) return Value{unary->op == ast::UnaryOperator::minus ? -*floating : *floating};
-      return Value{};
-    }
-    if (const auto* assignment = dynamic_cast<const ast::AssignmentExpression*>(&node)) {
-      const auto* target = dynamic_cast<const ast::IdentifierExpression*>(assignment->target.get());
-      Value value = expression(*assignment->value);
-      if (target) {
-        const auto found = globals_.find(target->name);
-        if (found != globals_.end() && found->second.mutable_) found->second.value = value;
-      }
-      return value;
-    }
-    if (const auto* binary = dynamic_cast<const ast::BinaryExpression*>(&node)) return binary_expression(*binary);
-    if (const auto* call = dynamic_cast<const ast::CallExpression*>(&node)) return call_expression(*call);
-    return Value{};
   }
+  const bool has_initialized_snapshot =
+      std::any_of(snapshot_variables.begin(), snapshot_variables.end(),
+                  [](const Variable &variable) { return variable.initialized; });
+  if (has_initialized_snapshot) {
+    content += "print(\"" + std::string(state_marker) + "\")\n";
+    for (const auto &variable : snapshot_variables)
+      if (variable.initialized)
+        content += "print(`" + variable.name + "`)\n";
+  }
+  content += "return 0\n}\n";
+  return content;
+}
 
-private:
-  void execute_block(const ast::BlockStatement& block) {
-    for (const auto& item : block.items) execute_item(*item);
-  }
-  static std::string unquote(const std::string& spelling) {
-    if (spelling.size() < 2) return spelling;
-    return spelling.substr(1, spelling.size() - 2);
-  }
-  static bool equal(const Value& left, const Value& right) { return left.data == right.data; }
-  static std::optional<double> number(const Value& value) {
-    if (const auto* integer = std::get_if<std::int64_t>(&value.data)) return static_cast<double>(*integer);
-    if (const auto* floating = std::get_if<double>(&value.data)) return *floating;
-    return std::nullopt;
-  }
-  static Value numeric(double value, bool floating) { return floating ? Value{value} : Value{static_cast<std::int64_t>(value)}; }
-  Value binary_expression(const ast::BinaryExpression& expression) {
-    if (expression.op == ast::BinaryOperator::logical_and) {
-      const Value left = this->expression(*expression.left);
-      return Value{left.truthy() && this->expression(*expression.right).truthy()};
-    }
-    if (expression.op == ast::BinaryOperator::logical_or) { const Value left = this->expression(*expression.left); return Value{left.truthy() || this->expression(*expression.right).truthy()}; }
-    const Value left = this->expression(*expression.left);
-    if (expression.op == ast::BinaryOperator::null_coalescing) return left.is_nil() ? this->expression(*expression.right) : left;
-    const Value right = this->expression(*expression.right);
-    if (expression.op == ast::BinaryOperator::equal || expression.op == ast::BinaryOperator::lifted_equal) return Value{equal(left, right)};
-    if (expression.op == ast::BinaryOperator::not_equal) return Value{!equal(left, right)};
-    const auto l = number(left); const auto r = number(right);
-    if (!l || !r) return Value{};
-    const bool floating = std::holds_alternative<double>(left.data) || std::holds_alternative<double>(right.data);
-    switch (expression.op) {
-    case ast::BinaryOperator::add: return numeric(*l + *r, floating);
-    case ast::BinaryOperator::subtract: return numeric(*l - *r, floating);
-    case ast::BinaryOperator::multiply: return numeric(*l * *r, floating);
-    case ast::BinaryOperator::divide: return numeric(*l / *r, true);
-    case ast::BinaryOperator::modulo: return numeric(std::fmod(*l, *r), floating);
-    case ast::BinaryOperator::less_than: return Value{*l < *r};
-    case ast::BinaryOperator::less_than_or_equal: return Value{*l <= *r};
-    case ast::BinaryOperator::greater_than: return Value{*l > *r};
-    case ast::BinaryOperator::greater_than_or_equal: return Value{*l >= *r};
-    default: return Value{};
-    }
-  }
-  Value call_expression(const ast::CallExpression& call) {
-    const auto* callee = dynamic_cast<const ast::IdentifierExpression*>(call.callee.get());
-    if (!callee) return Value{};
-    if (callee->name == "print") {
-      for (const auto& argument : call.arguments) output_ << expression(*argument).text();
-      output_ << '\n'; return Value{};
-    }
-    // Funções do REPL são interpretadas em um escopo simples de parâmetros.
-    const auto found = functions_.find(callee->name);
-    if (found == functions_.end()) return Value{};
-    std::unordered_map<std::string, Binding> saved = globals_;
-    for (std::size_t i = 0; i < found->second->parameters.size() && i < call.arguments.size(); ++i)
-      globals_.insert_or_assign(found->second->parameters[i]->name, Binding{expression(*call.arguments[i]), true});
-    Value result{};
-    for (const auto& item : found->second->body->items) {
-      if (const auto* returned = dynamic_cast<const ast::ReturnStatement*>(item.get())) { if (returned->expression) result = expression(*returned->expression); break; }
-      if (const auto* declaration = dynamic_cast<const ast::VariableDeclaration*>(item.get())) declare(*declaration);
-      if (const auto* statement = dynamic_cast<const ast::ExpressionStatement*>(item.get())) (void)expression(*statement->expression);
-    }
-    globals_ = std::move(saved);
-    return result;
-  }
-  std::unordered_map<std::string, Binding>& globals_;
-  std::unordered_map<std::string, const ast::FunctionDeclaration*> functions_;
-  std::ostream& output_;
-};
+const ast::FunctionDeclaration *main_function(const ast::Program &program) {
+  for (const auto &item : program.items)
+    if (const auto *function =
+            dynamic_cast<const ast::FunctionDeclaration *>(item.get());
+        function && function->name == "main")
+      return function;
+  return nullptr;
+}
+
+bool is_print_call(const ast::Expression &expression) {
+  const auto *call = dynamic_cast<const ast::CallExpression *>(&expression);
+  const auto *callee =
+      call ? dynamic_cast<const ast::IdentifierExpression *>(call->callee.get())
+           : nullptr;
+  return callee && callee->name == "print";
+}
 
 class State final {
 public:
-  bool execute(const std::string& input, std::ostream& output, source::SourceFile& source,
-               diagnostics::DiagnosticEngine& diagnostics) {
-    const auto first = input.find_first_not_of(" \t");
-    const std::string_view trimmed = first == std::string::npos ? std::string_view{} : std::string_view{input}.substr(first);
-    const bool definition = trimmed.starts_with("function ") || trimmed.starts_with("func ");
-    std::string content;
-    for (const auto& function : functions_) content += function + '\n';
-    if (definition) content += input + "\nfunction main() -> void {}";
-    else {
-      content += "function main() -> void {\n";
-      for (const auto& variable : variables_) content += variable + '\n';
-      content += input + "\n}";
+  bool execute(const std::string &input, std::ostream &output,
+               source::SourceFile &source_file,
+               diagnostics::DiagnosticEngine &diagnostics) {
+    const bool function_definition = is_function_definition(input);
+    auto next_functions = functions_;
+    if (function_definition) next_functions.push_back(input);
+
+    source::SourceFile probe_source{
+        .path = "<repl>",
+        .content = compose_source(next_functions, variables_, input, false,
+                                  function_definition, {})};
+    diagnostics::DiagnosticEngine probe_diagnostics;
+    lexer::Lexer probe_lexer{probe_source, probe_diagnostics};
+    parser::Parser probe_parser{probe_lexer.tokenize(), probe_diagnostics};
+    auto probe_program = probe_parser.parse_program();
+    semantics::SemanticAnalyzer probe_analyzer{probe_diagnostics};
+    const bool probe_valid =
+        !probe_diagnostics.has_errors() && probe_analyzer.analyze(probe_program) &&
+        !probe_diagnostics.has_errors();
+
+    bool echo_expression = false;
+    auto next_variables = variables_;
+    if (probe_valid && !function_definition) {
+      if (const auto *entry = main_function(probe_program)) {
+        const auto first_input = variables_.size();
+        const auto input_end = entry->body->items.size() > 0
+                                   ? entry->body->items.size() - 1
+                                   : 0;
+        for (std::size_t index = first_input; index < input_end; ++index) {
+          const auto *declaration =
+              dynamic_cast<const ast::VariableDeclaration *>(
+                  entry->body->items[index].get());
+          if (!declaration) continue;
+          std::optional<std::string> type;
+          if (declaration->type)
+            type = executable_type(*declaration->type);
+          else if (declaration->initializer)
+            type = executable_type(
+                probe_analyzer.type_of(*declaration->initializer));
+          if (type) {
+            next_variables.push_back(
+                {declaration->name, *type, {},
+                 declaration->mutability == ast::Mutability::mutable_,
+                 declaration->initializer != nullptr});
+          }
+        }
+
+        if (input_end == first_input + 1) {
+          const auto *statement =
+              dynamic_cast<const ast::ExpressionStatement *>(
+                  entry->body->items[first_input].get());
+          if (statement && !is_print_call(*statement->expression)) {
+            const auto type =
+                executable_type(probe_analyzer.type_of(*statement->expression));
+            echo_expression = type.has_value();
+          }
+        }
+      }
     }
-    source = source::SourceFile{.path = "<repl>", .content = std::move(content)};
-    lexer::Lexer lexer{source, diagnostics};
+    if (probe_valid)
+      for (auto &variable : next_variables)
+        variable.initialized = probe_analyzer.is_initialized(variable.name);
+
+    source_file = source::SourceFile{
+        .path = "<repl>",
+        .content = compose_source(next_functions, variables_, input,
+                                  echo_expression, function_definition,
+                                  next_variables)};
+    lexer::Lexer lexer{source_file, diagnostics};
     parser::Parser parser{lexer.tokenize(), diagnostics};
-    const auto program = parser.parse_program();
+    auto program = parser.parse_program();
+    if (diagnostics.has_errors()) return false;
+
     semantics::SemanticAnalyzer analyzer{diagnostics};
-    if (diagnostics.has_errors() || !analyzer.analyze(program) || diagnostics.has_errors()) return false;
-    Interpreter interpreter{bindings_, output};
-    interpreter.functions(program);
-    if (definition) { functions_.push_back(input); return true; }
-    const ast::FunctionDeclaration* main = nullptr;
-    for (const auto& item : program.items)
-      if (const auto* function = dynamic_cast<const ast::FunctionDeclaration*>(item.get()); function && function->name == "main") main = function;
-    if (!main || main->body->items.empty()) return true;
-    const std::size_t previous_variables = variables_.size();
-    for (std::size_t i = 0; i < previous_variables && i < main->body->items.size(); ++i)
-      if (const auto* variable = dynamic_cast<const ast::VariableDeclaration*>(main->body->items[i].get())) interpreter.declare(*variable, true);
-    const auto& item = main->body->items.back();
-    if (const auto* variable = dynamic_cast<const ast::VariableDeclaration*>(item.get())) {
-      interpreter.declare(*variable); variables_.push_back(input); return true;
+    if (!analyzer.analyze(program) || diagnostics.has_errors()) return false;
+    for (auto &variable : next_variables)
+      variable.initialized = analyzer.is_initialized(variable.name);
+
+    codegen::ir::IrGenerator generator{diagnostics, analyzer};
+    const auto module = generator.generate(program);
+    if (diagnostics.has_errors()) return false;
+
+    std::ostringstream vm_output;
+    try {
+      vm::VM machine;
+      machine.load(module);
+      machine.set_output(vm_output);
+      (void)machine.run();
+    } catch (const std::exception &error) {
+      diagnostics.emit(diagnostics::catalog::runtime::execution_failure,
+                       program.span, error.what());
+      output << vm_output.str();
+      return false;
     }
-    if (const auto* statement = dynamic_cast<const ast::ExpressionStatement*>(item.get())) {
-      const Value value = interpreter.expression(*statement->expression);
-      const auto* call = dynamic_cast<const ast::CallExpression*>(statement->expression.get());
-      const auto* id = call ? dynamic_cast<const ast::IdentifierExpression*>(call->callee.get()) : nullptr;
-      if (!id || id->name != "print") output << value.text() << '\n';
-    } else {
-      interpreter.execute_item(*item);
+
+    std::string captured = vm_output.str();
+    std::vector<Variable *> snapshot_variables;
+    for (auto &variable : next_variables)
+      if (variable.initialized) snapshot_variables.push_back(&variable);
+    if (!snapshot_variables.empty()) {
+      const std::string marker = std::string(state_marker) + '\n';
+      const auto marker_position = captured.rfind(marker);
+      if (marker_position == std::string::npos) {
+        diagnostics.error("ARGOS-R0001",
+                          "não consegui guardar os valores desta sessão",
+                          program.span);
+        return false;
+      }
+      std::istringstream values{
+          captured.substr(marker_position + marker.size())};
+      for (auto *variable : snapshot_variables) {
+        if (!std::getline(values, variable->value)) {
+          diagnostics.error("ARGOS-R0001",
+                            "não consegui guardar o valor de " + variable->name,
+                            program.span);
+          return false;
+        }
+      }
+      captured.resize(marker_position);
     }
+
+    functions_ = std::move(next_functions);
+    variables_ = std::move(next_variables);
+    output << captured;
     return true;
   }
-  void reset() { bindings_.clear(); variables_.clear(); functions_.clear(); }
+
+  void reset() {
+    variables_.clear();
+    functions_.clear();
+  }
+
   [[nodiscard]] std::vector<std::string> completion_candidates() const {
     std::vector<std::string> result{
         ":help", ":quit", ":q", ":reset", "function", "var", "mut",
         "if", "else", "while", "break", "continue", "return", "print",
-        "true", "false", "nil", "int", "double", "bool", "char", "string", "void"};
-    for (const auto& [name, binding] : bindings_) result.push_back(name);
-    for (const auto& definition : functions_) {
+        "true", "false", "nil", "int", "float", "double", "bool", "char",
+        "string", "void"};
+    for (const auto &variable : variables_) result.push_back(variable.name);
+    for (const auto &definition : functions_) {
       const auto start = definition.find_first_not_of(" \t");
       const auto name_start = definition.find(' ', start);
       if (name_start == std::string::npos) continue;
       const auto name_end = definition.find('(', name_start + 1);
-      if (name_end != std::string::npos) result.push_back(definition.substr(name_start + 1, name_end - name_start - 1));
+      if (name_end != std::string::npos)
+        result.push_back(
+            definition.substr(name_start + 1, name_end - name_start - 1));
     }
     return result;
   }
+
 private:
-  std::unordered_map<std::string, Binding> bindings_;
-  std::vector<std::string> variables_;
+  std::vector<Variable> variables_;
   std::vector<std::string> functions_;
 };
+
+State session;
+
 } // namespace
 
-static State session;
-bool ReplSession::execute(const std::string& input, std::ostream& output, source::SourceFile& source, diagnostics::DiagnosticEngine& diagnostics) { return session.execute(input, output, source, diagnostics); }
+bool ReplSession::execute(const std::string &input, std::ostream &output,
+                          source::SourceFile &source_file,
+                          diagnostics::DiagnosticEngine &diagnostics) {
+  return session.execute(input, output, source_file, diagnostics);
+}
+
 void ReplSession::reset() { session.reset(); }
-std::vector<std::string> ReplSession::completion_candidates() const { return session.completion_candidates(); }
+
+std::vector<std::string> ReplSession::completion_candidates() const {
+  return session.completion_candidates();
+}
+
 } // namespace argos::repl

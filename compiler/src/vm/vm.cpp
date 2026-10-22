@@ -1,7 +1,10 @@
 #include "argos/vm/vm.hpp"
+#include "argos/ir/validator.hpp"
 
 #include <charconv>
+#include <bit>
 #include <cstdint>
+#include <iomanip>
 #include <limits>
 #include <stdexcept>
 #include <string_view>
@@ -22,18 +25,20 @@ namespace {
 std::int32_t VM::run() const {
   if (module_ == nullptr)
     throw std::runtime_error("nenhum módulo foi carregado na VM");
+  if (const auto error = argos::ir::validate_module(*module_))
+    invalid(*error);
   for (const auto &function : module_->functions) {
     if (function.name == "main") {
       if (function.parameter_count != 0)
         invalid("main não pode receber parâmetros");
-      return execute(function.id, {});
+      return static_cast<std::int32_t>(execute(function.id, {}));
     }
   }
   throw std::runtime_error("módulo não contém uma função main");
 }
 
-std::int32_t VM::execute(argos::ir::FunctionId function_id,
-                         const std::vector<std::int32_t>& arguments) const {
+std::uint64_t VM::execute(argos::ir::FunctionId function_id,
+                          const std::vector<std::uint64_t> &arguments) const {
   if (module_ == nullptr || function_id >= module_->functions.size())
     invalid("função ausente");
   const auto &function = module_->functions[function_id];
@@ -49,18 +54,26 @@ std::int32_t VM::execute(argos::ir::FunctionId function_id,
   if (function.blocks.empty())
     invalid("função sem blocos");
 
-  std::vector<std::int32_t> registers(function.register_count, 0);
-  std::vector<std::int32_t> slots(function.slot_count, 0);
+  std::vector<std::uint64_t> registers(function.register_count, 0);
+  std::vector<std::uint64_t> slots(function.slot_count, 0);
   for (std::size_t index = 0; index < arguments.size(); ++index) slots[index] = arguments[index];
-  const auto register_value = [&](argos::ir::Register reg) -> std::int32_t {
+  const auto register_value = [&](argos::ir::Register reg) -> std::uint64_t {
     if (reg >= registers.size())
       invalid("registrador fora dos limites");
     return registers[reg];
   };
-  const auto set_register = [&](argos::ir::Register reg, std::int32_t value) {
+  const auto set_register = [&](argos::ir::Register reg, std::uint64_t value) {
     if (reg >= registers.size())
       invalid("registrador fora dos limites");
     registers[reg] = value;
+  };
+  const auto integer_value = [&](argos::ir::Register reg) {
+    return static_cast<std::int32_t>(register_value(reg));
+  };
+  const auto double_value = [&](argos::ir::Register reg) {
+    if (function.register_types[reg] == argos::ir::ValueType::float64)
+      return std::bit_cast<double>(register_value(reg));
+    return static_cast<double>(integer_value(reg));
   };
 
   std::size_t block_index = 0;
@@ -77,6 +90,7 @@ std::int32_t VM::execute(argos::ir::FunctionId function_id,
       continue;
     }
     const auto &instruction = block.instructions[instruction_index++];
+    std::ostream &output = output_ ? *output_ : std::cout;
     const auto jump_to = [&](argos::ir::LabelId label) {
       const auto target = blocks.find(label);
       if (target == blocks.end())
@@ -93,12 +107,23 @@ std::int32_t VM::execute(argos::ir::FunctionId function_id,
       if (instruction.constant >= module_->constants.size())
         invalid("constante fora dos limites");
       const auto &text = module_->constants[instruction.constant].value;
-      std::int32_t value{};
-      const auto [end, error] =
-          std::from_chars(text.data(), text.data() + text.size(), value);
-      if (error != std::errc{} || end != text.data() + text.size())
-        invalid("constante Int inválida");
-      set_register(instruction.dst, value);
+      if (function.register_types[instruction.dst] ==
+          argos::ir::ValueType::float64) {
+        double value{};
+        const auto [end, error] =
+            std::from_chars(text.data(), text.data() + text.size(), value);
+        if (error != std::errc{} || end != text.data() + text.size())
+          invalid("constante double inválida");
+        set_register(instruction.dst, std::bit_cast<std::uint64_t>(value));
+      } else {
+        std::int32_t value{};
+        const auto [end, error] =
+            std::from_chars(text.data(), text.data() + text.size(), value);
+        if (error != std::errc{} || end != text.data() + text.size())
+          invalid("constante Int inválida");
+        set_register(instruction.dst, static_cast<std::uint64_t>(
+                                          static_cast<std::int64_t>(value)));
+      }
       break;
     }
     case Opcode::load_var:
@@ -112,71 +137,125 @@ std::int32_t VM::execute(argos::ir::FunctionId function_id,
       slots[instruction.slot] = register_value(instruction.src1);
       break;
     case Opcode::neg: {
-      const auto value = register_value(instruction.src1);
-      if (value == std::numeric_limits<std::int32_t>::min())
-        throw std::runtime_error("overflow aritmético na VM");
-      set_register(instruction.dst, -value);
+      if (function.register_types[instruction.dst] ==
+          argos::ir::ValueType::float64) {
+        set_register(instruction.dst, std::bit_cast<std::uint64_t>(
+                                          -double_value(instruction.src1)));
+      } else {
+        const auto value = integer_value(instruction.src1);
+        if (value == std::numeric_limits<std::int32_t>::min())
+          throw std::runtime_error("overflow aritmético na VM");
+        set_register(instruction.dst, static_cast<std::uint64_t>(
+                                          static_cast<std::int64_t>(-value)));
+      }
       break;
     }
+    case Opcode::int_to_double:
+      set_register(instruction.dst, std::bit_cast<std::uint64_t>(
+                                        static_cast<double>(integer_value(instruction.src1))));
+      break;
     case Opcode::logical_not:
       set_register(instruction.dst,
                    register_value(instruction.src1) == 0 ? 1 : 0);
       break;
     case Opcode::add:
-      set_register(
-          instruction.dst,
-          static_cast<std::int32_t>(
-              static_cast<std::uint32_t>(register_value(instruction.src1)) +
-              static_cast<std::uint32_t>(register_value(instruction.src2))));
+      if (function.register_types[instruction.dst] == argos::ir::ValueType::float64)
+        set_register(instruction.dst, std::bit_cast<std::uint64_t>(
+                                          double_value(instruction.src1) +
+                                          double_value(instruction.src2)));
+      else
+        set_register(instruction.dst, static_cast<std::uint64_t>(
+                                          static_cast<std::int64_t>(
+                                              static_cast<std::int32_t>(
+                                                  static_cast<std::uint32_t>(integer_value(instruction.src1)) +
+                                                  static_cast<std::uint32_t>(integer_value(instruction.src2))))));
       break;
     case Opcode::sub:
-      set_register(
-          instruction.dst,
-          static_cast<std::int32_t>(
-              static_cast<std::uint32_t>(register_value(instruction.src1)) -
-              static_cast<std::uint32_t>(register_value(instruction.src2))));
+      if (function.register_types[instruction.dst] == argos::ir::ValueType::float64)
+        set_register(instruction.dst, std::bit_cast<std::uint64_t>(
+                                          double_value(instruction.src1) -
+                                          double_value(instruction.src2)));
+      else
+        set_register(instruction.dst, static_cast<std::uint64_t>(
+                                          static_cast<std::int64_t>(
+                                              static_cast<std::int32_t>(
+                                                  static_cast<std::uint32_t>(integer_value(instruction.src1)) -
+                                                  static_cast<std::uint32_t>(integer_value(instruction.src2))))));
       break;
     case Opcode::mul:
-      set_register(
-          instruction.dst,
-          static_cast<std::int32_t>(
-              static_cast<std::uint32_t>(register_value(instruction.src1)) *
-              static_cast<std::uint32_t>(register_value(instruction.src2))));
+      if (function.register_types[instruction.dst] == argos::ir::ValueType::float64)
+        set_register(instruction.dst, std::bit_cast<std::uint64_t>(
+                                          double_value(instruction.src1) *
+                                          double_value(instruction.src2)));
+      else
+        set_register(instruction.dst, static_cast<std::uint64_t>(
+                                          static_cast<std::int64_t>(
+                                              static_cast<std::int32_t>(
+                                                  static_cast<std::uint32_t>(integer_value(instruction.src1)) *
+                                                  static_cast<std::uint32_t>(integer_value(instruction.src2))))));
       break;
     case Opcode::div:
+      set_register(instruction.dst, std::bit_cast<std::uint64_t>(
+                                        double_value(instruction.src1) /
+                                        double_value(instruction.src2)));
+      break;
     case Opcode::mod: {
-      const auto lhs = register_value(instruction.src1);
-      const auto rhs = register_value(instruction.src2);
+      const auto lhs = integer_value(instruction.src1);
+      const auto rhs = integer_value(instruction.src2);
       if (rhs == 0 ||
           (lhs == std::numeric_limits<std::int32_t>::min() && rhs == -1))
-        throw std::runtime_error("divisão inválida na VM");
-      set_register(instruction.dst,
-                   instruction.opcode == Opcode::div ? lhs / rhs : lhs % rhs);
+        throw std::runtime_error(
+            "módulo por zero ou resultado fora do intervalo\n  em " +
+            function.name);
+      set_register(instruction.dst, static_cast<std::uint64_t>(
+                                        static_cast<std::int64_t>(lhs % rhs)));
       break;
     }
     case Opcode::cmp_eq:
-      set_register(instruction.dst, register_value(instruction.src1) ==
-                                        register_value(instruction.src2));
+      set_register(instruction.dst,
+                   function.register_types[instruction.src1] ==
+                           argos::ir::ValueType::float64
+                       ? double_value(instruction.src1) ==
+                             double_value(instruction.src2)
+                       : register_value(instruction.src1) ==
+                             register_value(instruction.src2));
       break;
     case Opcode::cmp_ne:
-      set_register(instruction.dst, register_value(instruction.src1) !=
-                                        register_value(instruction.src2));
+      set_register(instruction.dst,
+                   function.register_types[instruction.src1] ==
+                           argos::ir::ValueType::float64
+                       ? double_value(instruction.src1) !=
+                             double_value(instruction.src2)
+                       : register_value(instruction.src1) !=
+                             register_value(instruction.src2));
       break;
     case Opcode::cmp_lt:
-      set_register(instruction.dst, register_value(instruction.src1) <
-                                        register_value(instruction.src2));
+      set_register(instruction.dst,
+                   function.register_types[instruction.src1] ==
+                           argos::ir::ValueType::float64
+                       ? double_value(instruction.src1) < double_value(instruction.src2)
+                       : integer_value(instruction.src1) < integer_value(instruction.src2));
       break;
     case Opcode::cmp_le:
-      set_register(instruction.dst, register_value(instruction.src1) <=
-                                        register_value(instruction.src2));
+      set_register(instruction.dst,
+                   function.register_types[instruction.src1] ==
+                           argos::ir::ValueType::float64
+                       ? double_value(instruction.src1) <= double_value(instruction.src2)
+                       : integer_value(instruction.src1) <= integer_value(instruction.src2));
       break;
     case Opcode::cmp_gt:
-      set_register(instruction.dst, register_value(instruction.src1) >
-                                        register_value(instruction.src2));
+      set_register(instruction.dst,
+                   function.register_types[instruction.src1] ==
+                           argos::ir::ValueType::float64
+                       ? double_value(instruction.src1) > double_value(instruction.src2)
+                       : integer_value(instruction.src1) > integer_value(instruction.src2));
       break;
     case Opcode::cmp_ge:
-      set_register(instruction.dst, register_value(instruction.src1) >=
-                                        register_value(instruction.src2));
+      set_register(instruction.dst,
+                   function.register_types[instruction.src1] ==
+                           argos::ir::ValueType::float64
+                       ? double_value(instruction.src1) >= double_value(instruction.src2)
+                       : integer_value(instruction.src1) >= integer_value(instruction.src2));
       break;
     case Opcode::jmp:
       jump_to(instruction.label);
@@ -186,21 +265,30 @@ std::int32_t VM::execute(argos::ir::FunctionId function_id,
         jump_to(instruction.label);
       break;
     case Opcode::call: {
-      std::vector<std::int32_t> call_arguments;
+      std::vector<std::uint64_t> call_arguments;
       for (const auto reg : instruction.arguments) call_arguments.push_back(register_value(reg));
-      set_register(instruction.dst, execute(instruction.function, call_arguments));
+      try {
+        set_register(instruction.dst, execute(instruction.function, call_arguments));
+      } catch (const std::exception &error) {
+        throw std::runtime_error(std::string{error.what()} + "\n  chamado por " +
+                                 function.name);
+      }
       break;
     }
-    case Opcode::print_int: std::cout << register_value(instruction.src1); break;
-    case Opcode::print_bool: std::cout << (register_value(instruction.src1) != 0 ? "true" : "false"); break;
+    case Opcode::print_int: output << integer_value(instruction.src1); break;
+    case Opcode::print_bool: output << (register_value(instruction.src1) != 0 ? "true" : "false"); break;
+    case Opcode::print_double:
+      output << std::setprecision(17) << std::defaultfloat
+             << std::bit_cast<double>(register_value(instruction.src1));
+      break;
     case Opcode::print_string: {
       if (instruction.constant >= module_->constants.size()) invalid("constante fora dos limites");
       const auto &literal = module_->constants[instruction.constant].value;
       if (literal.size() < 2) invalid("literal de string inválido");
-      std::cout << literal.substr(1, literal.size() - 2);
+      output << literal.substr(1, literal.size() - 2);
       break;
     }
-    case Opcode::print_newline: std::cout << '\n'; break;
+    case Opcode::print_newline: output << '\n'; break;
     case Opcode::ret:
       return register_value(instruction.src1);
     default:

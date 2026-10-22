@@ -1,0 +1,5 @@
+function main() -> int {
+    var flag: bool = true
+    print(flag)
+    return 0
+}

@@ -7,6 +7,7 @@ add_library(argos_frontend STATIC
     src/lexer/lexer.cpp
     src/lexer/token_kind.cpp
     src/parser/parser.cpp
+    src/ir/validator.cpp
     src/repl/repl_session.cpp
     src/semantics/semantic_analyzer.cpp
     src/source/source_manager.cpp

@@ -1,0 +1,10 @@
+function half(_ value: double) -> double {
+    return value / 2
+}
+
+function main() -> int {
+    print(1 / 2)
+    print(1.0 / 2.0)
+    print(half(1.0))
+    return 0
+}

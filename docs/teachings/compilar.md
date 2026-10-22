@@ -48,11 +48,11 @@ Para `arquivo.argos`, a forma curta pedida é:
 echo $?
 ```
 
-O nome da saída é o nome do fonte sem a extensão `.argos`. O arquivo precisa conter uma entrada `func main() -> int`; por exemplo:
+O nome da saída é o nome do fonte sem a extensão `.argos`. O arquivo precisa conter uma entrada `function main() -> int`; por exemplo:
 
 ```argos
-func main() -> int {
-    let answer: int = 6 * 7
+function main() -> int {
+    var answer: int = 6 * 7
     return answer
 }
 ```
@@ -69,9 +69,9 @@ Use `-o` para escolher o caminho do binário:
 echo $?
 ```
 
-Nesse caso o status esperado é `14`. O linker escreve uma saída temporária e só instala o executável após sucesso; `-o` não pode apontar para o próprio arquivo-fonte. Em sistemas Unix, o status do processo preserva apenas os oito bits baixos do retorno de `main()`: não use `echo $?` para verificar resultados fora de `0..255`. Ainda não há impressão automática do valor de retorno. Rode `echo $?` **imediatamente** após o executável, antes de outro comando alterar o status do shell.
+Nesse caso o status esperado é `14`. O linker escreve uma saída temporária e só instala o executável após sucesso; `-o` não pode apontar para o próprio arquivo-fonte. Em sistemas Unix, o status do processo preserva apenas os oito bits baixos do retorno de `main()`: não use `echo $?` para verificar resultados fora de `0..255`. `print` escreve na saída padrão. Rode `echo $?` **imediatamente** após o executável, antes de outro comando alterar o status do shell.
 
-**Limites atuais:** apenas x86-64/Linux, `func main() -> int`, funções sem parâmetros, variáveis locais `int`/`bool`, literais decimais, aritmética, comparações, atribuição simples, `if`, `while`, chamadas sem argumentos e `return`. O backend emite assembly diretamente da IR e usa `cc` apenas para assembler/linker, não para transpilar ArgosLang para C. Divisão por zero e overflow ainda não têm uma política de runtime própria.
+**Limites atuais:** backend nativo x86-64/Linux; funções com até seis parâmetros `int`/`bool`/`float`/`double`; variáveis locais `var` e `var mut`, inclusive declarações tipadas sem inicializador; inteiros, números reais, booleanos e strings literais em `print`; aritmética inteira e real, comparações, atribuição, `if`, `while`, `break`, `continue`, chamadas e `return`. `/` sempre produz `double`, mesmo para operandos `int`; `%` é inteiro e erros de módulo por zero ou `int.min % -1` terminam com status 70. `float` e `double` usam binary64 nesta versão. `main` pode retornar `int` ou `void`. O backend gera assembly a partir da IR tipada/validada e usa `cc` apenas para montar e ligar, não para transpilar ArgosLang para C.
 
 `examples/null_safety.argos` **ainda não compila para executável**: não define `main()` e usa protocolos, strings, opcionais e variáveis de topo, que não têm lowering nesse backend. `argosc check examples/null_safety.argos` pode validar o frontend, mas `argosc examples/null_safety.argos` termina com diagnóstico `ARGOS-C0001`/`ARGOS-C0002`, sem criar binário. O exemplo `minimal_optional.argos` também passa em `check`, porém ainda não compila para máquina.
 
@@ -92,13 +92,15 @@ Os comandos do frontend são `lex`, `parse`, `ast` e `check`:
 
 ## 4. Ampliar a compilação
 
-O caminho projetado em [architecture.md](../architecture.md) é:
+O caminho executável atual e a arquitetura-alvo estão descritos em
+[architecture.md](../architecture.md):
 
 ```text
-.argos -> lexer -> parser -> semântica -> IR Argos verificada
-       -> backend nativo do alvo -> objeto/executável
+.argos -> lexer -> parser manual -> semântica -> IR tipada e validada
+       -> VM (direto da IR) ou assembly x86-64 -> cc (montagem/link)
 ```
 
-Esse caminho está ligado ao CLI somente para a fatia executável descrita acima. O restante da IR, um verificador geral, formatos de objeto próprios, outras ABIs e backends de máquina ainda precisam ser implementados e testados. Passar em `check` não significa que a compilação nativa desse arquivo esteja disponível.
+Um arquivo de bytecode independente ainda não existe, e passar em `check` não
+significa que toda construção do frontend esteja disponível para execução.
 
 Para rodar um programa pela VM quando esse backend estiver pronto, consulte [interpretar.md](interpretar.md). Para distribuição e alvos de hardware, consulte [executar-em-maquinas.md](executar-em-maquinas.md).

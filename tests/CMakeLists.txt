@@ -10,8 +10,11 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 
 add_executable(argos_tests
+    diagnostics/diagnostic_tests.cpp
+    ir/ir_tests.cpp
     lexer/lexer_tests.cpp
     parser/parser_tests.cpp
+    repl/repl_tests.cpp
     semantics/semantic_tests.cpp
 )
 
@@ -37,6 +40,12 @@ foreach(example IN ITEMS
     minimal_nested
     minimal_signed
     minimal_parameters
+    minimal_print_int
+    minimal_print_bool
+    minimal_print_string
+    minimal_boolean_call
+    minimal_control_flow
+    minimal_real_division
 )
     add_test(
         NAME "example_${example}_check"
@@ -44,6 +53,20 @@ foreach(example IN ITEMS
                 "${PROJECT_SOURCE_DIR}/examples/${example}.argos"
     )
 endforeach()
+add_test(
+    NAME example_minimal_modulo_by_zero_vm
+    COMMAND "${CMAKE_COMMAND}"
+        "-DARGOSC=$<TARGET_FILE:argosc>"
+        "-DSOURCE=${PROJECT_SOURCE_DIR}/examples/minimal_modulo_by_zero.argos"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/runtime_error.cmake"
+)
+add_test(
+    NAME example_minimal_modulo_overflow_vm
+    COMMAND "${CMAKE_COMMAND}"
+        "-DARGOSC=$<TARGET_FILE:argosc>"
+        "-DSOURCE=${PROJECT_SOURCE_DIR}/examples/minimal_modulo_overflow.argos"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/runtime_error.cmake"
+)
 
 foreach(example_expected IN ITEMS
     "minimal_literal:42"
@@ -54,16 +77,36 @@ foreach(example_expected IN ITEMS
     "minimal_nested:11"
     "minimal_signed:2"
     "minimal_parameters:42"
+    "minimal_print_int:0"
+    "minimal_print_bool:0"
+    "minimal_print_string:0"
+    "minimal_boolean_call:0"
+    "minimal_control_flow:8"
+    "minimal_break:7"
+    "minimal_real_division:0"
 )
     string(REPLACE ":" ";" example_parts "${example_expected}")
     list(GET example_parts 0 example)
     list(GET example_parts 1 expected)
+    set(expected_stdout "")
+    if(example STREQUAL "minimal_print_int")
+        set(expected_stdout "42")
+    elseif(example STREQUAL "minimal_print_bool")
+        set(expected_stdout "true")
+    elseif(example STREQUAL "minimal_print_string")
+        set(expected_stdout "hello")
+    elseif(example STREQUAL "minimal_boolean_call")
+        set(expected_stdout "true")
+    elseif(example STREQUAL "minimal_real_division")
+        set(expected_stdout "0.5\n0.5\n0.5")
+    endif()
     add_test(
         NAME "example_${example}_vm"
         COMMAND "${CMAKE_COMMAND}"
             "-DARGOSC=$<TARGET_FILE:argosc>"
             "-DSOURCE=${PROJECT_SOURCE_DIR}/examples/${example}.argos"
             "-DEXPECTED=${expected}"
+            "-DEXPECTED_STDOUT=${expected_stdout}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/run_example.cmake"
     )
 endforeach()
@@ -79,10 +122,29 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
         "minimal_nested:11"
         "minimal_signed:2"
         "minimal_parameters:42"
+        "minimal_print_int:0"
+        "minimal_print_bool:0"
+        "minimal_print_string:0"
+        "minimal_boolean_call:0"
+        "minimal_control_flow:8"
+        "minimal_break:7"
+        "minimal_real_division:0"
     )
         string(REPLACE ":" ";" example_parts "${example_expected}")
         list(GET example_parts 0 example)
         list(GET example_parts 1 expected)
+        set(expected_stdout "")
+        if(example STREQUAL "minimal_print_int")
+            set(expected_stdout "42")
+        elseif(example STREQUAL "minimal_print_bool")
+            set(expected_stdout "true")
+        elseif(example STREQUAL "minimal_print_string")
+            set(expected_stdout "hello")
+        elseif(example STREQUAL "minimal_boolean_call")
+            set(expected_stdout "true")
+        elseif(example STREQUAL "minimal_real_division")
+            set(expected_stdout "0.5\n0.5\n0.5")
+        endif()
         add_test(
             NAME "example_${example}_native"
             COMMAND "${CMAKE_COMMAND}"
@@ -90,6 +152,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
                 "-DSOURCE=${PROJECT_SOURCE_DIR}/examples/${example}.argos"
                 "-DBINARY=${CMAKE_BINARY_DIR}/bin/${example}-test"
                 "-DEXPECTED=${expected}"
+                "-DEXPECTED_STDOUT=${expected_stdout}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/compile_example.cmake"
         )
     endforeach()
@@ -113,4 +176,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/compile_rejection.cmake"
         )
     endforeach()
+    add_test(
+        NAME example_minimal_modulo_by_zero_native
+        COMMAND "${CMAKE_COMMAND}"
+            "-DARGOSC=$<TARGET_FILE:argosc>"
+            "-DSOURCE=${PROJECT_SOURCE_DIR}/examples/minimal_modulo_by_zero.argos"
+            "-DBINARY=${CMAKE_BINARY_DIR}/bin/minimal-modulo-by-zero-test"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/runtime_error.cmake"
+    )
+    add_test(
+        NAME example_minimal_modulo_overflow_native
+        COMMAND "${CMAKE_COMMAND}"
+            "-DARGOSC=$<TARGET_FILE:argosc>"
+            "-DSOURCE=${PROJECT_SOURCE_DIR}/examples/minimal_modulo_overflow.argos"
+            "-DBINARY=${CMAKE_BINARY_DIR}/bin/minimal-modulo-overflow-test"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/runtime_error.cmake"
+    )
 endif()

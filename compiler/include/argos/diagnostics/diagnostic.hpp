@@ -25,7 +25,9 @@ enum class Severity {
 struct Diagnostic final {
     Severity severity{Severity::error};
     std::string code;
+    std::string title;
     std::string message;
+    std::string explanation;
     std::string help;
     source::SourceSpan span{};
 };

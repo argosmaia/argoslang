@@ -232,6 +232,11 @@ bool SemanticAnalyzer::declare(Symbol symbol) {
 void SemanticAnalyzer::report(std::string_view code,
                               const source::SourceSpan &span,
                               std::string message) {
+  if (const auto *definition =
+          diagnostics::catalog::semantic::find_definition(code)) {
+    diagnostics_.emit(*definition, span, std::move(message));
+    return;
+  }
   diagnostics_.error(std::string(code), std::move(message), span);
 }
 
@@ -550,6 +555,8 @@ void SemanticAnalyzer::analyze_if(const ast::IfStatement &statement) {
       const bool in_then = then_state[i].symbols.at(name).initialized;
       const bool in_else = else_state[i].symbols.at(name).initialized;
       symbol.initialized = symbol.initialized || (in_then && in_else);
+      if (symbol.id < symbol_records_.size())
+        symbol_records_[symbol.id].initialized = symbol.initialized;
     }
   }
 }
@@ -634,9 +641,9 @@ Type SemanticAnalyzer::analyze_identifier(
   }
   if (!analyzing_assignment_target_ &&
       symbol->kind != Symbol::Kind::function && !symbol->initialized) {
-    diagnostics_.error("ARGOS-S0301", "variável " + quoted(expression.name) +
-        " usada antes da inicialização", expression.span,
-        "inicialize-a antes do uso: var " + expression.name + ": int = 0");
+    report("ARGOS-S0301", expression.span,
+           "variável " + quoted(expression.name) +
+               " usada antes da inicialização");
   }
   expression_symbols_[&expression] = symbol->id;
   if (symbol->kind == Symbol::Kind::type) {
@@ -691,18 +698,29 @@ Type SemanticAnalyzer::analyze_binary(const ast::BinaryExpression &expression) {
              "operação aritmética exige operandos numéricos não opcionais");
       return error_type();
     }
-    if (left.kind == right.kind) return left;
-    if (is_assignable_expression(right, left, *expression.right)) {
-      record_coercion(*expression.right, right, left);
-      return left;
+    if (expression.op == ast::BinaryOperator::modulo &&
+        (!is_integral(left) || !is_integral(right))) {
+      report("ARGOS-S0320", expression.span,
+             "módulo exige operandos inteiros");
+      return error_type();
     }
-    if (is_assignable_expression(left, right, *expression.left)) {
-      record_coercion(*expression.left, left, right);
-      return right;
+    if (expression.op == ast::BinaryOperator::divide) {
+      const Type double_type{TypeKind::double_type, 0};
+      if (is_assignable(left, double_type))
+        record_coercion(*expression.left, left, double_type);
+      if (is_assignable(right, double_type))
+        record_coercion(*expression.right, right, double_type);
+      return double_type;
     }
-    report("ARGOS-S0321", expression.span,
-           "operandos aritméticos devem possuir o mesmo tipo");
-    return error_type();
+    const Type common = common_numeric_type(left, right);
+    if (common.is_error()) {
+      report("ARGOS-S0321", expression.span,
+             "operandos aritméticos devem possuir tipos numéricos compatíveis");
+      return error_type();
+    }
+    if (left != common) record_coercion(*expression.left, left, common);
+    if (right != common) record_coercion(*expression.right, right, common);
+    return common;
   }
   case ast::BinaryOperator::less_than:
   case ast::BinaryOperator::less_than_or_equal:
@@ -805,7 +823,11 @@ Type SemanticAnalyzer::analyze_assignment(
   }
 
   const auto mark_initialized = [&]() {
-    if (target_symbol) target_symbol->initialized = true;
+    if (target_symbol) {
+      target_symbol->initialized = true;
+      if (target_symbol->id < symbol_records_.size())
+        symbol_records_[target_symbol->id].initialized = true;
+    }
     return target;
   };
 
@@ -1124,6 +1146,22 @@ bool SemanticAnalyzer::is_assignable(Type from, Type to) noexcept {
     return to.is_optional();
   }
 
+  if (to.nullable_depth == 0 && from.nullable_depth == 0) {
+    const auto real_type = [](TypeKind kind) {
+      return kind == TypeKind::float_type || kind == TypeKind::double_type;
+    };
+    const auto integral_type = [](TypeKind kind) {
+      return kind == TypeKind::byte || kind == TypeKind::sbyte ||
+             kind == TypeKind::short_type || kind == TypeKind::ushort_type ||
+             kind == TypeKind::int_type || kind == TypeKind::uint_type ||
+             kind == TypeKind::long_type || kind == TypeKind::ulong_type ||
+             kind == TypeKind::usize || kind == TypeKind::isize;
+    };
+    if ((integral_type(from.kind) && real_type(to.kind)) ||
+        (real_type(from.kind) && real_type(to.kind)))
+      return true;
+  }
+
   if (from.kind != to.kind) {
     return false;
   }
@@ -1147,9 +1185,19 @@ bool SemanticAnalyzer::is_equality_comparable(Type left, Type right) noexcept {
 }
 
 Type SemanticAnalyzer::common_numeric_type(Type left, Type right) noexcept {
-  if (left.kind == right.kind)
-    return Type{left.kind, 0};
-  return error_type();
+  const auto rank = [](TypeKind kind) {
+    switch (kind) {
+    case TypeKind::float_type: return 1;
+    case TypeKind::double_type: return 2;
+    default: return 0;
+    }
+  };
+  if (left.kind == right.kind) return Type{left.kind, 0};
+  if (!is_numeric(left) || !is_numeric(right) || left.is_optional() ||
+      right.is_optional())
+    return error_type();
+  return rank(left.kind) >= rank(right.kind) ? Type{left.kind, 0}
+                                              : Type{right.kind, 0};
 }
 
 bool SemanticAnalyzer::require_boolean(Type type,
@@ -1241,6 +1289,15 @@ SemanticAnalyzer::symbol_id_of(const ast::Expression &expression) const {
 
 const Symbol *SemanticAnalyzer::symbol_by_id(SymbolId id) const noexcept {
   return id < symbol_records_.size() ? &symbol_records_[id] : nullptr;
+}
+
+bool SemanticAnalyzer::is_initialized(std::string_view name) const noexcept {
+  for (auto symbol = symbol_records_.rbegin(); symbol != symbol_records_.rend();
+       ++symbol) {
+    if (symbol->kind == Symbol::Kind::variable && symbol->name == name)
+      return symbol->initialized;
+  }
+  return false;
 }
 
 } // namespace argos::semantics

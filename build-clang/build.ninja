@@ -78,8 +78,6 @@ build compiler/CMakeFiles/argos_frontend.dir/src/ast/ast_printer.cpp.o: CXX_COMP
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/ast
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argos_frontend.dir/argos_frontend.pdb
-  TARGET_PDB = compiler/libargos_frontend.pdb
 
 build compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/ir_generator.cpp.o: CXX_COMPILER__argos_frontend_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/codegen/ir/ir_generator.cpp || cmake_object_order_depends_target_argos_frontend
   DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/ir_generator.cpp.o.d
@@ -87,8 +85,6 @@ build compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/ir_generator.cpp.o: 
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argos_frontend.dir/argos_frontend.pdb
-  TARGET_PDB = compiler/libargos_frontend.pdb
 
 build compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/executable_ir_generator.cpp.o: CXX_COMPILER__argos_frontend_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/codegen/ir/executable_ir_generator.cpp || cmake_object_order_depends_target_argos_frontend
   DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/executable_ir_generator.cpp.o.d
@@ -96,8 +92,6 @@ build compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/executable_ir_genera
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argos_frontend.dir/argos_frontend.pdb
-  TARGET_PDB = compiler/libargos_frontend.pdb
 
 build compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.o: CXX_COMPILER__argos_frontend_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/diagnostics/diagnostic_engine.cpp || cmake_object_order_depends_target_argos_frontend
   DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.o.d
@@ -105,8 +99,6 @@ build compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.c
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/diagnostics
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argos_frontend.dir/argos_frontend.pdb
-  TARGET_PDB = compiler/libargos_frontend.pdb
 
 build compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o: CXX_COMPILER__argos_frontend_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/diagnostics/diagnostic_printer.cpp || cmake_object_order_depends_target_argos_frontend
   DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o.d
@@ -114,8 +106,6 @@ build compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/diagnostics
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argos_frontend.dir/argos_frontend.pdb
-  TARGET_PDB = compiler/libargos_frontend.pdb
 
 build compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o: CXX_COMPILER__argos_frontend_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/lexer/lexer.cpp || cmake_object_order_depends_target_argos_frontend
   DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o.d
@@ -123,8 +113,6 @@ build compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o: CXX_COMPILER
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/lexer
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argos_frontend.dir/argos_frontend.pdb
-  TARGET_PDB = compiler/libargos_frontend.pdb
 
 build compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o: CXX_COMPILER__argos_frontend_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/lexer/token_kind.cpp || cmake_object_order_depends_target_argos_frontend
   DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o.d
@@ -132,8 +120,6 @@ build compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o: CXX_COM
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/lexer
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argos_frontend.dir/argos_frontend.pdb
-  TARGET_PDB = compiler/libargos_frontend.pdb
 
 build compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o: CXX_COMPILER__argos_frontend_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/parser/parser.cpp || cmake_object_order_depends_target_argos_frontend
   DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o.d
@@ -141,8 +127,13 @@ build compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o: CXX_COMPIL
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/parser
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argos_frontend.dir/argos_frontend.pdb
-  TARGET_PDB = compiler/libargos_frontend.pdb
+
+build compiler/CMakeFiles/argos_frontend.dir/src/ir/validator.cpp.o: CXX_COMPILER__argos_frontend_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/ir/validator.cpp || cmake_object_order_depends_target_argos_frontend
+  DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/ir/validator.cpp.o.d
+  FLAGS = -std=gnu++23 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wnull-dereference -Wdouble-promotion -Wformat=2
+  INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
+  OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
+  OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/ir
 
 build compiler/CMakeFiles/argos_frontend.dir/src/repl/repl_session.cpp.o: CXX_COMPILER__argos_frontend_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/repl/repl_session.cpp || cmake_object_order_depends_target_argos_frontend
   DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/repl/repl_session.cpp.o.d
@@ -150,8 +141,6 @@ build compiler/CMakeFiles/argos_frontend.dir/src/repl/repl_session.cpp.o: CXX_CO
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/repl
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argos_frontend.dir/argos_frontend.pdb
-  TARGET_PDB = compiler/libargos_frontend.pdb
 
 build compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o: CXX_COMPILER__argos_frontend_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/semantics/semantic_analyzer.cpp || cmake_object_order_depends_target_argos_frontend
   DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o.d
@@ -159,8 +148,6 @@ build compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/semantics
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argos_frontend.dir/argos_frontend.pdb
-  TARGET_PDB = compiler/libargos_frontend.pdb
 
 build compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o: CXX_COMPILER__argos_frontend_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/source/source_manager.cpp || cmake_object_order_depends_target_argos_frontend
   DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o.d
@@ -168,8 +155,6 @@ build compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o: CX
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/source
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argos_frontend.dir/argos_frontend.pdb
-  TARGET_PDB = compiler/libargos_frontend.pdb
 
 build compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o: CXX_COMPILER__argos_frontend_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/vm/vm.cpp || cmake_object_order_depends_target_argos_frontend
   DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o.d
@@ -177,8 +162,6 @@ build compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o: CXX_COMPILER__argo
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/vm
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argos_frontend.dir/argos_frontend.pdb
-  TARGET_PDB = compiler/libargos_frontend.pdb
 
 
 # =============================================================================
@@ -188,13 +171,12 @@ build compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o: CXX_COMPILER__argo
 #############################################
 # Link the static library compiler/libargos_frontend.a
 
-build compiler/libargos_frontend.a: CXX_STATIC_LIBRARY_LINKER__argos_frontend_ compiler/CMakeFiles/argos_frontend.dir/src/ast/ast_printer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/ir_generator.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/executable_ir_generator.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/repl/repl_session.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o
+build compiler/libargos_frontend.a: CXX_STATIC_LIBRARY_LINKER__argos_frontend_ compiler/CMakeFiles/argos_frontend.dir/src/ast/ast_printer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/ir_generator.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/executable_ir_generator.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/ir/validator.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/repl/repl_session.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   POST_BUILD = :
   PRE_LINK = :
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argos_frontend.dir/argos_frontend.pdb
   TARGET_FILE = compiler/libargos_frontend.a
-  TARGET_PDB = compiler/libargos_frontend.pdb
+  TARGET_PDB = argos_frontend.a.dbg
 
 # =============================================================================
 # Object build statements for EXECUTABLE target argosc
@@ -211,8 +193,6 @@ build compiler/CMakeFiles/argosc.dir/src/driver/main.cpp.o: CXX_COMPILER__argosc
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argosc.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argosc.dir/src/driver
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argosc.dir/
-  TARGET_PDB = bin/argosc.pdb
 
 build compiler/CMakeFiles/argosc.dir/src/driver/native_compile.cpp.o: CXX_COMPILER__argosc_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/driver/native_compile.cpp || cmake_object_order_depends_target_argosc
   DEP_FILE = compiler/CMakeFiles/argosc.dir/src/driver/native_compile.cpp.o.d
@@ -220,8 +200,6 @@ build compiler/CMakeFiles/argosc.dir/src/driver/native_compile.cpp.o: CXX_COMPIL
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argosc.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argosc.dir/src/driver
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argosc.dir/
-  TARGET_PDB = bin/argosc.pdb
 
 build compiler/CMakeFiles/argosc.dir/src/codegen/native/x86_64/x86_64_codegen.cpp.o: CXX_COMPILER__argosc_unscanned_ /home/dgti/Projetos/argoslang/compiler/src/codegen/native/x86_64/x86_64_codegen.cpp || cmake_object_order_depends_target_argosc
   DEP_FILE = compiler/CMakeFiles/argosc.dir/src/codegen/native/x86_64/x86_64_codegen.cpp.o.d
@@ -229,8 +207,6 @@ build compiler/CMakeFiles/argosc.dir/src/codegen/native/x86_64/x86_64_codegen.cp
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argosc.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argosc.dir/src/codegen/native/x86_64
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argosc.dir/
-  TARGET_PDB = bin/argosc.pdb
 
 
 # =============================================================================
@@ -245,9 +221,8 @@ build bin/argosc: CXX_EXECUTABLE_LINKER__argosc_ compiler/CMakeFiles/argosc.dir/
   OBJECT_DIR = compiler/CMakeFiles/argosc.dir
   POST_BUILD = :
   PRE_LINK = :
-  TARGET_COMPILE_PDB = compiler/CMakeFiles/argosc.dir/
   TARGET_FILE = bin/argosc
-  TARGET_PDB = bin/argosc.pdb
+  TARGET_PDB = argosc.dbg
 
 
 #############################################
@@ -305,14 +280,14 @@ build compiler/all: phony compiler/libargos_frontend.a bin/argosc
 #############################################
 # Re-run CMake if any of its inputs changed.
 
-build build.ninja: RERUN_CMAKE | /home/dgti/Projetos/argoslang/CMakeLists.txt /home/dgti/Projetos/argoslang/compiler/CMakeLists.txt /usr/share/cmake-3.28/Modules/CMakeCXXCompiler.cmake.in /usr/share/cmake-3.28/Modules/CMakeCXXCompilerABI.cpp /usr/share/cmake-3.28/Modules/CMakeCXXInformation.cmake /usr/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake /usr/share/cmake-3.28/Modules/CMakeCompilerIdDetection.cmake /usr/share/cmake-3.28/Modules/CMakeDetermineCXXCompiler.cmake /usr/share/cmake-3.28/Modules/CMakeDetermineCompileFeatures.cmake /usr/share/cmake-3.28/Modules/CMakeDetermineCompiler.cmake /usr/share/cmake-3.28/Modules/CMakeDetermineCompilerABI.cmake /usr/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake /usr/share/cmake-3.28/Modules/CMakeDetermineSystem.cmake /usr/share/cmake-3.28/Modules/CMakeFindBinUtils.cmake /usr/share/cmake-3.28/Modules/CMakeGenericSystem.cmake /usr/share/cmake-3.28/Modules/CMakeInitializeConfigs.cmake /usr/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake /usr/share/cmake-3.28/Modules/CMakeNinjaFindMake.cmake /usr/share/cmake-3.28/Modules/CMakeParseImplicitIncludeInfo.cmake /usr/share/cmake-3.28/Modules/CMakeParseImplicitLinkInfo.cmake /usr/share/cmake-3.28/Modules/CMakeParseLibraryArchitecture.cmake /usr/share/cmake-3.28/Modules/CMakeSystem.cmake.in /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInitialize.cmake /usr/share/cmake-3.28/Modules/CMakeTestCXXCompiler.cmake /usr/share/cmake-3.28/Modules/CMakeTestCompilerCommon.cmake /usr/share/cmake-3.28/Modules/Compiler/ADSP-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/ARMCC-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/ARMClang-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/AppleClang-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Borland-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/CMakeCommonCompilerMacros.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-DetermineCompilerInternal.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-FindBinUtils.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang.cmake /usr/share/cmake-3.28/Modules/Compiler/Comeau-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Compaq-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Cray-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/CrayClang-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Embarcadero-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Fujitsu-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/FujitsuClang-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/GHS-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/GNU-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/GNU.cmake /usr/share/cmake-3.28/Modules/Compiler/HP-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/IAR-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/IBMCPP-CXX-DetermineVersionInternal.cmake /usr/share/cmake-3.28/Modules/Compiler/IBMClang-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Intel-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/IntelLLVM-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/LCC-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/MSVC-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/NVHPC-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/NVIDIA-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/OpenWatcom-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/OrangeC-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/PGI-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/PathScale-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/SCO-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/SunPro-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/TI-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Tasking-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/VisualAge-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Watcom-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/XL-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/XLClang-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/zOS-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/FindICU.cmake /usr/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake /usr/share/cmake-3.28/Modules/FindPackageMessage.cmake /usr/share/cmake-3.28/Modules/Internal/FeatureTesting.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Determine-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Initialize.cmake /usr/share/cmake-3.28/Modules/Platform/Linux.cmake /usr/share/cmake-3.28/Modules/Platform/UnixPaths.cmake /usr/share/cmake-3.28/Modules/SelectLibraryConfigurations.cmake CMakeCache.txt CMakeFiles/3.28.3/CMakeCXXCompiler.cmake CMakeFiles/3.28.3/CMakeSystem.cmake
+build build.ninja: RERUN_CMAKE | /home/dgti/Projetos/argoslang/CMakeLists.txt /home/dgti/Projetos/argoslang/compiler/CMakeLists.txt /usr/share/cmake-3.28/Modules/CMakeCXXInformation.cmake /usr/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake /usr/share/cmake-3.28/Modules/CMakeGenericSystem.cmake /usr/share/cmake-3.28/Modules/CMakeInitializeConfigs.cmake /usr/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInitialize.cmake /usr/share/cmake-3.28/Modules/Compiler/CMakeCommonCompilerMacros.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang.cmake /usr/share/cmake-3.28/Modules/Compiler/GNU.cmake /usr/share/cmake-3.28/Modules/FindICU.cmake /usr/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake /usr/share/cmake-3.28/Modules/FindPackageMessage.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Initialize.cmake /usr/share/cmake-3.28/Modules/Platform/Linux.cmake /usr/share/cmake-3.28/Modules/Platform/UnixPaths.cmake /usr/share/cmake-3.28/Modules/SelectLibraryConfigurations.cmake CMakeCache.txt CMakeFiles/3.28.3/CMakeCXXCompiler.cmake CMakeFiles/3.28.3/CMakeSystem.cmake
   pool = console
 
 
 #############################################
 # A missing CMake input file is not an error.
 
-build /home/dgti/Projetos/argoslang/CMakeLists.txt /home/dgti/Projetos/argoslang/compiler/CMakeLists.txt /usr/share/cmake-3.28/Modules/CMakeCXXCompiler.cmake.in /usr/share/cmake-3.28/Modules/CMakeCXXCompilerABI.cpp /usr/share/cmake-3.28/Modules/CMakeCXXInformation.cmake /usr/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake /usr/share/cmake-3.28/Modules/CMakeCompilerIdDetection.cmake /usr/share/cmake-3.28/Modules/CMakeDetermineCXXCompiler.cmake /usr/share/cmake-3.28/Modules/CMakeDetermineCompileFeatures.cmake /usr/share/cmake-3.28/Modules/CMakeDetermineCompiler.cmake /usr/share/cmake-3.28/Modules/CMakeDetermineCompilerABI.cmake /usr/share/cmake-3.28/Modules/CMakeDetermineCompilerId.cmake /usr/share/cmake-3.28/Modules/CMakeDetermineSystem.cmake /usr/share/cmake-3.28/Modules/CMakeFindBinUtils.cmake /usr/share/cmake-3.28/Modules/CMakeGenericSystem.cmake /usr/share/cmake-3.28/Modules/CMakeInitializeConfigs.cmake /usr/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake /usr/share/cmake-3.28/Modules/CMakeNinjaFindMake.cmake /usr/share/cmake-3.28/Modules/CMakeParseImplicitIncludeInfo.cmake /usr/share/cmake-3.28/Modules/CMakeParseImplicitLinkInfo.cmake /usr/share/cmake-3.28/Modules/CMakeParseLibraryArchitecture.cmake /usr/share/cmake-3.28/Modules/CMakeSystem.cmake.in /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInitialize.cmake /usr/share/cmake-3.28/Modules/CMakeTestCXXCompiler.cmake /usr/share/cmake-3.28/Modules/CMakeTestCompilerCommon.cmake /usr/share/cmake-3.28/Modules/Compiler/ADSP-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/ARMCC-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/ARMClang-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/AppleClang-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Borland-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/CMakeCommonCompilerMacros.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-DetermineCompilerInternal.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-FindBinUtils.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang.cmake /usr/share/cmake-3.28/Modules/Compiler/Comeau-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Compaq-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Cray-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/CrayClang-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Embarcadero-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Fujitsu-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/FujitsuClang-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/GHS-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/GNU-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/GNU.cmake /usr/share/cmake-3.28/Modules/Compiler/HP-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/IAR-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/IBMCPP-CXX-DetermineVersionInternal.cmake /usr/share/cmake-3.28/Modules/Compiler/IBMClang-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Intel-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/IntelLLVM-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/LCC-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/MSVC-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/NVHPC-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/NVIDIA-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/OpenWatcom-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/OrangeC-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/PGI-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/PathScale-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/SCO-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/SunPro-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/TI-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Tasking-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/VisualAge-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/Watcom-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/XL-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/XLClang-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/Compiler/zOS-CXX-DetermineCompiler.cmake /usr/share/cmake-3.28/Modules/FindICU.cmake /usr/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake /usr/share/cmake-3.28/Modules/FindPackageMessage.cmake /usr/share/cmake-3.28/Modules/Internal/FeatureTesting.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Determine-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Initialize.cmake /usr/share/cmake-3.28/Modules/Platform/Linux.cmake /usr/share/cmake-3.28/Modules/Platform/UnixPaths.cmake /usr/share/cmake-3.28/Modules/SelectLibraryConfigurations.cmake CMakeCache.txt CMakeFiles/3.28.3/CMakeCXXCompiler.cmake CMakeFiles/3.28.3/CMakeSystem.cmake: phony
+build /home/dgti/Projetos/argoslang/CMakeLists.txt /home/dgti/Projetos/argoslang/compiler/CMakeLists.txt /usr/share/cmake-3.28/Modules/CMakeCXXInformation.cmake /usr/share/cmake-3.28/Modules/CMakeCommonLanguageInclude.cmake /usr/share/cmake-3.28/Modules/CMakeGenericSystem.cmake /usr/share/cmake-3.28/Modules/CMakeInitializeConfigs.cmake /usr/share/cmake-3.28/Modules/CMakeLanguageInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInformation.cmake /usr/share/cmake-3.28/Modules/CMakeSystemSpecificInitialize.cmake /usr/share/cmake-3.28/Modules/Compiler/CMakeCommonCompilerMacros.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Compiler/Clang.cmake /usr/share/cmake-3.28/Modules/Compiler/GNU.cmake /usr/share/cmake-3.28/Modules/FindICU.cmake /usr/share/cmake-3.28/Modules/FindPackageHandleStandardArgs.cmake /usr/share/cmake-3.28/Modules/FindPackageMessage.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Clang-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU-CXX.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-GNU.cmake /usr/share/cmake-3.28/Modules/Platform/Linux-Initialize.cmake /usr/share/cmake-3.28/Modules/Platform/Linux.cmake /usr/share/cmake-3.28/Modules/Platform/UnixPaths.cmake /usr/share/cmake-3.28/Modules/SelectLibraryConfigurations.cmake CMakeCache.txt CMakeFiles/3.28.3/CMakeCXXCompiler.cmake CMakeFiles/3.28.3/CMakeSystem.cmake: phony
 
 
 #############################################

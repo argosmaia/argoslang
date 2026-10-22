@@ -2,6 +2,8 @@
 
 #include "argos/diagnostics/diagnostic_definition.hpp"
 
+#include <array>
+
 namespace argos::diagnostics::catalog {
 
 namespace lexer {
@@ -41,13 +43,20 @@ inline constexpr DiagnosticDefinition incomplete_keyword{
 namespace compiler {
 inline constexpr DiagnosticDefinition unsupported_lowering{
     "ARGOS-C0001", Severity::error, "construção ainda não é compilável",
-    "O frontend aceitou a construção, mas a IR/VM/backend nativo ainda não a suporta.",
-    "Use o REPL ou o subconjunto executável documentado."};
+    "O compilador entendeu o trecho, mas ainda não aprendeu a executá-lo.",
+    "Por enquanto, use uma construção do subconjunto executável do MVP."};
 inline constexpr DiagnosticDefinition invalid_entry_point{
     "ARGOS-C0002", Severity::error, "ponto de entrada inválido",
     "Um executável ArgosLang precisa de uma function main sem parâmetros.",
     "Declare function main() -> void ou function main() -> int."};
 } // namespace compiler
+
+namespace runtime {
+inline constexpr DiagnosticDefinition execution_failure{
+    "ARGOS-R0001", Severity::error, "erro durante a execução",
+    "O programa tentou fazer uma conta que não pode terminar com segurança, como dividir por zero.",
+    "Confira os valores usados nessa conta e veja se o divisor não é zero."};
+} // namespace runtime
 
 namespace warning {
 inline constexpr DiagnosticDefinition legacy_function_keyword{
@@ -65,7 +74,7 @@ constexpr DiagnosticDefinition semantic_error(std::string_view code,
                                               std::string_view title,
                                               std::string_view help) {
   return {code, Severity::error, title,
-          "A análise semântica encontrou uma regra da linguagem violada.", help};
+          "Uma parte do código não combina com o tipo de valor esperado.", help};
 }
 namespace symbols {
 inline constexpr DiagnosticDefinition duplicate_declaration{"ARGOS-S0001", Severity::error, "declaração duplicada", "Um nome foi declarado mais de uma vez no mesmo escopo.", "Renomeie uma declaração ou remova a duplicada."};
@@ -175,5 +184,78 @@ inline constexpr DiagnosticDefinition duplicate_parameter_label{
     "Dois parâmetros da mesma função possuem o mesmo rótulo externo.",
     "Dê a cada parâmetro rotulado um nome externo único."};
 } // namespace semantic::calls
+
+namespace semantic {
+inline const DiagnosticDefinition *
+find_definition(std::string_view code) noexcept {
+  static constexpr std::array definitions{
+      &symbols::duplicate_declaration,
+      &symbols::invalid_ast_node,
+      &symbols::unknown_declaration,
+      &symbols::unknown_statement,
+      &symbols::unknown_expression,
+      &symbols::unknown_identifier,
+      &symbols::uninitialized_variable,
+      &symbols::type_used_as_value,
+      &declarations::invalid_variable_type,
+      &declarations::incompatible_initializer,
+      &declarations::missing_variable_type_or_value,
+      &declarations::uninferable_variable_type,
+      &declarations::integer_literal_out_of_inferred_range,
+      &operators::unary_numeric,
+      &operators::logical_not,
+      &operators::arithmetic_operands,
+      &operators::arithmetic_type_mismatch,
+      &operators::equality_type_mismatch,
+      &operators::lifted_equality_requires_optional,
+      &operators::coalesce_requires_optional,
+      &operators::coalesce_fallback_mismatch,
+      &operators::relational_operands,
+      &operators::logical_operands,
+      &operators::relational_type_mismatch,
+      &operators::lifted_equality_type_mismatch,
+      &assignment::invalid_target,
+      &assignment::immutable_target,
+      &assignment::incompatible_value,
+      &assignment::compound_requires_numeric,
+      &assignment::compound_type_mismatch,
+      &assignment::coalescing_value_mismatch,
+      &assignment::safe_assignment_requires_optional,
+      &assignment::unknown_assignment_target,
+      &control::return_outside_function,
+      &control::incompatible_return,
+      &control::missing_return,
+      &control::break_outside_loop,
+      &control::continue_outside_loop,
+      &types::unknown_type,
+      &types::condition_not_boolean,
+      &types::conditional_branch_mismatch,
+      &members::optional_member_requires_safe_access,
+      &members::member_base_not_nominal,
+      &members::unknown_member,
+      &members::unsafe_access_on_optional,
+      &postfix::increment_requires_mutable_numeric,
+      &postfix::decrement_requires_mutable_numeric,
+      &postfix::unwrap_requires_optional,
+      &postfix::unsafe_unwrap,
+      &postfix::unsupported_propagation,
+      &postfix::invalid_postfix_not,
+      &protocols::duplicate_protocol_component,
+      &protocols::invalid_protocol_component_type,
+      &protocols::incompatible_protocol_default,
+      &calls::non_named_callee,
+      &calls::undeclared_function,
+      &calls::missing_argument,
+      &calls::incompatible_argument,
+      &calls::positional_argument_without_slot,
+      &calls::unknown_argument_label,
+      &calls::duplicate_argument,
+      &calls::duplicate_parameter_label,
+  };
+  for (const auto *definition : definitions)
+    if (definition->code == code) return definition;
+  return nullptr;
+}
+} // namespace semantic
 
 } // namespace argos::diagnostics::catalog

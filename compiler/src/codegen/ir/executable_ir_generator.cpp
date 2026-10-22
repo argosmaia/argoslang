@@ -17,11 +17,14 @@ using argos::ir::Opcode;
 using argos::ir::Register;
 using argos::ir::Slot;
 using argos::ir::LabelId;
+using argos::ir::ValueType;
 
 bool supported_type(const ast::TypeSyntax *type) {
   return type && type->nullable_depth == 0 &&
          (type->name == "int" || type->name == "bool" ||
-          type->name == "Int" || type->name == "Bool");
+          type->name == "float" || type->name == "double" ||
+          type->name == "Int" || type->name == "Bool" ||
+          type->name == "Float" || type->name == "Double");
 }
 
 bool supported_return_type(const ast::TypeSyntax *type) {
@@ -29,29 +32,16 @@ bool supported_return_type(const ast::TypeSyntax *type) {
          (type && type->nullable_depth == 0 && type->name == "void");
 }
 
-bool is_boolean_expression(const ast::Expression &expression) {
-  if (dynamic_cast<const ast::BooleanLiteralExpression *>(&expression)) return true;
-  if (const auto *group = dynamic_cast<const ast::GroupingExpression *>(&expression))
-    return is_boolean_expression(*group->expression);
-  if (const auto *unary = dynamic_cast<const ast::UnaryExpression *>(&expression))
-    return unary->op == ast::UnaryOperator::not_;
-  if (const auto *binary = dynamic_cast<const ast::BinaryExpression *>(&expression)) {
-    using Operator = ast::BinaryOperator;
-    return binary->op == Operator::equal || binary->op == Operator::not_equal ||
-           binary->op == Operator::less_than || binary->op == Operator::less_than_or_equal ||
-           binary->op == Operator::greater_than || binary->op == Operator::greater_than_or_equal;
-  }
-  return false;
-}
-
 class Lowerer final {
 public:
   Lowerer(argos::ir::Module &module, diagnostics::DiagnosticEngine &diagnostics,
+          const semantics::SemanticAnalyzer &semantics,
           const ast::FunctionDeclaration &source,
           const std::unordered_map<std::string, argos::ir::FunctionId> &ids,
           const std::unordered_map<std::string, std::size_t> &arities,
           argos::ir::FunctionId id)
-      : module_(module), diagnostics_(diagnostics), source_(source), ids_(ids), arities_(arities) {
+      : module_(module), diagnostics_(diagnostics), semantics_(semantics),
+        source_(source), ids_(ids), arities_(arities) {
     function_.id = id;
     function_.name = source.name;
     scopes_.emplace_back();
@@ -60,12 +50,15 @@ public:
 
   argos::ir::Function lower() {
     if (source_.parameters.size() > 6 || !supported_return_type(source_.return_type.get())) {
-      error(source_, "somente funções com até seis parâmetros int/bool e retorno int/bool/void são compiláveis");
+      error(source_, "somente funções com até seis parâmetros int/bool/float/double e retorno int/bool/float/double/void são compiláveis");
     } else {
+      function_.return_type = syntax_type(source_.return_type.get());
       function_.parameter_count = static_cast<std::uint32_t>(source_.parameters.size());
       for (const auto& parameter : source_.parameters) {
-        if (!supported_type(parameter->type.get())) error(*parameter, "parâmetro deve ser int ou bool");
-        scopes_.back().insert_or_assign(parameter->name, function_.slot_count++);
+        if (!supported_type(parameter->type.get())) error(*parameter, "parâmetro deve ser int, bool, float ou double");
+        const auto type = syntax_type(parameter->type.get());
+        function_.parameter_types.push_back(type);
+        scopes_.back().insert_or_assign(parameter->name, add_slot(type));
       }
       block(*source_.body);
     }
@@ -82,7 +75,40 @@ private:
     function_.blocks.push_back({id, {}});
     return id;
   }
-  Register reg() { return function_.register_count++; }
+  static ValueType syntax_type(const ast::TypeSyntax *type) {
+    if (type && (type->name == "bool" || type->name == "Bool"))
+      return ValueType::boolean;
+    if (type && (type->name == "float" || type->name == "Float" ||
+                 type->name == "double" || type->name == "Double"))
+      return ValueType::float64;
+    if (type && type->name == "void") return ValueType::void_type;
+    return ValueType::int32;
+  }
+  static std::optional<ValueType> semantic_type(const semantics::Type &type) {
+    if (type.nullable_depth != 0) return std::nullopt;
+    if (type.kind == semantics::TypeKind::int_type) return ValueType::int32;
+    if (type.kind == semantics::TypeKind::bool_type) return ValueType::boolean;
+    if (type.kind == semantics::TypeKind::float_type ||
+        type.kind == semantics::TypeKind::double_type)
+      return ValueType::float64;
+    if (type.kind == semantics::TypeKind::void_type) return ValueType::void_type;
+    return std::nullopt;
+  }
+  std::optional<ValueType> expression_type(const ast::Expression &node) {
+    const auto type = semantic_type(semantics_.type_of(node));
+    if (!type) error(node, "o tipo desta expressão ainda não pode ser representado pela IR executável");
+    return type;
+  }
+  Slot add_slot(ValueType type) {
+    const auto result = function_.slot_count++;
+    function_.slot_types.push_back(type);
+    return result;
+  }
+  Register reg(ValueType type = ValueType::int32) {
+    const auto result = function_.register_count++;
+    function_.register_types.push_back(type);
+    return result;
+  }
   void emit(Instruction instruction) {
     function_.blocks[current_].instructions.push_back(std::move(instruction));
   }
@@ -92,12 +118,12 @@ private:
     instruction.label = label;
     emit(std::move(instruction));
   }
-  Register constant(std::string value) {
+  Register constant(std::string value, ValueType type = ValueType::int32) {
     const auto id = static_cast<argos::ir::ConstantId>(module_.constants.size());
     module_.constants.push_back({id, std::move(value)});
     Instruction instruction;
     instruction.opcode = Opcode::load_const;
-    instruction.dst = reg();
+    instruction.dst = reg(type);
     instruction.constant = id;
     const auto result = instruction.dst;
     emit(std::move(instruction));
@@ -112,6 +138,30 @@ private:
   }
 
   std::optional<Register> expression(const ast::Expression &node) {
+    auto result = expression_impl(node);
+    const auto coercion = semantics_.coercion_of(node);
+    if (!result || !coercion) return result;
+    const auto target = semantic_type(*coercion);
+    if (!target) {
+      error(node, "a conversão numérica desta expressão ainda não é compilável");
+      return std::nullopt;
+    }
+    if (function_.register_types[*result] == *target) return result;
+    if (*target != ValueType::float64 ||
+        function_.register_types[*result] != ValueType::int32) {
+      error(node, "a conversão numérica desta expressão ainda não é compilável");
+      return std::nullopt;
+    }
+    Instruction conversion;
+    conversion.opcode = Opcode::int_to_double;
+    conversion.dst = reg(ValueType::float64);
+    conversion.src1 = *result;
+    const auto converted = conversion.dst;
+    emit(std::move(conversion));
+    return converted;
+  }
+
+  std::optional<Register> expression_impl(const ast::Expression &node) {
     if (const auto *literal = dynamic_cast<const ast::IntegerLiteralExpression *>(&node)) {
       std::string digits;
       for (char c : literal->spelling) if (c != '_') digits.push_back(c);
@@ -123,8 +173,23 @@ private:
       }
       return constant(std::to_string(value));
     }
+    if (const auto *literal = dynamic_cast<const ast::FloatLiteralExpression *>(&node)) {
+      std::string text;
+      for (const char character : literal->spelling)
+        if (character != '_') text.push_back(character);
+      if (!text.empty() && (text.back() == 'f' || text.back() == 'F'))
+        text.pop_back();
+      double value{};
+      const auto [end, status] =
+          std::from_chars(text.data(), text.data() + text.size(), value);
+      if (status != std::errc{} || end != text.data() + text.size()) {
+        error(node, "literal double inválido");
+        return std::nullopt;
+      }
+      return constant(text, ValueType::float64);
+    }
     if (const auto *literal = dynamic_cast<const ast::BooleanLiteralExpression *>(&node))
-      return constant(literal->value ? "1" : "0");
+      return constant(literal->value ? "1" : "0", ValueType::boolean);
     if (const auto *group = dynamic_cast<const ast::GroupingExpression *>(&node))
       return expression(*group->expression);
     if (const auto *identifier = dynamic_cast<const ast::IdentifierExpression *>(&node)) {
@@ -135,8 +200,8 @@ private:
       }
       Instruction instruction;
       instruction.opcode = Opcode::load_var;
-      instruction.dst = reg();
       instruction.slot = *place;
+      instruction.dst = reg(function_.slot_types[*place]);
       const auto result = instruction.dst;
       emit(std::move(instruction));
       return result;
@@ -147,7 +212,9 @@ private:
       if (unary->op == ast::UnaryOperator::plus) return operand;
       Instruction instruction;
       instruction.opcode = unary->op == ast::UnaryOperator::minus ? Opcode::neg : Opcode::logical_not;
-      instruction.dst = reg();
+      const auto type = expression_type(node);
+      if (!type) return std::nullopt;
+      instruction.dst = reg(*type);
       instruction.src1 = *operand;
       const auto result = instruction.dst;
       emit(std::move(instruction));
@@ -176,7 +243,9 @@ private:
       if (!left || !right) return std::nullopt;
       Instruction instruction;
       instruction.opcode = opcode;
-      instruction.dst = reg();
+      const auto type = expression_type(node);
+      if (!type) return std::nullopt;
+      instruction.dst = reg(*type);
       instruction.src1 = *left;
       instruction.src2 = *right;
       const auto result = instruction.dst;
@@ -212,8 +281,12 @@ private:
           } else {
             const auto value = expression(*argument);
             if (!value) return std::nullopt;
-            instruction.opcode = is_boolean_expression(*argument)
-                ? Opcode::print_bool : Opcode::print_int;
+            const auto type = function_.register_types[*value];
+            instruction.opcode =
+                type == ValueType::boolean
+                    ? Opcode::print_bool
+                    : type == ValueType::float64 ? Opcode::print_double
+                                                 : Opcode::print_int;
             instruction.src1 = *value;
           }
           emit(std::move(instruction));
@@ -230,7 +303,9 @@ private:
       }
       Instruction instruction;
       instruction.opcode = Opcode::call;
-      instruction.dst = reg();
+      const auto type = expression_type(node);
+      if (!type) return std::nullopt;
+      instruction.dst = reg(*type);
       instruction.function = ids_.at(callee->name);
       for (std::size_t index = 0; index < call->arguments.size(); ++index) {
         if (!call->argument_labels[index].empty()) { error(node, "argumentos nomeados ainda não são compiláveis"); return std::nullopt; }
@@ -257,10 +332,19 @@ private:
   bool item_lower(const ast::BlockItem &node) {
     if (const auto *variable = dynamic_cast<const ast::VariableDeclaration *>(&node)) {
       if (variable->type && !supported_type(variable->type.get())) {
-        error(node, "somente variáveis Int ou Bool são compiláveis");
+        error(node, "somente variáveis int, bool, float ou double são compiláveis");
         return false;
       }
-      const auto place = function_.slot_count++;
+      const auto type = variable->type
+                            ? std::optional<ValueType>{syntax_type(variable->type.get())}
+                            : (variable->initializer
+                                   ? expression_type(*variable->initializer)
+                                   : std::nullopt);
+      if (!type) {
+        error(node, "a variável precisa ter tipo int, bool, float ou double para ser compilada");
+        return false;
+      }
+      const auto place = add_slot(*type);
       scopes_.back().insert_or_assign(variable->name, place);
       if (variable->initializer) {
         const auto value = expression(*variable->initializer);
@@ -293,6 +377,10 @@ private:
       }
       const auto value = expression(*statement->expression);
       if (!value) return false;
+      if (function_.register_types[*value] != function_.return_type) {
+        error(node, "o tipo do valor retornado não corresponde ao tipo declarado pela função");
+        return false;
+      }
       Instruction instruction;
       instruction.opcode = Opcode::ret;
       instruction.src1 = *value;
@@ -361,6 +449,7 @@ private:
 
   argos::ir::Module &module_;
   diagnostics::DiagnosticEngine &diagnostics_;
+  const semantics::SemanticAnalyzer &semantics_;
   const ast::FunctionDeclaration &source_;
   const std::unordered_map<std::string, argos::ir::FunctionId> &ids_;
   const std::unordered_map<std::string, std::size_t> &arities_;
@@ -373,7 +462,7 @@ private:
 
 } // namespace
 
-argos::ir::Module ExecutableIrGenerator::generate(const ast::Program &program) {
+argos::ir::Module IrGenerator::generate(const ast::Program &program) {
   argos::ir::Module module;
   std::vector<const ast::FunctionDeclaration *> functions;
   std::unordered_map<std::string, argos::ir::FunctionId> ids;
@@ -403,7 +492,7 @@ argos::ir::Module ExecutableIrGenerator::generate(const ast::Program &program) {
   }
   if (diagnostics_.has_errors()) return module;
   for (std::size_t id = 0; id < functions.size(); ++id) {
-    Lowerer lowerer{module, diagnostics_, *functions[id], ids, arities,
+    Lowerer lowerer{module, diagnostics_, semantics_, *functions[id], ids, arities,
                     static_cast<argos::ir::FunctionId>(id)};
     module.functions.push_back(lowerer.lower());
   }

@@ -50,12 +50,28 @@ O compilador pode permanecer como monolito modular, mas suas fronteiras devem se
 
 ## 4. Arquitetura geral do compilador
 
-O frontend transforma texto em uma AST válida e tipada. A IR Argos funciona como representação comum da semântica executável. A partir dela, existem exatamente duas rotas de saída próprias da ArgosLang:
+O frontend transforma texto em uma AST válida e tipada. A IR Argos funciona como representação comum da semântica executável. A arquitetura-alvo possui duas rotas de saída próprias da ArgosLang:
 
 1. **Execução em VM:** IR Argos → bytecode/opcodes → máquina virtual.
 2. **Compilação nativa direta:** IR Argos → Machine IR específica do alvo → seleção e alocação de instruções → código de máquina, assembly ou código-objeto.
 
-As duas rotas são irmãs. C, C++, Rust e Swift não são destinos de transpilação nem etapas internas da compilação. Essas linguagens, assim como Assembly, pertencem exclusivamente à camada de interoperabilidade. A VM consome bytecode; o backend nativo consome a IR e produz representação de máquina sem passar por C, C++, LLVM ou outro compilador intermediário.
+As duas rotas são irmãs. C, C++, Rust e Swift não são destinos de transpilação nem etapas internas da compilação. Essas linguagens, assim como Assembly, pertencem exclusivamente à camada de interoperabilidade. No desenho-alvo, a VM consumirá bytecode; hoje ela executa a IR diretamente. O backend nativo consome a IR e gera assembly sem transpilar ArgosLang para C, C++, LLVM ou outra linguagem intermediária.
+
+### 4.1. Estado implementado em 22 de outubro de 2026
+
+O estado acima é a direção arquitetural; não descreve tudo o que já existe:
+
+- O parser é manual e usa precedência de operadores. LR(1) é uma meta futura,
+  não o algoritmo atual.
+- O frontend gera uma IR tipada e validada para o subconjunto do MVP.
+- A VM executa essa IR diretamente. Ainda não há bytecode binário separado:
+  `BytecodeEmitter` produz apenas texto para inspeção.
+- O alvo nativo disponível é x86-64/Linux. O backend emite assembly e chama
+  `cc` somente para montar e ligar o executável.
+- `run`, `compile` e REPL compartilham frontend, análise semântica e lowering.
+  O REPL mantém o estado reconstruindo entradas no mesmo executor VM.
+- ARM64, RISC-V e AVR permanecem backends planejados; não são destinos
+  funcionais nesta versão.
 
 ## 5. Análise léxica
 

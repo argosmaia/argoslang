@@ -1,6 +1,7 @@
 #include "argos/ast/ast_printer.hpp"
-#include "argos/codegen/ir/executable_ir_generator.hpp"
+#include "argos/codegen/ir/ir_generator.hpp"
 #include "argos/diagnostics/diagnostic_engine.hpp"
+#include "argos/diagnostics/diagnostic_printer.hpp"
 #include "argos/driver/native_compile.hpp"
 #include "argos/lexer/lexer.hpp"
 #include "argos/lexer/token_kind.hpp"
@@ -58,7 +59,7 @@ void print_usage(std::string_view executable) {
         << "  " << executable << " ast <arquivo.argos>    - Imprime a Árvore de Sintaxe Abstrata (AST) formatada\n"
         << "  " << executable << " check <arquivo.argos>  - Executa a análise semântica (verificação de tipos e escopos)\n"
         << "  " << executable << " run <arquivo.argos>    - Executa pela VM o subconjunto suportado\n"
-        << "  " << executable << " repl                 - Abre o interpretador interativo\n"
+        << "  " << executable << " repl                 - Abre o shell interativo da VM\n"
         << "  " << executable << " <arquivo.argos> [-o executável] - Compila no host x86-64/Linux\n"
         << "  " << executable << " compile <arquivo.argos> [-o executável] - Mesmo comando explícito\n";
 }
@@ -67,33 +68,13 @@ void print_diagnostics(
     const argos::source::SourceFile& source_file,
     const argos::diagnostics::DiagnosticEngine& diagnostics
 ) {
-    for (const auto& diagnostic : diagnostics.diagnostics()) {
-        std::cerr
-            << source_file.path.string()
-            << ':'
-            << diagnostic.span.begin.line
-            << ':'
-            << diagnostic.span.begin.column
-            << ": " << argos::diagnostics::severity_name(diagnostic.severity) << "["
-            << diagnostic.code
-            << "]: "
-            << diagnostic.message
-            << '\n';
-        std::size_t line_begin = 0;
-        for (std::size_t line = 1; line < diagnostic.span.begin.line && line_begin < source_file.content.size(); ++line) {
-            const auto newline = source_file.content.find('\n', line_begin);
-            line_begin = newline == std::string::npos ? source_file.content.size() : newline + 1;
-        }
-        const auto line_end = source_file.content.find('\n', line_begin);
-        std::cerr << "  " << source_file.content.substr(line_begin, line_end - line_begin) << '\n'
-                  << "  " << std::string(diagnostic.span.begin.column > 0 ? diagnostic.span.begin.column - 1 : 0, ' ') << "^\n";
-        if (!diagnostic.help.empty()) std::cerr << "  ajuda: " << diagnostic.help << '\n';
-    }
+    argos::diagnostics::DiagnosticPrinter{}.print(source_file, diagnostics, std::cerr);
 }
 
 int run_repl() {
-    std::cout << "ArgosLang REPL. Use :help ou :quit.\n";
+    std::cout << "ArgosLang REPL (VM). Use :help ou :quit.\n";
     argos::repl::ReplSession session;
+    session.reset();
     active_repl_session = &session;
     rl_attempted_completion_function = repl_completion;
     while (char* raw_line = readline(">>> ")) {
@@ -260,7 +241,7 @@ int main(int argc, char** argv) {
                 << source_path.string() << '\n';
         }
         if (command == "compile" && success && !diagnostics.has_errors()) {
-            argos::codegen::ir::ExecutableIrGenerator generator{diagnostics};
+            argos::codegen::ir::IrGenerator generator{diagnostics, analyzer};
             const auto module = generator.generate(program);
             if (!diagnostics.has_errors()) {
                 std::string compile_error;
@@ -273,7 +254,7 @@ int main(int argc, char** argv) {
             }
         }
         if (command == "run" && success && !diagnostics.has_errors()) {
-            argos::codegen::ir::ExecutableIrGenerator generator{diagnostics};
+            argos::codegen::ir::IrGenerator generator{diagnostics, analyzer};
             const auto module = generator.generate(program);
             if (!diagnostics.has_errors()) {
                 try {
@@ -282,7 +263,7 @@ int main(int argc, char** argv) {
                     const auto result = vm.run();
                     std::cout << "Resultado da VM: " << result << '\n';
                 } catch (const std::exception& error) {
-                    std::cerr << "argosc: erro de execução da VM: " << error.what() << '\n';
+                    std::cerr << "argosc: erro de execução: " << error.what() << '\n';
                     return 70;
                 }
             }

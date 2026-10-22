@@ -1,7 +1,19 @@
 # Build outputs
 /build/
+/build-*/
 /out/
 /dist/
+/_deps/
+
+# CMake-generated files (at the repository root or in source subdirectories)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+DartConfiguration.tcl
+build.ninja
+rules.ninja
+Testing/
 
 # Cache & compile DB
 /.cache/
@@ -24,6 +36,8 @@ compile_commands.json
 /docs/*
 !/docs/architecture.md
 !/docs/grammar-spec.md
+!/docs/mvp.md
+!/docs/testing-and-compiler-guide.md
 !/docs/guide/
 !/docs/guide/*.md
 !/docs/diagnostics/

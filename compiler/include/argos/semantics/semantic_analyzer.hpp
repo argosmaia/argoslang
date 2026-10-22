@@ -94,6 +94,7 @@ public:
   [[nodiscard]] std::optional<SymbolId>
   symbol_id_of(const ast::Expression &expression) const;
   [[nodiscard]] const Symbol *symbol_by_id(SymbolId id) const noexcept;
+  [[nodiscard]] bool is_initialized(std::string_view name) const noexcept;
 
 private:
   struct Scope final {

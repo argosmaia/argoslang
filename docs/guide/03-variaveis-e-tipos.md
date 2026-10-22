@@ -1,13 +1,20 @@
 # Variáveis e tipos
 
-Uma variável declara nome, tipo e valor inicial. A inicialização explícita
-evita que um valor não definido seja lido.
+Uma variável pode receber o primeiro valor na declaração ou depois. O
+compilador não deixa ler uma variável antes de ela receber um valor:
 
 ```argos
 var answer: int = 42
 var name: string = "Argos"
 var enabled: bool = true
+var firstValue: int
+firstValue = 42
+var mut total: int
+total = 42
 ```
+
+O primeiro valor pode ser atribuído uma vez mesmo sem `mut`. Depois disso, a
+variável fica imutável; use `var mut` quando precisar alterá-la novamente.
 
 `var` é imutável. Para reatribuir, declare `var mut`:
 
@@ -24,7 +31,11 @@ count = count + 1 // erro: variável imutável
 ```
 
 Os nomes canônicos de tipos são minúsculos: `bool`, `byte`, `char`, `short`,
-`int`, `uint`, `long`, `ulong`, `float`, `double`, `string` e `void`.
+`int`, `uint`, `long`, `ulong`, `float`, `double`, `string` e `void`. No
+subconjunto executável atual, `float` também usa representação binary64.
+Valores inteiros podem ser convertidos para `float` ou `double`, e valores
+`float` e `double` podem ser usados entre esses dois tipos. Por isso, por
+exemplo, `var value: float = 2` e `var value: float = 2.0` são válidos no MVP.
 
 ## Opcionais
 

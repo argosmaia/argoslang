@@ -1,13 +1,14 @@
 # REPL
 
-Inicie o interpretador interativo:
+Inicie o shell interativo:
 
 ```bash
 argosc repl
 ```
 
-O REPL é uma sessão da linguagem, não uma calculadora isolada. Cada entrada
-passa pelo lexer, parser, AST e análise semântica antes de ser interpretada.
+Cada entrada passa pelo mesmo lexer, parser, análise semântica, IR tipada e VM
+usados por `argosc run`. O REPL mantém variáveis locais `int`/`bool` e funções
+entre entradas; não usa um interpretador AST separado.
 
 ```text
 >>> var mut count: int = 0
@@ -15,9 +16,12 @@ passa pelo lexer, parser, AST e análise semântica antes de ser interpretada.
 1
 >>> count
 1
->>> var fallback: string? = nil
->>> fallback ?? "Anonymous"
-Anonymous
+>>> function twice(_ value: int) -> int { return value * 2; }
+>>> twice(count)
+4
+>>> var flag: bool = true
+>>> print(flag)
+true
 ```
 
 Use `:help` para exemplos, `:reset` para descartar variáveis e funções da
@@ -28,4 +32,6 @@ REPL, palavras-chave, variáveis e funções conhecidas. Esse histórico não é
 gravado em arquivo: ele e todo o contexto são apagados ao sair do REPL.
 
 Uma expressão como `count + 1` calcula e mostra o resultado, mas não altera
-`count`. Para atualizar uma variável, use atribuição e declare-a com `mut`.
+`count`. Para atualizá-la, declare-a com `var mut` e use uma atribuição.
+O REPL executa o mesmo subconjunto descrito em [mvp.md](../mvp.md); por
+exemplo, opcionais e valores `string` armazenados ainda não são executáveis.

@@ -509,6 +509,13 @@ build compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.c
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/diagnostics
 
+build compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o: CXX_COMPILER__argos_frontend_unscanned_Debug /home/dgti/Projetos/argoslang/compiler/src/diagnostics/diagnostic_printer.cpp || cmake_object_order_depends_target_argos_frontend
+  DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o.d
+  FLAGS = -g -std=gnu++23 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wnull-dereference -Wdouble-promotion -Wformat=2
+  INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
+  OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
+  OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/diagnostics
+
 build compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o: CXX_COMPILER__argos_frontend_unscanned_Debug /home/dgti/Projetos/argoslang/compiler/src/lexer/lexer.cpp || cmake_object_order_depends_target_argos_frontend
   DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o.d
   FLAGS = -g -std=gnu++23 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wnull-dereference -Wdouble-promotion -Wformat=2
@@ -529,6 +536,20 @@ build compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o: CXX_COMPIL
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/parser
+
+build compiler/CMakeFiles/argos_frontend.dir/src/ir/validator.cpp.o: CXX_COMPILER__argos_frontend_unscanned_Debug /home/dgti/Projetos/argoslang/compiler/src/ir/validator.cpp || cmake_object_order_depends_target_argos_frontend
+  DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/ir/validator.cpp.o.d
+  FLAGS = -g -std=gnu++23 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wnull-dereference -Wdouble-promotion -Wformat=2
+  INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
+  OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
+  OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/ir
+
+build compiler/CMakeFiles/argos_frontend.dir/src/repl/repl_session.cpp.o: CXX_COMPILER__argos_frontend_unscanned_Debug /home/dgti/Projetos/argoslang/compiler/src/repl/repl_session.cpp || cmake_object_order_depends_target_argos_frontend
+  DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/repl/repl_session.cpp.o.d
+  FLAGS = -g -std=gnu++23 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wnull-dereference -Wdouble-promotion -Wformat=2
+  INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include
+  OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
+  OBJECT_FILE_DIR = compiler/CMakeFiles/argos_frontend.dir/src/repl
 
 build compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o: CXX_COMPILER__argos_frontend_unscanned_Debug /home/dgti/Projetos/argoslang/compiler/src/semantics/semantic_analyzer.cpp || cmake_object_order_depends_target_argos_frontend
   DEP_FILE = compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o.d
@@ -559,7 +580,7 @@ build compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o: CXX_COMPILER__argo
 #############################################
 # Link the static library compiler/libargos_frontend.a
 
-build compiler/libargos_frontend.a: CXX_STATIC_LIBRARY_LINKER__argos_frontend_Debug compiler/CMakeFiles/argos_frontend.dir/src/ast/ast_printer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/ir_generator.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/executable_ir_generator.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o
+build compiler/libargos_frontend.a: CXX_STATIC_LIBRARY_LINKER__argos_frontend_Debug compiler/CMakeFiles/argos_frontend.dir/src/ast/ast_printer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/ir_generator.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/codegen/ir/executable_ir_generator.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_engine.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/diagnostics/diagnostic_printer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/lexer/lexer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/lexer/token_kind.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/parser/parser.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/ir/validator.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/repl/repl_session.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/semantics/semantic_analyzer.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/source/source_manager.cpp.o compiler/CMakeFiles/argos_frontend.dir/src/vm/vm.cpp.o
   LANGUAGE_COMPILE_FLAGS = -g
   OBJECT_DIR = compiler/CMakeFiles/argos_frontend.dir
   POST_BUILD = :
@@ -605,9 +626,9 @@ build compiler/CMakeFiles/argosc.dir/src/codegen/native/x86_64/x86_64_codegen.cp
 #############################################
 # Link the executable bin/argosc
 
-build bin/argosc: CXX_EXECUTABLE_LINKER__argosc_Debug compiler/CMakeFiles/argosc.dir/src/driver/main.cpp.o compiler/CMakeFiles/argosc.dir/src/driver/native_compile.cpp.o compiler/CMakeFiles/argosc.dir/src/codegen/native/x86_64/x86_64_codegen.cpp.o | compiler/libargos_frontend.a /usr/lib/x86_64-linux-gnu/libicuuc.so || compiler/libargos_frontend.a
+build bin/argosc: CXX_EXECUTABLE_LINKER__argosc_Debug compiler/CMakeFiles/argosc.dir/src/driver/main.cpp.o compiler/CMakeFiles/argosc.dir/src/driver/native_compile.cpp.o compiler/CMakeFiles/argosc.dir/src/codegen/native/x86_64/x86_64_codegen.cpp.o | compiler/libargos_frontend.a /usr/lib/x86_64-linux-gnu/libreadline.so /usr/lib/x86_64-linux-gnu/libicuuc.so || compiler/libargos_frontend.a
   FLAGS = -g
-  LINK_LIBRARIES = compiler/libargos_frontend.a  /usr/lib/x86_64-linux-gnu/libicuuc.so  -ldl
+  LINK_LIBRARIES = compiler/libargos_frontend.a  /usr/lib/x86_64-linux-gnu/libreadline.so  /usr/lib/x86_64-linux-gnu/libicuuc.so  -ldl
   OBJECT_DIR = compiler/CMakeFiles/argosc.dir
   POST_BUILD = :
   PRE_LINK = :
@@ -663,6 +684,20 @@ build compiler/rebuild_cache: phony compiler/CMakeFiles/rebuild_cache.util
 
 build cmake_object_order_depends_target_argos_tests: phony || cmake_object_order_depends_target_Catch2 cmake_object_order_depends_target_Catch2WithMain cmake_object_order_depends_target_argos_frontend
 
+build tests/CMakeFiles/argos_tests.dir/diagnostics/diagnostic_tests.cpp.o: CXX_COMPILER__argos_tests_unscanned_Debug /home/dgti/Projetos/argoslang/tests/diagnostics/diagnostic_tests.cpp || cmake_object_order_depends_target_argos_tests
+  DEP_FILE = tests/CMakeFiles/argos_tests.dir/diagnostics/diagnostic_tests.cpp.o.d
+  FLAGS = -g -std=gnu++23 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wnull-dereference -Wdouble-promotion -Wformat=2
+  INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include -I/home/dgti/Projetos/argoslang/build/_deps/catch2-src/src/catch2/.. -I/home/dgti/Projetos/argoslang/build-gcc/_deps/catch2-build/generated-includes
+  OBJECT_DIR = tests/CMakeFiles/argos_tests.dir
+  OBJECT_FILE_DIR = tests/CMakeFiles/argos_tests.dir/diagnostics
+
+build tests/CMakeFiles/argos_tests.dir/ir/ir_tests.cpp.o: CXX_COMPILER__argos_tests_unscanned_Debug /home/dgti/Projetos/argoslang/tests/ir/ir_tests.cpp || cmake_object_order_depends_target_argos_tests
+  DEP_FILE = tests/CMakeFiles/argos_tests.dir/ir/ir_tests.cpp.o.d
+  FLAGS = -g -std=gnu++23 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wnull-dereference -Wdouble-promotion -Wformat=2
+  INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include -I/home/dgti/Projetos/argoslang/build/_deps/catch2-src/src/catch2/.. -I/home/dgti/Projetos/argoslang/build-gcc/_deps/catch2-build/generated-includes
+  OBJECT_DIR = tests/CMakeFiles/argos_tests.dir
+  OBJECT_FILE_DIR = tests/CMakeFiles/argos_tests.dir/ir
+
 build tests/CMakeFiles/argos_tests.dir/lexer/lexer_tests.cpp.o: CXX_COMPILER__argos_tests_unscanned_Debug /home/dgti/Projetos/argoslang/tests/lexer/lexer_tests.cpp || cmake_object_order_depends_target_argos_tests
   DEP_FILE = tests/CMakeFiles/argos_tests.dir/lexer/lexer_tests.cpp.o.d
   FLAGS = -g -std=gnu++23 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wnull-dereference -Wdouble-promotion -Wformat=2
@@ -676,6 +711,13 @@ build tests/CMakeFiles/argos_tests.dir/parser/parser_tests.cpp.o: CXX_COMPILER__
   INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include -I/home/dgti/Projetos/argoslang/build/_deps/catch2-src/src/catch2/.. -I/home/dgti/Projetos/argoslang/build-gcc/_deps/catch2-build/generated-includes
   OBJECT_DIR = tests/CMakeFiles/argos_tests.dir
   OBJECT_FILE_DIR = tests/CMakeFiles/argos_tests.dir/parser
+
+build tests/CMakeFiles/argos_tests.dir/repl/repl_tests.cpp.o: CXX_COMPILER__argos_tests_unscanned_Debug /home/dgti/Projetos/argoslang/tests/repl/repl_tests.cpp || cmake_object_order_depends_target_argos_tests
+  DEP_FILE = tests/CMakeFiles/argos_tests.dir/repl/repl_tests.cpp.o.d
+  FLAGS = -g -std=gnu++23 -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual -Wnull-dereference -Wdouble-promotion -Wformat=2
+  INCLUDES = -I/home/dgti/Projetos/argoslang/compiler/include -I/home/dgti/Projetos/argoslang/build/_deps/catch2-src/src/catch2/.. -I/home/dgti/Projetos/argoslang/build-gcc/_deps/catch2-build/generated-includes
+  OBJECT_DIR = tests/CMakeFiles/argos_tests.dir
+  OBJECT_FILE_DIR = tests/CMakeFiles/argos_tests.dir/repl
 
 build tests/CMakeFiles/argos_tests.dir/semantics/semantic_tests.cpp.o: CXX_COMPILER__argos_tests_unscanned_Debug /home/dgti/Projetos/argoslang/tests/semantics/semantic_tests.cpp || cmake_object_order_depends_target_argos_tests
   DEP_FILE = tests/CMakeFiles/argos_tests.dir/semantics/semantic_tests.cpp.o.d
@@ -692,7 +734,7 @@ build tests/CMakeFiles/argos_tests.dir/semantics/semantic_tests.cpp.o: CXX_COMPI
 #############################################
 # Link the executable bin/argos_tests
 
-build bin/argos_tests tests/argos_tests-b12d07c_tests.cmake | ${cmake_ninja_workdir}tests/argos_tests-b12d07c_tests.cmake: CXX_EXECUTABLE_LINKER__argos_tests_Debug tests/CMakeFiles/argos_tests.dir/lexer/lexer_tests.cpp.o tests/CMakeFiles/argos_tests.dir/parser/parser_tests.cpp.o tests/CMakeFiles/argos_tests.dir/semantics/semantic_tests.cpp.o | compiler/libargos_frontend.a _deps/catch2-build/src/libCatch2Maind.a /usr/lib/x86_64-linux-gnu/libicuuc.so _deps/catch2-build/src/libCatch2d.a || _deps/catch2-build/src/libCatch2Maind.a _deps/catch2-build/src/libCatch2d.a compiler/libargos_frontend.a
+build bin/argos_tests tests/argos_tests-b12d07c_tests.cmake | ${cmake_ninja_workdir}tests/argos_tests-b12d07c_tests.cmake: CXX_EXECUTABLE_LINKER__argos_tests_Debug tests/CMakeFiles/argos_tests.dir/diagnostics/diagnostic_tests.cpp.o tests/CMakeFiles/argos_tests.dir/ir/ir_tests.cpp.o tests/CMakeFiles/argos_tests.dir/lexer/lexer_tests.cpp.o tests/CMakeFiles/argos_tests.dir/parser/parser_tests.cpp.o tests/CMakeFiles/argos_tests.dir/repl/repl_tests.cpp.o tests/CMakeFiles/argos_tests.dir/semantics/semantic_tests.cpp.o | compiler/libargos_frontend.a _deps/catch2-build/src/libCatch2Maind.a /usr/lib/x86_64-linux-gnu/libicuuc.so _deps/catch2-build/src/libCatch2d.a || _deps/catch2-build/src/libCatch2Maind.a _deps/catch2-build/src/libCatch2d.a compiler/libargos_frontend.a
   FLAGS = -g
   LINK_LIBRARIES = compiler/libargos_frontend.a  _deps/catch2-build/src/libCatch2Maind.a  /usr/lib/x86_64-linux-gnu/libicuuc.so  -ldl  _deps/catch2-build/src/libCatch2d.a
   OBJECT_DIR = tests/CMakeFiles/argos_tests.dir

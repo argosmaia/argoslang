@@ -1,6 +1,6 @@
 # Interpretar programas ArgosLang
 
-**Estado atual:** `argosc run` executa pela VM o mesmo subconjunto inicial suportado pelo backend nativo: funções sem parâmetros que retornam `int` ou `bool`, variáveis locais, aritmética, comparações, atribuição, `if`, `while`, chamadas locais sem argumentos e `return`. Alguns recursos aceitos por `check`, como opcionais, protocolos e `string`, ainda não possuem lowering para a VM.
+**Estado atual:** `argosc run`, `argosc compile` e o REPL compartilham o mesmo subconjunto executável. Ele inclui funções com até seis parâmetros `int`/`bool`/`float`/`double`, variáveis locais, inclusive declarações tipadas sem inicializador, aritmética inteira e real, comparações, atribuição, `if`, `while`, `break`, `continue`, chamadas posicionais, `return` e `print` de `int`, `bool`, `float`, `double` e literais `string`. A operação `/` sempre retorna `double`, inclusive quando os operandos são `int`. `float` e `double` usam binary64 nesta versão. Valores `string` armazenados, opcionais e protocolos ainda não têm lowering executável.
 
 ## Compilar não é interpretar
 
@@ -11,7 +11,7 @@ Estes dois fluxos têm saídas diferentes:
 | Validar o fonte | `argosc check arquivo.argos` | Disponível |
 | Gerar um binário do host | `argosc arquivo.argos` | Disponível para o subconjunto x86-64/Linux |
 | Rodar o binário gerado | `./arquivo` | Disponível após compilação bem-sucedida |
-| Interpretar pela VM | `argosc run arquivo.argos` | Disponível para o subconjunto executável |
+| Executar pela VM | `argosc run arquivo.argos` | Disponível para o subconjunto executável |
 
 `argosc arquivo.argos` **não** interpreta: produz um executável nativo. `./arquivo` executa esse binário sem ler novamente o fonte `.argos`. Já `argosc run arquivo.argos` executa em memória, sem criar executável.
 
@@ -49,20 +49,23 @@ O status esperado é `42`; isso é **execução nativa**, não interpretação. 
 
 ## Como a interpretação deve funcionar
 
-A arquitetura em [architecture.md](../architecture.md) prevê um único frontend para compilação e interpretação:
+A arquitetura em [architecture.md](../architecture.md) separa o frontend das
+rotas de execução:
 
 ```text
-.argos -> lexer -> parser -> semântica -> IR Argos verificada
-       -> bytecode verificado -> VM -> resultado de main()
+.argos -> lexer -> parser -> semântica -> IR tipada e validada
+       -> VM (direto da IR) ou backend nativo x86-64/Linux
 ```
 
-A VM deverá carregar funções, criar frames, guardar valores tipados, executar saltos e chamadas, e preservar a semântica de opcionais e erros de runtime. O bytecode externo deverá ser validado antes de rodar. O modelo de valores, as chamadas e a ABI da VM ainda precisam ser fechados antes de anunciar um formato de bytecode estável.
-
-No código atual, a rota executável gera IR limitada e a VM interpreta os opcodes dessa fatia diretamente. A VM valida índices de funções, blocos, registradores, slots e constantes antes de usá-los. Divisão por zero e a divisão excepcional `Int.min / -1` interrompem a execução com erro de runtime; a política geral de overflow continua em evolução.
+No código atual, a VM interpreta os opcodes da IR diretamente. Um validador
+compartilhado verifica funções, blocos, registradores, slots, chamadas e tipos
+antes da execução ou da geração nativa. Ainda não existe bytecode binário
+separado; `BytecodeEmitter` é somente uma visualização textual. O operador
+`%` permanece inteiro; divisor zero e `int.min % -1` são erros de runtime.
 
 ## Fluxo pretendido para `run`
 
-`argosc run arquivo.argos` valida o fonte, gera a IR executável, inicia a VM e executa a entrada sem produzir um executável nativo no diretório atual. Os testes de ponta a ponta cobrem literal (`42`), aritmética (`14`), desvio (`7`), laço (`6`), chamadas, blocos aninhados e aritmética com sinal. O suporte a opcionais pela VM continua futuro.
+`argosc run arquivo.argos` valida o fonte, gera a IR executável, inicia a VM e executa a entrada sem produzir um executável nativo no diretório atual. Os testes de ponta a ponta cobrem literal, divisão real, aritmética, desvios, laços, `break`, `continue`, chamadas, `print`, erros de módulo e equivalência VM/nativo. O suporte a opcionais pela VM continua futuro.
 
 ```bash
 argosc run examples/minimal_literal.argos
@@ -70,7 +73,9 @@ argosc run examples/minimal_literal.argos
 
 ## REPL
 
-`argosc repl` abre um interpretador interativo de expressões `int`. Ele não cria arquivos e aceita `:help`, `:quit` ou `:q`:
+`argosc repl` usa a mesma IR e VM, mantendo valores `int`/`bool`/`float`/`double` e funções
+entre entradas. Ele não cria arquivos e aceita `:help`, `:reset`, `:quit` ou
+`:q`:
 
 ```text
 $ argosc repl

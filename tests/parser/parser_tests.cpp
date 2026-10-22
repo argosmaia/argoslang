@@ -32,7 +32,7 @@ TEST_CASE("parses variable declarations") {
     argos::diagnostics::DiagnosticEngine diagnostics;
 
     const auto program = parse(
-        "let x: Int = 42;\nvar y: String? = null;",
+        "var x: int = 42;\nvar mut y: string? = nil;",
         diagnostics
     );
 
@@ -43,14 +43,14 @@ TEST_CASE("parses variable declarations") {
     REQUIRE(decl1 != nullptr);
     REQUIRE(decl1->name == "x");
     REQUIRE(decl1->mutability == argos::ast::Mutability::immutable);
-    REQUIRE(decl1->type->name == "Int");
+    REQUIRE(decl1->type->name == "int");
     REQUIRE(decl1->type->nullable_depth == 0);
 
     const auto* decl2 = dynamic_cast<const argos::ast::VariableDeclaration*>(program.items[1].get());
     REQUIRE(decl2 != nullptr);
     REQUIRE(decl2->name == "y");
     REQUIRE(decl2->mutability == argos::ast::Mutability::mutable_);
-    REQUIRE(decl2->type->name == "String");
+    REQUIRE(decl2->type->name == "string");
     REQUIRE(decl2->type->nullable_depth == 1);
 }
 
@@ -58,7 +58,7 @@ TEST_CASE("parses function declaration with return type and body") {
     argos::diagnostics::DiagnosticEngine diagnostics;
 
     const auto program = parse(
-        "func add(a: Int, b: Int) -> Int { return a + b; }",
+        "function add(a: int, b: int) -> int { return a + b; }",
         diagnostics
     );
 
@@ -72,7 +72,7 @@ TEST_CASE("parses function declaration with return type and body") {
     REQUIRE(fn->parameters[0]->name == "a");
     REQUIRE(fn->parameters[1]->name == "b");
     REQUIRE(fn->return_type != nullptr);
-    REQUIRE(fn->return_type->name == "Int");
+    REQUIRE(fn->return_type->name == "int");
     REQUIRE(fn->body != nullptr);
     REQUIRE(fn->body->items.size() == 1);
 }
@@ -81,7 +81,7 @@ TEST_CASE("parses operator precedence and null-safety operators") {
     argos::diagnostics::DiagnosticEngine diagnostics;
 
     const auto program = parse(
-        "let res: String = user?.profile?.name ?? \"Default\";",
+        "var res: string = user?.profile?.name ?? \"Default\";",
         diagnostics
     );
 
@@ -102,13 +102,13 @@ TEST_CASE("parses while loops and unsafe blocks") {
     argos::diagnostics::DiagnosticEngine diagnostics;
 
     const auto program = parse(
-        "func main() -> Void {\n"
-        "    var i: Byte = 0;\n"
+        "function main() -> void {\n"
+        "    var mut i: byte = 0;\n"
         "    while i < 10 {\n"
         "        i = i + 1;\n"
         "    }\n"
         "    unsafe {\n"
-        "        let ptr: USize = 0x24;\n"
+        "        var ptr: usize = 0x24;\n"
         "    }\n"
         "}",
         diagnostics
@@ -132,7 +132,7 @@ TEST_CASE("parses while loops and unsafe blocks") {
 
 TEST_CASE("uses normative coalescing precedence") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto program = parse("let result = left || right ?? fallback;", diagnostics);
+    const auto program = parse("var result = left || right ?? fallback;", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     const auto *decl = dynamic_cast<const argos::ast::VariableDeclaration *>(program.items[0].get());
     REQUIRE(decl != nullptr);
@@ -146,27 +146,27 @@ TEST_CASE("uses normative coalescing precedence") {
 
 TEST_CASE("rejects legacy postfix bang") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    (void)parse("let plain = optional!;", diagnostics);
+    (void)parse("var plain = optional!;", diagnostics);
     REQUIRE(diagnostics.has_errors());
 }
 
 TEST_CASE("reports unsupported nominal declarations") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto program = parse("class User {} let x: Int = 2;", diagnostics);
+    const auto program = parse("class User {} var x: int = 2;", diagnostics);
     REQUIRE(diagnostics.has_errors());
     REQUIRE(program.items.size() == 1);
 }
 
 TEST_CASE("reports unsupported match statements") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto program = parse("match value { default => 1; } let x: Int = 2;", diagnostics);
+    const auto program = parse("match value { default => 1; } var x: int = 2;", diagnostics);
     REQUIRE(diagnostics.has_errors());
     REQUIRE(program.items.size() == 1);
 }
 
 TEST_CASE("parses a non-generic data protocol") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto program = parse("protocol User(id: UInt, name: String?);", diagnostics);
+    const auto program = parse("protocol User(id: uint, name: string?);", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     const auto *protocol = dynamic_cast<const argos::ast::ProtocolDeclaration *>(program.items[0].get());
     REQUIRE(protocol != nullptr);
@@ -177,7 +177,7 @@ TEST_CASE("parses a non-generic data protocol") {
 
 TEST_CASE("accepts escaped identifiers in declarations") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto program = parse("let `class`: Int = 1;", diagnostics);
+    const auto program = parse("var `class`: int = 1;", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     const auto *decl = dynamic_cast<const argos::ast::VariableDeclaration *>(program.items[0].get());
     REQUIRE(decl != nullptr);
@@ -186,7 +186,7 @@ TEST_CASE("accepts escaped identifiers in declarations") {
 
 TEST_CASE("semicolon is optional before a closing brace or EOF") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto program = parse("func f() -> Int { return 1 }\nlet x: Int = 1", diagnostics);
+    const auto program = parse("function f() -> int { return 1 }\nvar x: int = 1", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     REQUIRE(program.items.size() == 2);
 }
@@ -194,8 +194,8 @@ TEST_CASE("semicolon is optional before a closing brace or EOF") {
 TEST_CASE("single statement bodies may omit braces") {
     argos::diagnostics::DiagnosticEngine diagnostics;
     const auto program = parse(
-        "func choose(flag: Bool) -> Int if flag return 1 else return 2\n"
-        "func count() -> Int { var x: Int = 0; while x < 3 x = x + 1; return x }",
+        "function choose(flag: bool) -> int if flag return 1 else return 2\n"
+        "function count() -> int { var mut x: int = 0; while x < 3 x = x + 1; return x }",
         diagnostics
     );
     REQUIRE_FALSE(diagnostics.has_errors());
@@ -204,6 +204,6 @@ TEST_CASE("single statement bodies may omit braces") {
 
 TEST_CASE("same-line statements still require a separator") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    (void)parse("func f() -> Int { let x: Int = 1 return x }", diagnostics);
+    (void)parse("function f() -> int { var x: int = 1 return x }", diagnostics);
     REQUIRE(diagnostics.has_errors());
 }

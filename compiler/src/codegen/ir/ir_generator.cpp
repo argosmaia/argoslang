@@ -2,8 +2,8 @@
 
 namespace argos::codegen::ir {
 
-IrGenerator::IrGenerator(diagnostics::DiagnosticEngine &d) : diagnostics_(d) {}
-argos::ir::Module IrGenerator::generate(const argos::ast::Program &) {
-  return {};
-}
+IrGenerator::IrGenerator(diagnostics::DiagnosticEngine &diagnostics,
+                         const semantics::SemanticAnalyzer &semantics)
+    : diagnostics_(diagnostics), semantics_(semantics) {}
+
 } // namespace argos::codegen::ir

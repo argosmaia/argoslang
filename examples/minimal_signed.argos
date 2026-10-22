@@ -1,7 +1,7 @@
 // Resultado esperado: 2
-func main() -> int {
+function main() -> int {
     var numerator: int = -7
     var denominator: int = 3
-    if numerator < denominator return numerator / denominator + numerator % denominator + 5
+    if numerator < denominator return numerator % denominator + denominator
     else return 0
 }

@@ -1,7 +1,15 @@
 # Especificação da Gramática e Arquitetura da ArgosLang
 
-> Especificação normativa — 14 de setembro de 2026  
-> Parser: LR canônico com um símbolo de lookahead, LR(1).
+> Especificação de evolução — 14 de setembro de 2026
+> Parser-alvo: LR canônico com um símbolo de lookahead, LR(1).
+
+> **Estado do compilador (22 de outubro de 2026):** o parser implementado é
+> manual, com precedência de operadores; não é LR(1). Esta especificação
+> descreve o desenho futuro e não deve ser usada como lista de recursos
+> executáveis. Para o subconjunto que funciona hoje, consulte [mvp.md](mvp.md).
+> A grafia canônica é `function`, `var`/`var mut`, `nil` e tipos primitivos em
+> minúsculas (`int`, `bool`, `string`); exemplos antigos nesta especificação
+> não substituem essa forma canônica.
 
 ## 1. Escopo
 
@@ -57,7 +65,7 @@ CharLiteral ::= "'" CharContent "'" ;
 StringLiteral ::= '"' StringContent* '"' ;
 MultilineStringLiteral ::= '"""' MultilineContent* '"""' ;
 BooleanLiteral ::= "true" | "false" ;
-NullLiteral ::= "null" ;
+NullLiteral ::= "nil" ;
 ```
 
 Comentários de linha começam com `//`; comentários de bloco usam `/* ... */` e podem aninhar. Comentários de documentação usam `///` ou `/** ... */`.
@@ -135,7 +143,7 @@ ClassMember ::= FieldDecl | PropertyDecl | InitializerDecl
               | NestedTypeDecl | ForeignDecl | EmptyDecl ;
 
 FieldDecl ::= AttributeList? Visibility? MemberModifier*
-              ("let" | "var") Identifier ":" Type
+              "var" ("mut")? Identifier ":" Type
               ("=" Expression)? SEMI ;
 
 PropertyDecl ::= AttributeList? Visibility? MemberModifier*
@@ -155,7 +163,7 @@ MethodDecl ::= AttributeList? Visibility? MemberModifier*
                FunctionSignature (FunctionBody | SEMI) ;
 
 ComputedPropertyDecl ::= AttributeList? Visibility? MemberModifier*
-                         ("let" | "var") Identifier ":" Type PropertyBody ;
+                         "var" ("mut")? Identifier ":" Type PropertyBody ;
 NestedTypeDecl ::= ClassDecl | ProtocolDecl | InterfaceDecl | EnumDecl
                  | TypeAliasDecl ;
 OperatorDecl ::= AttributeList? Visibility? MemberModifier*
@@ -228,7 +236,7 @@ InterfaceMember ::= InterfaceMethodRequirement
 InterfaceMethodRequirement ::= AttributeList? Visibility?
                                FunctionSignature SEMI ;
 InterfacePropertyRequirement ::= AttributeList? Visibility?
-                                 ("let" | "var") Identifier ":" Type
+                                 "var" ("mut")? Identifier ":" Type
                                  "{" AccessorRequirementList "}" ;
 AccessorRequirementList ::= "get" "set"? ;
 AssociatedTypeDecl ::= "type" Identifier GenericBoundList? SEMI ;
@@ -290,7 +298,7 @@ let value = parse::<Int>(text);
 ```ebnf
 FunctionDecl ::= AttributeList? Visibility? MemberModifier*
                  FunctionSignature SimpleFunctionBody ;
-FunctionSignature ::= "func" Identifier GenericParameterClause?
+FunctionSignature ::= "function" Identifier GenericParameterClause?
                       "(" ParameterList? ")"
                       ReturnClause? ThrowsClause? WhereClause? ;
 ReturnClause ::= "->" Type ;
@@ -302,7 +310,7 @@ ParameterList ::= Parameter ("," Parameter)* ","? ;
 Parameter ::= AttributeList? ParameterLabel? Identifier ":" Type
               ParameterModifier* DefaultArgument? ;
 ParameterLabel ::= Identifier | "_" ;
-ParameterModifier ::= "let" | "var" | "mut" | "inout" ;
+ParameterModifier ::= "var" | "mut" | "inout" ;
 DefaultArgument ::= "=" Expression ;
 ```
 
@@ -339,7 +347,7 @@ Capturas são imutáveis por padrão. Captura mutável é explícita e deve resp
 VariableDecl ::= AttributeList? Visibility? StorageModifier?
                  BindingKind Pattern VariableType?
                  VariableInitializer? SEMI ;
-BindingKind ::= "let" | "var" ;
+BindingKind ::= "var" ("mut")? ;
 StorageModifier ::= "static" | "thread_local" ;
 VariableType ::= ":" Type ;
 VariableInitializer ::= "=" Expression ;
@@ -357,24 +365,24 @@ EnumPattern ::= QualifiedName ("(" PatternList? ")")? ;
 LiteralPattern ::= Literal ;
 ```
 
-Sem tipo escrito, a declaração requer inicializador inferível. Sem inicializador, requer tipo e prova de inicialização antes do uso. `let` recebe valor exatamente uma vez.
+Sem tipo escrito, a declaração requer inicializador inferível. Sem inicializador, requer tipo e prova de inicialização antes do uso. `var` recebe valor uma vez; `var mut` pode ser reatribuída.
 
 ## 16. Sistema de tipos
 
 | Tipo | Semântica | Largura |
 | --- | --- | ---: |
-| `Bool` | lógico | 1 byte mínimo de armazenamento |
-| `Byte` | inteiro sem sinal | 8 bits |
-| `SByte` | inteiro com sinal | 8 bits |
-| `Short` / `UShort` | inteiro com/sem sinal | 16 bits |
-| `Int` / `UInt` | inteiro com/sem sinal | 32 bits |
-| `Long` / `ULong` | inteiro com/sem sinal | 64 bits |
-| `ISize` / `USize` | inteiro da palavra-alvo | dependente do alvo |
-| `Float` | IEEE 754 binary32, se suportado | 32 bits |
-| `Double` | IEEE 754 binary64, se suportado | 64 bits |
-| `Char` | escalar Unicode | 32 bits lógicos |
-| `Void` | ausência de retorno | sem armazenamento |
-| `Never` | computação que não retorna | inabitável |
+| `bool` | lógico | 1 byte mínimo de armazenamento |
+| `byte` | inteiro sem sinal | 8 bits |
+| `sbyte` | inteiro com sinal | 8 bits |
+| `short` / `ushort` | inteiro com/sem sinal | 16 bits |
+| `int` / `uint` | inteiro com/sem sinal | 32 bits |
+| `long` / `ulong` | inteiro com/sem sinal | 64 bits |
+| `isize` / `usize` | inteiro da palavra-alvo | dependente do alvo |
+| `float` | IEEE 754 binary32, se suportado | 32 bits |
+| `double` | IEEE 754 binary64, se suportado | 64 bits |
+| `char` | escalar Unicode | 32 bits lógicos |
+| `void` | ausência de retorno | sem armazenamento |
+| `never` | computação que não retorna | inabitável |
 
 `Byte` é sem sinal para representar bytes, registradores e buffers. `SByte` é a contraparte assinada. `String` é tipo nominal intrínseco da biblioteca padrão, logicamente UTF-8.
 
@@ -384,10 +392,10 @@ Type ::= FunctionType OptionalSuffix*
 PrimaryType ::= PrimitiveType | NamedType | TupleType | ArrayType
               | SliceType | PointerType | ReferenceType
               | InferredType | "(" Type ")" ;
-PrimitiveType ::= "Bool" | "Byte" | "SByte" | "Short" | "UShort"
-                | "Int" | "UInt" | "Long" | "ULong"
-                | "ISize" | "USize" | "Float" | "Double"
-                | "Char" | "Void" | "Never" ;
+PrimitiveType ::= "bool" | "byte" | "sbyte" | "short" | "ushort"
+                | "int" | "uint" | "long" | "ulong"
+                | "isize" | "usize" | "float" | "double"
+                | "char" | "string" | "void" | "never" ;
 NamedType ::= QualifiedName GenericArgumentClause? ;
 TupleType ::= "(" TypeList ")" ;
 TypeList ::= Type ("," Type)+ ","? ;

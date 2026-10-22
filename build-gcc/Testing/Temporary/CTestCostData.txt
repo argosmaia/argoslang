@@ -36,71 +36,470 @@ parses 0 0
 parses 0 0
 rejects 0 0
 resolves 0 0
-example_minimal_literal_check 2 0.00295157
-example_minimal_arithmetic_check 2 0.0029188
-example_minimal_branch_check 2 0.0034638
-example_minimal_loop_check 2 0.0030087
-example_minimal_optional_check 2 0.00358206
-example_minimal_call_check 2 0.00274904
-example_minimal_nested_check 2 0.00288518
-example_minimal_signed_check 2 0.00320009
-example_minimal_parameters_check 2 0.00297208
-example_minimal_literal_vm 2 0.0133967
-example_minimal_arithmetic_vm 2 0.0139904
-example_minimal_branch_vm 2 0.0134415
-example_minimal_loop_vm 2 0.0150024
-example_minimal_call_vm 2 0.0135769
-example_minimal_nested_vm 2 0.0134862
-example_minimal_signed_vm 2 0.0135147
-example_minimal_parameters_vm 2 0.0138513
-example_minimal_literal_native 2 0.0429183
-example_minimal_arithmetic_native 2 0.042288
-example_minimal_branch_native 2 0.0433004
-example_minimal_loop_native 2 0.0457468
-example_minimal_call_native 2 0.0440176
-example_minimal_nested_native 2 0.0526416
-example_minimal_signed_native 2 0.0467731
-example_minimal_parameters_native 2 0.0471755
-example_minimal_literal_short_form 2 0.0456913
-example_minimal_optional_native_rejected 2 0.0144231
-example_null_safety_native_rejected 2 0.0137705
-rejects malformed UTF-8 identifiers 1 0.00674567
-uses normative coalescing precedence 1 0.00811872
-uses maximal munch for nullable operators 1 0.00678809
-parses function declaration with return type and body 1 0.00810707
-rejects nominal member access until nominal types exist 1 0.00686706
-merges initialization across branches and loops 1 0.00781715
-inserts terminators only at eligible newlines 1 0.00646266
-retains resolved symbol bindings for later phases 1 0.00701504
-tracks initialization and one assignment to let 1 0.00713199
-keeps multiline signatures and operator continuations together 1 0.00663705
-fits integer literals contextually without widening variables 0 0
-reports unterminated strings 1 0.0064317
-rejects legacy postfix bang 1 0.00629895
-parses while loops and unsafe blocks 1 0.00644334
-parses operator precedence and null-safety operators 1 0.00695029
-parses variable declarations 1 0.00633778
-rejects invalid character escapes 1 0.00672741
-rejects unknown and uninferrable types 1 0.00711273
-same-line statements still require a separator 1 0.00724735
-lexes Swift-like null-safety chain 1 0.00680515
-treats newlines inside block comments as eligible terminators 1 0.00654118
-single statement bodies may omit braces 1 0.00733652
-semicolon is optional before a closing brace or EOF 1 0.00667016
-reserves declaration and control keywords from the grammar 1 0.00670453
-resolves intrinsic String and inferred variables 1 0.00664111
-records contextual coercions without changing source types 1 0.00809816
-checks external parameter labels 1 0.00757463
-requires return on every reachable branch 1 0.00742632
-preserves optional depth and rejects implicit unwrap 1 0.00717607
-parses a non-generic data protocol 1 0.00683613
-supports nested block comments 1 0.00668942
-resolves protocol components and safe member chains 1 0.00753767
-rejects malformed UTF-8 even inside strings 1 0.00732255
-reports unsupported match statements 1 0.00740531
-lexes Unicode identifiers and new literal forms 1 0.00645316
-checks the null-safety example with explicit nominal definitions 1 0.00747184
-accepts escaped identifiers in declarations 1 0.00716518
-reports unsupported nominal declarations 1 0.00670786
+example_minimal_literal_check 10 0.00131665
+example_minimal_arithmetic_check 10 0.000800143
+example_minimal_branch_check 10 0.000799114
+example_minimal_loop_check 10 0.000729638
+example_minimal_optional_check 10 0.000762636
+example_minimal_call_check 10 0.00084809
+example_minimal_nested_check 10 0.000722808
+example_minimal_signed_check 9 0.000917925
+example_minimal_parameters_check 10 0.000883344
+example_minimal_literal_vm 10 0.00308431
+example_minimal_arithmetic_vm 10 0.00309174
+example_minimal_branch_vm 10 0.00292114
+example_minimal_loop_vm 10 0.0028248
+example_minimal_call_vm 10 0.0029717
+example_minimal_nested_vm 10 0.00353637
+example_minimal_signed_vm 9 0.00317568
+example_minimal_parameters_vm 10 0.00335199
+example_minimal_literal_native 10 0.0110718
+example_minimal_arithmetic_native 10 0.010579
+example_minimal_branch_native 10 0.0107845
+example_minimal_loop_native 10 0.0110195
+example_minimal_call_native 10 0.00967213
+example_minimal_nested_native 10 0.0108932
+example_minimal_signed_native 9 0.0113287
+example_minimal_parameters_native 10 0.00970953
+example_minimal_literal_short_form 10 0.0119391
+example_minimal_optional_native_rejected 10 0.00595608
+example_null_safety_native_rejected 10 0.00658865
+rejects 0 0
+uses 0 0
+uses 0 0
+parses 0 0
+rejects 0 0
+merges 0 0
+inserts 0 0
+retains 0 0
+tracks 0 0
+keeps 0 0
+fits 0 0
+reports 0 0
+rejects 0 0
+parses 0 0
+parses 0 0
+parses 0 0
+rejects 0 0
+rejects 0 0
+same-line 0 0
+lexes 0 0
+treats 0 0
+single 0 0
+semicolon 0 0
+reserves 0 0
+resolves 0 0
+records 0 0
+checks 0 0
+requires 0 0
+preserves 0 0
+parses 0 0
+supports 0 0
+resolves 0 0
+rejects 0 0
+reports 0 0
+lexes 0 0
+checks 0 0
+accepts 0 0
+reports 0 0
+rejects 0 0
+retains 0 0
+reserves 0 0
+rejects 0 0
+merges 0 0
+same-line 0 0
+inserts 0 0
+validates 0 0
+rejects 0 0
+reports 0 0
+parses 0 0
+rejects 0 0
+resolves 0 0
+parses 0 0
+rejects 0 0
+rejects 0 0
+supports 0 0
+REPL 0 0
+parses 0 0
+checks 0 0
+semicolon 0 0
+REPL 0 0
+reports 0 0
+preserves 0 0
+single 0 0
+requires 0 0
+uses 0 0
+rejects 0 0
+lexes 0 0
+parses 0 0
+rejects 0 0
+fits 0 0
+uses 0 0
+tracks 0 0
+keeps 0 0
+accepts 0 0
+parses 0 0
+lexes 0 0
+resolves 0 0
+treats 0 0
+REPL 0 0
+catalog 0 0
+checks 0 0
+records 0 0
+reports 0 0
+REPL 0 0
+example_minimal_print_int_check 8 0.00161501
+example_minimal_print_bool_check 8 0.000936237
+example_minimal_print_string_check 8 0.00101384
+example_minimal_boolean_call_check 8 0.0010073
+example_minimal_control_flow_check 8 0.00103122
+example_minimal_real_division_check 8 0.00094692
+example_minimal_modulo_by_zero_vm 8 0.00464087
+example_minimal_modulo_overflow_vm 8 0.00440223
+example_minimal_print_int_vm 8 0.00376083
+example_minimal_print_bool_vm 8 0.00397197
+example_minimal_print_string_vm 8 0.00397628
+example_minimal_boolean_call_vm 8 0.00411585
+example_minimal_control_flow_vm 8 0.00384958
+example_minimal_break_vm 8 0.00797574
+example_minimal_real_division_vm 8 0.00433483
+example_minimal_print_int_native 8 0.0115027
+example_minimal_print_bool_native 8 0.0124714
+example_minimal_print_string_native 8 0.0128924
+example_minimal_boolean_call_native 8 0.0171429
+example_minimal_control_flow_native 8 0.0153412
+example_minimal_break_native 8 0.024639
+example_minimal_real_division_native 8 0.0221371
+example_minimal_modulo_by_zero_native 8 0.0244845
+example_minimal_modulo_overflow_native 8 0.0200904
+rejects 0 0
+parses 0 0
+reports 0 0
+resolves 0 0
+checks 0 0
+supports 0 0
+parses 0 0
+rejects 0 0
+records 0 0
+lexes 0 0
+rejects 0 0
+REPL 0 0
+catalog 0 0
+requires 0 0
+REPL 0 0
+inserts 0 0
+rejects 0 0
+semicolon 0 0
+checks 0 0
+retains 0 0
+fits 0 0
+reserves 0 0
+rejects 0 0
+reports 0 0
+single 0 0
+uses 0 0
+uses 0 0
+rejects 0 0
+reports 0 0
+validates 0 0
+parses 0 0
+REPL 0 0
+resolves 0 0
+accepts 0 0
+tracks 0 0
+parses 0 0
+parses 0 0
+merges 0 0
+rejects 0 0
+REPL 0 0
+treats 0 0
+same-line 0 0
+rejects 0 0
+keeps 0 0
+lexes 0 0
+preserves 0 0
+preserves 0 0
+REPL 0 0
+requires 0 0
+semicolon 0 0
+validates 0 0
+tracks 0 0
+REPL 0 0
+reports 0 0
+rejects 0 0
+keeps 0 0
+single 0 0
+uses 0 0
+rejects 0 0
+REPL 0 0
+rejects 0 0
+catalog 0 0
+reserves 0 0
+rejects 0 0
+parses 0 0
+uses 0 0
+fits 0 0
+resolves 0 0
+records 0 0
+merges 0 0
+supports 0 0
+treats 0 0
+checks 0 0
+accepts 0 0
+checks 0 0
+rejects 0 0
+parses 0 0
+reports 0 0
+parses 0 0
+rejects 0 0
+parses 0 0
+REPL 0 0
+lexes 0 0
+retains 0 0
+inserts 0 0
+rejects 0 0
+lexes 0 0
+parses 0 0
+reports 0 0
+rejects 0 0
+same-line 0 0
+resolves 0 0
+rejects 0 0
+parses 0 0
+resolves 0 0
+rejects 0 0
+lexes 0 0
+REPL 0 0
+REPL 0 0
+parses 0 0
+parses 0 0
+inserts 0 0
+uses 0 0
+rejects 0 0
+uses 0 0
+merges 0 0
+rejects 0 0
+reserves 0 0
+reports 0 0
+requires 0 0
+semicolon 0 0
+lexes 0 0
+treats 0 0
+parses 0 0
+catalog 0 0
+fits 0 0
+tracks 0 0
+supports 0 0
+resolves 0 0
+reports 0 0
+REPL 0 0
+preserves 0 0
+checks 0 0
+reports 0 0
+checks 0 0
+single 0 0
+validates 0 0
+rejects 0 0
+same-line 0 0
+keeps 0 0
+REPL 0 0
+parses 0 0
+rejects 0 0
+records 0 0
+accepts 0 0
+rejects 0 0
+retains 0 0
+rejects 0 0
+fits 0 0
+requires 0 0
+REPL 0 0
+rejects 0 0
+rejects 0 0
+uses 0 0
+resolves 0 0
+rejects 0 0
+accepts 0 0
+parses 0 0
+parses 0 0
+rejects 0 0
+checks 0 0
+keeps 0 0
+tracks 0 0
+treats 0 0
+lexes 0 0
+reports 0 0
+resolves 0 0
+reserves 0 0
+retains 0 0
+converts 0 0
+rejects 0 0
+inserts 0 0
+REPL 0 0
+rejects 0 0
+REPL 0 0
+validates 0 0
+records 0 0
+supports 0 0
+checks 0 0
+rejects 0 0
+catalog 0 0
+rejects 0 0
+parses 0 0
+preserves 0 0
+merges 0 0
+same-line 0 0
+single 0 0
+parses 0 0
+lexes 0 0
+REPL 0 0
+uses 0 0
+semicolon 0 0
+REPL 0 0
+parses 0 0
+reports 0 0
+reports 0 0
+accepts 0 0
+REPL 0 0
+parses 0 0
+keeps 0 0
+rejects 0 0
+REPL 0 0
+rejects 0 0
+checks 0 0
+rejects 0 0
+semicolon 0 0
+same-line 0 0
+rejects 0 0
+rejects 0 0
+lexes 0 0
+inserts 0 0
+resolves 0 0
+resolves 0 0
+REPL 0 0
+reports 0 0
+reports 0 0
+single 0 0
+validates 0 0
+rejects 0 0
+retains 0 0
+records 0 0
+uses 0 0
+reports 0 0
+REPL 0 0
+converts 0 0
+parses 0 0
+uses 0 0
+merges 0 0
+tracks 0 0
+checks 0 0
+preserves 0 0
+parses 0 0
+parses 0 0
+supports 0 0
+catalog 0 0
+fits 0 0
+requires 0 0
+parses 0 0
+REPL 0 0
+lexes 0 0
+rejects 0 0
+reserves 0 0
+rejects 0 0
+treats 0 0
+single 0 0
+rejects 0 0
+requires 0 0
+parses 0 0
+converts 0 0
+reports 0 0
+accepts 0 0
+rejects 0 0
+uses 0 0
+keeps 0 0
+rejects 0 0
+reserves 0 0
+rejects 0 0
+rejects 0 0
+resolves 0 0
+REPL 0 0
+reports 0 0
+fits 0 0
+REPL 0 0
+validates 0 0
+lexes 0 0
+rejects 0 0
+parses 0 0
+parses 0 0
+reports 0 0
+inserts 0 0
+rejects 0 0
+REPL 0 0
+parses 0 0
+checks 0 0
+rejects 0 0
+semicolon 0 0
+lexes 0 0
+records 0 0
+uses 0 0
+preserves 0 0
+tracks 0 0
+supports 0 0
+catalog 0 0
+checks 0 0
+REPL 0 0
+retains 0 0
+same-line 0 0
+merges 0 0
+resolves 0 0
+treats 0 0
+parses 0 0
+REPL 0 0
+rejects calls with mismatched parameter counts 1 0.0075868
+rejects malformed UTF-8 identifiers 1 0.00659287
+converts integer and real values when initializing real variables 1 0.00797822
+requires return on every reachable branch 1 0.0102839
+merges initialization across branches and loops 1 0.00799087
+same-line statements still require a separator 1 0.0076724
+uses maximal munch for nullable operators 1 0.00794349
+supports nested block comments 1 0.00840769
+semicolon is optional before a closing brace or EOF 1 0.0073685
+parses while loops and unsafe blocks 1 0.00909556
+single statement bodies may omit braces 1 0.00973257
+REPL shares VM execution and keeps variable state 1 0.0116743
+lexes Unicode identifiers and new literal forms 1 0.00829279
+parses operator precedence and null-safety operators 1 0.00797937
+preserves optional depth and rejects implicit unwrap 1 0.00824867
+validates a complete executable IR module 1 0.0101169
+reports unsupported match statements 1 0.00837417
+rejects nominal member access until nominal types exist 1 0.0070624
+keeps multiline signatures and operator continuations together 1 0.00657764
+resolves intrinsic string and inferred variables 1 0.00844269
+tracks initialization and one assignment to immutable var 1 0.00794448
+records contextual coercions without changing source types 1 0.00681154
+reports unterminated strings 1 0.00863182
+REPL supports typed uninitialized float variables 1 0.012844
+rejects malformed UTF-8 even inside strings 1 0.00642899
+REPL runs stored functions and prints booleans by semantic type 1 0.00961076
+REPL converts integers and doubles to float variables 1 0.0131019
+inserts terminators only at eligible newlines 1 0.00687605
+rejects legacy postfix bang 1 0.0097988
+checks external parameter labels 1 0.00766353
+reserves declaration and control keywords from the grammar 1 0.0100553
+rejects invalid character escapes 1 0.0104137
+uses normative coalescing precedence 1 0.00771948
+parses variable declarations 1 0.00761678
+checks the null-safety example with explicit nominal definitions 1 0.00742156
+accepts escaped identifiers in declarations 1 0.00866894
+retains resolved symbol bindings for later phases 1 0.00753402
+REPL evaluates real division and persists double variables 1 0.009955
+parses function declaration with return type and body 1 0.00867824
+rejects control-flow edges that target missing blocks 1 0.00771537
+treats newlines inside block comments as eligible terminators 1 0.00711741
+rejects unknown and uninferrable types 1 0.00899107
+resolves protocol components and safe member chains 1 0.00927768
+fits integer literals contextually without widening variables 1 0.00884376
+lexes Swift-like null-safety chain 1 0.0105709
+parses a non-generic data protocol 1 0.0112447
+catalog diagnostics retain title, explanation, and help 1 0.00726737
+reports unsupported nominal declarations 1 0.00781849
 ---
-fits integer literals contextually without widening variables

@@ -20,6 +20,9 @@ ARGOS_BUILD_TESTS:BOOL=ON
 //Enable AddressSanitizer and UndefinedBehaviorSanitizer
 ARGOS_ENABLE_SANITIZERS:BOOL=OFF
 
+//Path to a library.
+ARGOS_READLINE_LIBRARY:FILEPATH=/usr/lib/x86_64-linux-gnu/libreadline.so
+
 //Value Computed by CMake
 ArgosLang_BINARY_DIR:STATIC=/home/dgti/Projetos/argoslang/build-gcc
 
