@@ -8,7 +8,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
-#include <unordered_set>
+#include <set>
 
 namespace argos::codegen::native::x86_64 {
 
@@ -67,11 +67,13 @@ void validate(const argos::ir::Module &module, const argos::ir::Function &functi
   case Opcode::cmp_ge:
     valid_reg(instruction.dst); valid_reg(instruction.src1); valid_reg(instruction.src2); break;
   case Opcode::jmp:
-    if (instruction.label >= function.blocks.size()) throw std::runtime_error("IR: salto inválido");
+    if (std::none_of(function.blocks.begin(), function.blocks.end(),
+                     [&](const auto &block) { return block.label == instruction.label; })) throw std::runtime_error("IR: salto inválido");
     break;
   case Opcode::jmp_if_false:
     valid_reg(instruction.src1);
-    if (instruction.label >= function.blocks.size()) throw std::runtime_error("IR: salto inválido");
+    if (std::none_of(function.blocks.begin(), function.blocks.end(),
+                     [&](const auto &block) { return block.label == instruction.label; })) throw std::runtime_error("IR: salto inválido");
     break;
   case Opcode::call:
     valid_reg(instruction.dst);
@@ -95,9 +97,12 @@ void validate(const argos::ir::Module &module, const argos::ir::Function &functi
 std::string CodeGenerator::generate(const argos::ir::Module &m) {
   if (const auto error = argos::ir::validate_module(m))
     throw std::runtime_error("IR inválida: " + *error);
+  for (const auto &function : m.functions)
+    if (function.parameter_count > 6)
+      throw std::runtime_error("IR: backend x86-64 suporta até seis parâmetros");
   std::ostringstream o;
-  std::unordered_set<argos::ir::ConstantId> string_constants;
-  std::unordered_set<argos::ir::ConstantId> double_constants;
+  std::set<argos::ir::ConstantId> string_constants;
+  std::set<argos::ir::ConstantId> double_constants;
   bool prints_integer = false;
   bool prints_boolean = false;
   bool prints_double = false;

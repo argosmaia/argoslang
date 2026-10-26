@@ -104,3 +104,19 @@ Um arquivo de bytecode independente ainda não existe, e passar em `check` não
 significa que toda construção do frontend esteja disponível para execução.
 
 Para rodar um programa pela VM quando esse backend estiver pronto, consulte [interpretar.md](interpretar.md). Para distribuição e alvos de hardware, consulte [executar-em-maquinas.md](executar-em-maquinas.md).
+
+### Gerar assembly
+
+Para salvar o assembly GNU/AT&T x86-64 em vez do executável:
+
+```bash
+./build/bin/argosc compile examples/minimal_arithmetic.argos -S -o /tmp/programa.s
+cc /tmp/programa.s -o /tmp/programa
+/tmp/programa
+echo $? # 14
+```
+
+A forma curta `argosc -S arquivo.argos` também funciona e gera `arquivo.s`
+no diretório atual. A opção `-S` usa o backend existente sobre a IR tipada e
+validada, sem chamar `cc`. Montar e ligar o resultado exige uma toolchain
+x86-64/Linux. O subconjunto suportado é o mesmo da compilação nativa.

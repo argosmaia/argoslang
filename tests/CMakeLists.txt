@@ -113,6 +113,7 @@ endforeach()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
    CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
+    find_program(ARGOS_ASSEMBLY_CC cc REQUIRED)
     foreach(example_expected IN ITEMS
         "minimal_literal:42"
         "minimal_arithmetic:14"
@@ -153,6 +154,18 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
                 "-DBINARY=${CMAKE_BINARY_DIR}/bin/${example}-test"
                 "-DEXPECTED=${expected}"
                 "-DEXPECTED_STDOUT=${expected_stdout}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/compile_example.cmake"
+        )
+        add_test(
+            NAME "example_${example}_assembly"
+            COMMAND "${CMAKE_COMMAND}"
+                "-DARGOSC=$<TARGET_FILE:argosc>"
+                "-DSOURCE=${PROJECT_SOURCE_DIR}/examples/${example}.argos"
+                "-DBINARY=${CMAKE_BINARY_DIR}/bin/${example}-assembly-test"
+                "-DEXPECTED=${expected}"
+                "-DEXPECTED_STDOUT=${expected_stdout}"
+                "-DASSEMBLY=ON"
+                "-DCC=${ARGOS_ASSEMBLY_CC}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/compile_example.cmake"
         )
     endforeach()

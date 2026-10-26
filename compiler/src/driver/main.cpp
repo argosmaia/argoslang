@@ -60,8 +60,8 @@ void print_usage(std::string_view executable) {
         << "  " << executable << " check <arquivo.argos>  - Executa a análise semântica (verificação de tipos e escopos)\n"
         << "  " << executable << " run <arquivo.argos>    - Executa pela VM o subconjunto suportado\n"
         << "  " << executable << " repl                 - Abre o shell interativo da VM\n"
-        << "  " << executable << " <arquivo.argos> [-o executável] - Compila no host x86-64/Linux\n"
-        << "  " << executable << " compile <arquivo.argos> [-o executável] - Mesmo comando explícito\n";
+        << "  " << executable << " <arquivo.argos> [-S] [-o saída] - Compila no host x86-64/Linux\n"
+        << "  " << executable << " compile <arquivo.argos> [-S] [-o saída] - Mesmo comando explícito\n";
 }
 
 void print_diagnostics(
@@ -129,30 +129,36 @@ int main(int argc, char** argv) {
     }
     std::filesystem::path source_path;
     std::filesystem::path output_path;
-    if (command == "compile") {
-        if (argc != 3 && argc != 5) {
-            print_usage(argv[0]);
-            return 64;
-        }
-        source_path = argv[2];
-        if (argc == 5) {
-            if (std::string_view{argv[3]} != "-o") {
-                print_usage(argv[0]);
-                return 64;
-            }
-            output_path = argv[4];
-        }
-    } else if (command == "lex" || command == "parse" ||
-               command == "ast" || command == "check" || command == "run") {
+    bool assembly_only = false;
+    if (command == "lex" || command == "parse" ||
+        command == "ast" || command == "check" || command == "run") {
         if (argc != 3) {
             print_usage(argv[0]);
             return 64;
         }
         source_path = argv[2];
-    } else if (argc == 2 || (argc == 4 && std::string_view{argv[2]} == "-o")) {
+    } else {
+        const int first = command == "compile" ? 2 : 1;
         command = "compile";
-        source_path = argv[1];
-        if (argc == 4) output_path = argv[3];
+        bool has_output = false;
+        for (int index = first; index < argc; ++index) {
+            const std::string_view argument{argv[index]};
+            if (argument == "-S" && !assembly_only) {
+                assembly_only = true;
+            } else if (argument == "-o" && !has_output && index + 1 < argc) {
+                output_path = argv[++index];
+                has_output = true;
+                if (output_path.empty()) {
+                    print_usage(argv[0]);
+                    return 64;
+                }
+            } else if (!argument.starts_with("-") && source_path.empty()) {
+                source_path = argv[index];
+            } else {
+                print_usage(argv[0]);
+                return 64;
+            }
+        }
     }
 
     if (command != "lex" && command != "parse" && command != "ast" &&
@@ -166,7 +172,10 @@ int main(int argc, char** argv) {
         return 64;
     }
     if (command == "compile") {
-        if (output_path.empty()) output_path = source_path.stem();
+        if (output_path.empty()) {
+            output_path = source_path.stem();
+            if (assembly_only) output_path += ".s";
+        }
         std::error_code equivalent_error;
         const bool same_file = std::filesystem::exists(output_path) &&
             std::filesystem::equivalent(source_path, output_path, equivalent_error);
@@ -245,12 +254,14 @@ int main(int argc, char** argv) {
             const auto module = generator.generate(program);
             if (!diagnostics.has_errors()) {
                 std::string compile_error;
-                const int result = argos::driver::compile_native(module, output_path, compile_error);
+                const int result = assembly_only
+                    ? argos::driver::emit_assembly(module, output_path, compile_error)
+                    : argos::driver::compile_native(module, output_path, compile_error);
                 if (result != 0) {
                     std::cerr << "argosc: " << compile_error << '\n';
                     return result;
                 }
-                std::cout << "Executável gerado: " << output_path.string() << '\n';
+                std::cout << (assembly_only ? "Assembly gerado: " : "Executável gerado: ") << output_path.string() << '\n';
             }
         }
         if (command == "run" && success && !diagnostics.has_errors()) {

@@ -16,6 +16,27 @@ extern char **environ;
 #endif
 
 namespace argos::driver {
+int emit_assembly(const argos::ir::Module &module,
+                  const std::filesystem::path &output,
+                  std::string &error) {
+  std::string assembly;
+  try {
+    codegen::native::x86_64::CodeGenerator backend;
+    assembly = backend.generate(module);
+  } catch (const std::exception &exception) {
+    error = exception.what();
+    return 65;
+  }
+  std::ofstream file{output, std::ios::binary};
+  file << assembly;
+  file.close();
+  if (!file) {
+    error = "não foi possível gravar assembly: " + output.string();
+    return 74;
+  }
+  return 0;
+}
+
 int compile_native(const argos::ir::Module &module,
                    const std::filesystem::path &output,
                    std::string &error) {

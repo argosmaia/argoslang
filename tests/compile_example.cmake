@@ -1,4 +1,18 @@
-if(SHORT_FORM)
+if(ASSEMBLY)
+    execute_process(
+        COMMAND "${ARGOSC}" compile -S "${SOURCE}" -o "${BINARY}.s"
+        RESULT_VARIABLE emit_result
+        ERROR_VARIABLE emit_error
+    )
+    if(NOT emit_result EQUAL 0)
+        message(FATAL_ERROR "Geração de assembly falhou: ${emit_error}")
+    endif()
+    execute_process(
+        COMMAND "${CC}" "${BINARY}.s" -o "${BINARY}"
+        RESULT_VARIABLE compile_result
+        ERROR_VARIABLE compile_error
+    )
+elseif(SHORT_FORM)
     execute_process(
         COMMAND "${ARGOSC}" "${SOURCE}" -o "${BINARY}"
         RESULT_VARIABLE compile_result

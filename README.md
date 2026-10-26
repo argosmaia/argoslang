@@ -84,3 +84,19 @@ echo $?  # 42
 - [docs/mvp.md](docs/mvp.md): Contrato do subconjunto executável, VM, nativo e REPL.
 - [docs/language-evolution.md](docs/language-evolution.md): Decisões e ordem de evolução após o MVP.
 - [docs/argoslang-v0.0.1.md](docs/argoslang-v0.0.1.md): Referência de instalação e uso da versão v0.0.1.
+
+### Gerar assembly
+
+Para salvar o assembly GNU/AT&T x86-64 em vez do executável:
+
+```bash
+./build/bin/argosc compile examples/minimal_arithmetic.argos -S -o /tmp/programa.s
+cc /tmp/programa.s -o /tmp/programa
+/tmp/programa
+echo $? # 14
+```
+
+A forma curta `argosc -S arquivo.argos` também funciona e gera `arquivo.s`
+no diretório atual. A opção `-S` usa o backend existente sobre a IR tipada e
+validada, sem chamar `cc`. Montar e ligar o resultado exige uma toolchain
+x86-64/Linux. O subconjunto suportado é o mesmo da compilação nativa.
