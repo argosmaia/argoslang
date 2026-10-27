@@ -1,0 +1,13 @@
+function main() -> int {
+    if false && (1 % 0 == 0) || true {
+        print("nested short-circuit")
+    } else {
+        print("and-or failed")
+    }
+
+    if true || (1 % 0 == 0) {
+        print("short-circuit")
+    }
+
+    return 0
+}

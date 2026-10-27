@@ -39,7 +39,7 @@ std::string_view trim(std::string_view text) {
 
 bool is_function_definition(std::string_view input) {
   input = trim(input);
-  return input.starts_with("function ") || input.starts_with("func ");
+  return input.starts_with("function ");
 }
 
 std::string variable_source(const Variable &variable) {
@@ -61,11 +61,15 @@ std::optional<std::string> executable_type(const semantics::Type &type) {
 
 std::optional<std::string> executable_type(const ast::TypeSyntax &type) {
   if (type.nullable_depth != 0) return std::nullopt;
-  if (type.name == "int" || type.name == "Int") return "int";
-  if (type.name == "bool" || type.name == "Bool") return "bool";
-  if (type.name == "float" || type.name == "Float") return "float";
-  if (type.name == "double" || type.name == "Double") return "double";
+  if (type.name == "int") return "int";
+  if (type.name == "bool") return "bool";
+  if (type.name == "float") return "float";
+  if (type.name == "double") return "double";
   return std::nullopt;
+}
+
+bool is_string_type(const ast::TypeSyntax &type) {
+  return type.nullable_depth == 0 && type.name == "string";
 }
 
 std::string compose_source(const std::vector<std::string> &functions,
@@ -152,12 +156,29 @@ public:
               dynamic_cast<const ast::VariableDeclaration *>(
                   entry->body->items[index].get());
           if (!declaration) continue;
+          const bool is_string_declaration =
+              (declaration->type && is_string_type(*declaration->type)) ||
+              (!declaration->type && declaration->initializer &&
+               probe_analyzer.type_of(*declaration->initializer).kind ==
+                   semantics::TypeKind::string_type);
+          if (is_string_declaration) {
+            diagnostics.emit(
+                diagnostics::catalog::compiler::unsupported_lowering,
+                declaration->span,
+                "o REPL ainda não consegue manter variáveis string entre entradas");
+            return false;
+          }
           std::optional<std::string> type;
           if (declaration->type)
             type = executable_type(*declaration->type);
           else if (declaration->initializer)
             type = executable_type(
                 probe_analyzer.type_of(*declaration->initializer));
+          if (!type) {
+            diagnostics.emit(diagnostics::catalog::compiler::unsupported_lowering, declaration->span,
+                             "o REPL ainda não consegue preservar closures ou objetos entre entradas");
+            return false;
+          }
           if (type) {
             next_variables.push_back(
                 {declaration->name, *type, {},

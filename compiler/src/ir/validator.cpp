@@ -18,6 +18,9 @@ std::optional<std::string> validate_function(const Module &module,
   if (function.return_type != ValueType::int32 &&
       function.return_type != ValueType::boolean &&
       function.return_type != ValueType::float64 &&
+      function.return_type != ValueType::string &&
+      function.return_type != ValueType::closure &&
+      function.return_type != ValueType::object &&
       function.return_type != ValueType::void_type)
     return "tipo de retorno desconhecido";
   for (const auto type : function.slot_types)
@@ -28,7 +31,7 @@ std::optional<std::string> validate_function(const Module &module,
       return "parâmetro não pode ter tipo void";
   for (const auto type : function.register_types)
     if (type != ValueType::int32 && type != ValueType::boolean &&
-        type != ValueType::float64 &&
+        type != ValueType::float64 && type != ValueType::string && type != ValueType::closure && type != ValueType::object &&
         type != ValueType::void_type)
       return "registrador possui tipo desconhecido";
   for (std::size_t index = 0; index < function.parameter_types.size(); ++index) {
@@ -73,8 +76,10 @@ std::optional<std::string> validate_function(const Module &module,
         if (!valid_register(instruction.dst) ||
             !valid_constant(instruction.constant))
           return "constante ou registrador fora dos limites";
-        if (register_type(instruction.dst) == ValueType::void_type)
-          return "constante não pode produzir void";
+        if (register_type(instruction.dst) != ValueType::int32 &&
+            register_type(instruction.dst) != ValueType::boolean &&
+            register_type(instruction.dst) != ValueType::float64)
+          return "constante exige tipo numérico ou bool";
         {
           const auto &text = module.constants[instruction.constant].value;
           if (register_type(instruction.dst) == ValueType::float64) {
@@ -91,6 +96,11 @@ std::optional<std::string> validate_function(const Module &module,
               return "constante numérica inválida";
           }
         }
+        break;
+      case Opcode::load_string:
+        if (!has_register_type(instruction.dst, ValueType::string) ||
+            !valid_constant(instruction.constant))
+          return "constante de string ou registrador fora dos limites";
         break;
       case Opcode::load_var:
         if (!valid_register(instruction.dst) || !valid_slot(instruction.slot))
@@ -175,6 +185,43 @@ std::optional<std::string> validate_function(const Module &module,
             !valid_target(instruction.label))
           return "desvio condicional inválido";
         break;
+      case Opcode::new_object:
+        if (!has_register_type(instruction.dst, ValueType::object) || instruction.constant >= module.objects.size())
+          return "alocação de objeto inválida";
+        break;
+      case Opcode::load_field:
+      case Opcode::store_field:
+        if (!has_register_type(instruction.src1, ValueType::object) || instruction.constant >= module.objects.size() ||
+            instruction.count >= module.objects[instruction.constant].fields.size()) return "campo inexistente";
+        if (!has_register_type(instruction.opcode == Opcode::load_field ? instruction.dst : instruction.src2,
+                               module.objects[instruction.constant].fields[instruction.count])) return "tipo de campo incompatível";
+        break;
+      case Opcode::make_closure: {
+        if (!has_register_type(instruction.dst, ValueType::closure) ||
+            instruction.function >= module.functions.size()) return "closure aponta para função inexistente";
+        const auto& target = module.functions[instruction.function];
+        if (target.capture_types.size() != instruction.arguments.size()) return "capturas incompatíveis";
+        if (target.parameter_types.empty() || target.parameter_types.front() != ValueType::closure)
+          return "closure exige parâmetro de ambiente";
+        for (std::size_t i = 0; i < instruction.arguments.size(); ++i)
+          if (!has_register_type(instruction.arguments[i], target.capture_types[i])) return "tipo de captura incompatível";
+        break;
+      }
+      case Opcode::load_capture:
+        if (!has_register_type(instruction.src1, ValueType::closure) ||
+            instruction.count >= function.capture_types.size() ||
+            !has_register_type(instruction.dst, function.capture_types[instruction.count]))
+          return "leitura de captura inválida";
+        break;
+      case Opcode::call_closure:
+        if (!has_register_type(instruction.src1, ValueType::closure) ||
+            !has_register_type(instruction.dst, instruction.return_type) ||
+            instruction.parameter_types.size() != instruction.arguments.size() ||
+            instruction.arguments.size() > 5) return "assinatura de chamada de closure inválida";
+        for (std::size_t i = 0; i < instruction.arguments.size(); ++i)
+          if (!has_register_type(instruction.arguments[i], instruction.parameter_types[i]) ||
+              instruction.parameter_types[i] == ValueType::void_type) return "argumento de closure inválido";
+        break;
       case Opcode::call:
         if (!valid_register(instruction.dst) ||
             instruction.function >= module.functions.size())
@@ -219,6 +266,10 @@ std::optional<std::string> validate_function(const Module &module,
             module.constants[instruction.constant].value.back() != '"')
           return "literal de string malformado";
         break;
+      case Opcode::print_string_value:
+        if (!has_register_type(instruction.src1, ValueType::string))
+          return "print de string exige um registrador string";
+        break;
       case Opcode::ret:
         if (!valid_register(instruction.src1))
           return "retorno usa registrador inexistente";
@@ -246,6 +297,16 @@ std::optional<std::string> validate_module(const Module &module) {
   if (module.functions.empty())
     return "módulo sem funções";
 
+  const auto storage_type = [](ValueType type) {
+    return type == ValueType::int32 || type == ValueType::boolean || type == ValueType::float64 ||
+           type == ValueType::string || type == ValueType::closure || type == ValueType::object;
+  };
+  for (const auto& layout : module.objects)
+    for (const auto type : layout.fields)
+      if (!storage_type(type)) return "campo possui tipo de armazenamento inválido";
+  for (const auto& function : module.functions)
+    for (const auto type : function.capture_types)
+      if (!storage_type(type)) return "captura possui tipo de armazenamento inválido";
   bool has_entry = false;
   for (std::size_t index = 0; index < module.constants.size(); ++index) {
     if (module.constants[index].id != index)

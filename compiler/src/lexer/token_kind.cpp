@@ -25,10 +25,10 @@ std::string_view token_kind_name(TokenKind kind) noexcept {
         case TokenKind::KwProtocol: return "KwProtocol";
         case TokenKind::KwModule: return "KwModule";
         case TokenKind::KwType: return "KwType";
-        case TokenKind::KwInit: return "KwInit";
+        case TokenKind::KwConstruct: return "KwConstruct";
         case TokenKind::KwDeinit: return "KwDeinit";
-        case TokenKind::KwGet: return "KwGet";
-        case TokenKind::KwSet: return "KwSet";
+        case TokenKind::KwGetter: return "KwGetter";
+        case TokenKind::KwSetter: return "KwSetter";
         case TokenKind::KwWhere: return "KwWhere";
         case TokenKind::KwExtern: return "KwExtern";
         case TokenKind::KwInOut: return "KwInOut";

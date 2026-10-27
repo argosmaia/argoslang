@@ -161,6 +161,22 @@ TEST_CASE("keeps multiline signatures and operator continuations together") {
     REQUIRE(std::count(kinds.begin(), kinds.end(), argos::lexer::TokenKind::Semicolon) == 2);
 }
 
+TEST_CASE("accepts only canonical function keyword and lowercase primitive types") {
+    argos::diagnostics::DiagnosticEngine diagnostics;
+    const auto kinds = kinds_of(
+        "function f(value: int) -> string; func f(); Int String Float",
+        diagnostics
+    );
+    REQUIRE_FALSE(diagnostics.has_errors());
+    REQUIRE(kinds[0] == argos::lexer::TokenKind::KwFunction);
+    REQUIRE(kinds[5] == argos::lexer::TokenKind::KwInt);
+    REQUIRE(kinds[8] == argos::lexer::TokenKind::KwString);
+    REQUIRE(kinds[10] == argos::lexer::TokenKind::Identifier);
+    REQUIRE(kinds[15] == argos::lexer::TokenKind::Identifier);
+    REQUIRE(kinds[16] == argos::lexer::TokenKind::Identifier);
+    REQUIRE(kinds[17] == argos::lexer::TokenKind::Identifier);
+}
+
 TEST_CASE("rejects malformed UTF-8 identifiers") {
     argos::diagnostics::DiagnosticEngine diagnostics;
     const auto kinds = kinds_of(std::string{"var "} + static_cast<char>(0xC3) + " = 1", diagnostics);
@@ -189,4 +205,13 @@ TEST_CASE("reserves declaration and control keywords from the grammar") {
     REQUIRE(std::find(kinds.begin(), kinds.end(), argos::lexer::TokenKind::KwMatch) != kinds.end());
     REQUIRE(std::find(kinds.begin(), kinds.end(), argos::lexer::TokenKind::KwDefer) != kinds.end());
     REQUIRE(std::find(kinds.begin(), kinds.end(), argos::lexer::TokenKind::KwExtern) != kinds.end());
+}
+
+TEST_CASE("lexes construct and accessors without legacy constructor keyword") {
+    argos::diagnostics::DiagnosticEngine diagnostics;
+    const auto kinds = kinds_of("construct getter setter init get set", diagnostics);
+    using K = argos::lexer::TokenKind;
+    REQUIRE_FALSE(diagnostics.has_errors());
+    REQUIRE(kinds == std::vector<K>{K::KwConstruct, K::KwGetter, K::KwSetter,
+                                   K::Identifier, K::Identifier, K::Identifier, K::EndOfFile});
 }

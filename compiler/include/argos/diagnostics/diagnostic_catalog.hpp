@@ -59,10 +59,6 @@ inline constexpr DiagnosticDefinition execution_failure{
 } // namespace runtime
 
 namespace warning {
-inline constexpr DiagnosticDefinition legacy_function_keyword{
-    "ARGOS-W0001", Severity::warning, "grafia legada de function",
-    "'func' continua aceito apenas para facilitar a migração de fontes antigas.",
-    "Use 'function' em código novo."};
 inline constexpr DiagnosticDefinition legacy_null_keyword{
     "ARGOS-W0002", Severity::warning, "grafia legada de nil",
     "'null' continua aceito apenas para facilitar a migração de fontes antigas.",
@@ -185,10 +181,44 @@ inline constexpr DiagnosticDefinition duplicate_parameter_label{
     "Dê a cada parâmetro rotulado um nome externo único."};
 } // namespace semantic::calls
 
+namespace semantic::objects {
+inline constexpr DiagnosticDefinition invalid_modifier{"ARGOS-S0600", Severity::error, "modificador incompatível", "O modificador não se aplica a esta declaração.", "Remova o modificador ou use uma declaração compatível."};
+inline constexpr DiagnosticDefinition missing_body{"ARGOS-S0601", Severity::error, "corpo de função ausente", "Uma função concreta precisa de implementação.", "Adicione um corpo ou declare um requisito abstract."};
+inline constexpr DiagnosticDefinition invalid_construction{"ARGOS-S0602", Severity::error, "tipo não pode ser instanciado", "new exige uma classe concreta.", "Construa uma implementação concreta do contrato."};
+inline constexpr DiagnosticDefinition inheritance_cycle{"ARGOS-S0603", Severity::error, "ciclo de herança", "Um tipo depende de si mesmo na cadeia de bases.", "Remova a dependência circular."};
+inline constexpr DiagnosticDefinition invalid_bases{"ARGOS-S0604", Severity::error, "bases incompatíveis", "Classes têm herança simples e interfaces só estendem interfaces.", "Use uma classe base e contratos distintos."};
+inline constexpr DiagnosticDefinition final_base{"ARGOS-S0605", Severity::error, "classe base final", "Uma classe final não permite subclasses.", "Remova a herança ou revise o modificador final."};
+inline constexpr DiagnosticDefinition incompatible_member{"ARGOS-S0606", Severity::error, "contrato de membro incompatível", "Membros herdados devem conservar assinatura e rótulos.", "Implemente o contrato com os mesmos tipos e rótulos."};
+inline constexpr DiagnosticDefinition invalid_state{"ARGOS-S0607", Severity::error, "declaração de membro inválida", "Interfaces não armazenam estado e campos precisam de tipo.", "Declare o estado em uma classe com tipo explícito."};
+inline constexpr DiagnosticDefinition invalid_override{"ARGOS-S0608", Severity::error, "sobrescrita inválida", "override exige um membro herdado que permita sobrescrita.", "Confira override, virtual, abstract, final e visibilidade."};
+inline constexpr DiagnosticDefinition missing_implementation{"ARGOS-S0609", Severity::error, "requisito abstrato ausente", "Uma classe concreta deve implementar todos os contratos.", "Implemente o método ou declare a classe abstract."};
+inline constexpr DiagnosticDefinition invalid_parameter{"ARGOS-S0610", Severity::error, "tipo de parâmetro inválido", "Parâmetros precisam de tipos habitáveis.", "Use um tipo diferente de void ou never."};
+inline constexpr DiagnosticDefinition inaccessible_member{"ARGOS-S0611", Severity::error, "membro inacessível", "A visibilidade restringe o acesso ao membro.", "Use a API pública do tipo."};
+inline constexpr DiagnosticDefinition lambda_annotation{"ARGOS-S0612", Severity::error, "tipo de lambda não inferível", "Esta lambda precisa de uma anotação explícita.", "Anote os parâmetros e, quando necessário, o retorno."};
+inline constexpr DiagnosticDefinition invalid_capture{"ARGOS-S0613", Severity::error, "captura de lambda inválida", "Capturas exigem bindings locais imutáveis inicializados.", "Capture um binding var já inicializado; captura mutável ainda não está disponível."};
+inline constexpr DiagnosticDefinition field_initialization{"ARGOS-S0614", Severity::error, "inicialização de campo inválida", "O estado da instância deve ser inicializado antes de ser utilizado.", "Inicialize cada campo em todos os caminhos de construct antes de retornar."};
+} // namespace semantic::objects
+
 namespace semantic {
 inline const DiagnosticDefinition *
 find_definition(std::string_view code) noexcept {
   static constexpr std::array definitions{
+      &objects::invalid_modifier,
+      &objects::missing_body,
+      &objects::invalid_construction,
+      &objects::inheritance_cycle,
+      &objects::invalid_bases,
+      &objects::final_base,
+      &objects::incompatible_member,
+      &objects::invalid_state,
+      &objects::invalid_override,
+      &objects::missing_implementation,
+      &objects::invalid_parameter,
+      &objects::inaccessible_member,
+      &objects::lambda_annotation,
+      &objects::invalid_capture,
+      &objects::field_initialization,
+
       &symbols::duplicate_declaration,
       &symbols::invalid_ast_node,
       &symbols::unknown_declaration,

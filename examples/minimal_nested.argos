@@ -1,5 +1,5 @@
 // Resultado esperado: 11
-func main() -> int {
+function main() -> int {
     var mut count: int = 0
     while count < 3 {
         if count == 1 count = count + 2 else count = count + 1

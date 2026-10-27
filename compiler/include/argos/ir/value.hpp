@@ -12,6 +12,9 @@ enum class ValueType : std::uint8_t {
   int32,
   boolean,
   float64,
+  string,
+  closure,
+  object,
   void_type,
 };
 

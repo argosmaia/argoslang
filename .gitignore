@@ -37,6 +37,7 @@ compile_commands.json
 !/docs/architecture.md
 !/docs/grammar-spec.md
 !/docs/mvp.md
+!/docs/mvp-roadmap.md
 !/docs/testing-and-compiler-guide.md
 !/docs/guide/
 !/docs/guide/*.md

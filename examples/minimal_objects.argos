@@ -1,0 +1,27 @@
+class Account {
+    private var mut storedBalance: int = 0;
+    public var mut balance: int {
+        getter() { return this.storedBalance; }
+        setter() { this.storedBalance = value; }
+    }
+    public var id: string;
+    public construct(id: string, initial: int) {
+        this.id = id;
+        this.storedBalance = initial;
+    }
+    public function deposit(_ amount: int) -> int {
+        this.balance += amount;
+        return this.balance;
+    }
+    public function total() -> int { return balance; }
+}
+function identity(_ account: Account) -> Account { return account; }
+function main() -> int {
+    var account = new Account(initial: 10, id: "a");
+    var alias = identity(account);
+    print(alias.deposit(5));
+    print(account.total());
+    print(account.id);
+    print(account == alias);
+    return 0;
+}

@@ -46,6 +46,14 @@ foreach(example IN ITEMS
     minimal_boolean_call
     minimal_control_flow
     minimal_real_division
+    minimal_string_values
+    minimal_short_circuit
+    minimal_closures
+    minimal_objects
+    minimal_properties
+    minimal_object_closure
+    minimal_frontend_inheritance
+    minimal_frontend_bound_method
 )
     add_test(
         NAME "example_${example}_check"
@@ -84,12 +92,26 @@ foreach(example_expected IN ITEMS
     "minimal_control_flow:8"
     "minimal_break:7"
     "minimal_real_division:0"
+    "minimal_string_values:0"
+    "minimal_short_circuit:0"
+    "minimal_closures:0"
+    "minimal_objects:0"
+    "minimal_properties:0"
+    "minimal_object_closure:0"
 )
     string(REPLACE ":" ";" example_parts "${example_expected}")
     list(GET example_parts 0 example)
     list(GET example_parts 1 expected)
     set(expected_stdout "")
-    if(example STREQUAL "minimal_print_int")
+    if(example STREQUAL "minimal_closures")
+        set(expected_stdout "13\n7")
+    elseif(example STREQUAL "minimal_object_closure")
+        set(expected_stdout "2\n5\ncaptured\n12\n8\n10\n1\n2.5\nretained\ndone")
+    elseif(example STREQUAL "minimal_properties")
+        set(expected_stdout "target\nget\nrhs\nset\nget\n5\nget\nset\nget\n2.5\nupdated\ntrue\n5\n6\n4")
+    elseif(example STREQUAL "minimal_objects")
+        set(expected_stdout "15\n15\na\ntrue")
+    elseif(example STREQUAL "minimal_print_int")
         set(expected_stdout "42")
     elseif(example STREQUAL "minimal_print_bool")
         set(expected_stdout "true")
@@ -99,6 +121,10 @@ foreach(example_expected IN ITEMS
         set(expected_stdout "true")
     elseif(example STREQUAL "minimal_real_division")
         set(expected_stdout "0.5\n0.5\n0.5")
+    elseif(example STREQUAL "minimal_string_values")
+        set(expected_stdout "olá\nsame\nnul-safe\nline one\nline two")
+    elseif(example STREQUAL "minimal_short_circuit")
+        set(expected_stdout "nested short-circuit\nshort-circuit")
     endif()
     add_test(
         NAME "example_${example}_vm"
@@ -130,12 +156,26 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
         "minimal_control_flow:8"
         "minimal_break:7"
         "minimal_real_division:0"
+        "minimal_string_values:0"
+        "minimal_short_circuit:0"
+        "minimal_closures:0"
+        "minimal_objects:0"
+        "minimal_properties:0"
+        "minimal_object_closure:0"
     )
         string(REPLACE ":" ";" example_parts "${example_expected}")
         list(GET example_parts 0 example)
         list(GET example_parts 1 expected)
         set(expected_stdout "")
-        if(example STREQUAL "minimal_print_int")
+        if(example STREQUAL "minimal_closures")
+            set(expected_stdout "13\n7")
+        elseif(example STREQUAL "minimal_properties")
+            set(expected_stdout "target\nget\nrhs\nset\nget\n5\nget\nset\nget\n2.5\nupdated\ntrue\n5\n6\n4")
+        elseif(example STREQUAL "minimal_objects")
+            set(expected_stdout "15\n15\na\ntrue")
+        elseif(example STREQUAL "minimal_object_closure")
+            set(expected_stdout "2\n5\ncaptured\n12\n8\n10\n1\n2.5\nretained\ndone")
+        elseif(example STREQUAL "minimal_print_int")
             set(expected_stdout "42")
         elseif(example STREQUAL "minimal_print_bool")
             set(expected_stdout "true")
@@ -145,6 +185,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
             set(expected_stdout "true")
         elseif(example STREQUAL "minimal_real_division")
             set(expected_stdout "0.5\n0.5\n0.5")
+        elseif(example STREQUAL "minimal_string_values")
+            set(expected_stdout "olá\nsame\nnul-safe\nline one\nline two")
+        elseif(example STREQUAL "minimal_short_circuit")
+            set(expected_stdout "nested short-circuit\nshort-circuit")
         endif()
         add_test(
             NAME "example_${example}_native"
@@ -179,7 +223,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
             "-DSHORT_FORM=ON"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/compile_example.cmake"
     )
-    foreach(example IN ITEMS minimal_optional null_safety)
+    foreach(example IN ITEMS minimal_optional null_safety minimal_frontend_inheritance minimal_frontend_bound_method)
         add_test(
             NAME "example_${example}_native_rejected"
             COMMAND "${CMAKE_COMMAND}"
@@ -206,3 +250,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
             -P "${CMAKE_CURRENT_SOURCE_DIR}/runtime_error.cmake"
     )
 endif()
+
+add_test(
+    NAME legacy_constructor_rejected_by_all_commands
+    COMMAND "${CMAKE_COMMAND}"
+        "-DARGOSC=$<TARGET_FILE:argosc>"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/legacy_constructor_rejection.cmake"
+)

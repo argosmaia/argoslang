@@ -30,6 +30,7 @@ enum class TypeKind : std::uint8_t {
   char_type,
   string_type,
   nominal_type,
+  function_type,
   never_type,
   null_type,
   unknown,
@@ -39,6 +40,8 @@ struct Type final {
   TypeKind kind{TypeKind::error};
   std::size_t nullable_depth{0};
   std::string nominal_name;
+  // Function parameters followed by the return type; structural and invariant.
+  std::vector<Type> signature;
 
   Type() = default;
   Type(TypeKind kind_value, std::size_t depth = 0,
@@ -69,6 +72,7 @@ struct Symbol final {
   SymbolId id{0};
   enum class Kind : std::uint8_t {
     variable,
+    property,
     parameter,
     function,
     type,
@@ -78,10 +82,12 @@ struct Symbol final {
   Type type{};
   ast::Mutability mutability{ast::Mutability::immutable};
   bool initialized{false};
-  std::vector<Type> parameter_types;
-  std::vector<std::string> parameter_labels;
+  std::vector<Type> parameter_types{};
+  std::vector<std::string> parameter_labels{};
   Type return_type{TypeKind::void_type, 0};
   source::SourceSpan span{};
+  ast::Modifiers modifiers{};
+  std::string owner{};
 };
 
 class SemanticAnalyzer final {
@@ -94,6 +100,7 @@ public:
   [[nodiscard]] std::optional<SymbolId>
   symbol_id_of(const ast::Expression &expression) const;
   [[nodiscard]] const Symbol *symbol_by_id(SymbolId id) const noexcept;
+  [[nodiscard]] const std::vector<Symbol>& captures_of(const ast::LambdaExpression& expression) const;
   [[nodiscard]] bool is_initialized(std::string_view name) const noexcept;
 
 private:
@@ -124,6 +131,32 @@ private:
   void
   analyze_function_declaration(const ast::FunctionDeclaration &declaration);
   void analyze_protocol_declaration(const ast::ProtocolDeclaration &declaration);
+  struct ClassInfo {
+    const ast::ClassDeclaration* declaration{};
+    std::unordered_map<std::string, Symbol> members;
+    unsigned state{0};
+  };
+  void build_class(const std::string& name);
+  void analyze_class(const ast::ClassDeclaration& declaration);
+  Symbol function_symbol(const ast::FunctionDeclaration& declaration);
+  Type analyze_lambda(const ast::LambdaExpression& expression);
+  Type check_call(const ast::CallExpression& expression, const Symbol& function);
+  const Symbol* find_member(const Type& type, const std::string& name,
+                            const source::SourceSpan& span);
+  bool is_subtype(const std::string& derived, const std::string& base) const;
+  std::unordered_map<std::string, ClassInfo> classes_;
+  std::string current_class_;
+  std::vector<std::size_t> lambda_scope_boundaries_;
+  std::vector<const ast::LambdaExpression*> active_lambdas_;
+  std::unordered_map<const ast::LambdaExpression*, std::vector<Symbol>> lambda_captures_;
+  Symbol* lookup_field(const std::string& name);
+  const Symbol* lookup_field(const std::string& name) const;
+  Symbol* assignment_symbol(const ast::Expression& expression);
+  bool in_constructor_{false};
+  bool initializing_field_{false};
+  bool constructor_lambda_context_{false};
+  bool accessing_member_base_{false};
+  bool instance_ready() const;
   void record_coercion(const ast::Expression &expression, Type from, Type to);
 
   void analyze_statement(const ast::Statement &statement);
@@ -146,9 +179,9 @@ private:
   [[nodiscard]] static bool is_numeric(Type type) noexcept;
   [[nodiscard]] static bool is_integral(Type type) noexcept;
   [[nodiscard]] static bool is_boolean(Type type) noexcept;
-  [[nodiscard]] static bool is_assignable(Type from, Type to) noexcept;
-  [[nodiscard]] static bool is_assignable_expression(
-      Type from, Type to, const ast::Expression &expression);
+  [[nodiscard]] bool is_assignable(Type from, Type to) const;
+  [[nodiscard]] bool is_assignable_expression(
+      Type from, Type to, const ast::Expression &expression) const;
   [[nodiscard]] static bool is_equality_comparable(Type left,
                                                    Type right) noexcept;
   [[nodiscard]] static Type common_numeric_type(Type left, Type right) noexcept;

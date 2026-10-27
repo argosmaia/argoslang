@@ -247,7 +247,7 @@ Declarações duplicadas no mesmo namespace semântico devem ser rejeitadas, enq
 
 O sistema não deve limitar tipos a um enum de primitivos. Tipos definidos pelo usuário e tipos da biblioteca padrão exigem identidade nominal, parâmetros genéricos e vínculo com símbolos.
 
-`String` deve ser decidido formalmente como tipo da biblioteca padrão ou tipo intrínseco. Não deve aparecer nos exemplos como se fosse primitivo enquanto estiver ausente do contrato de tipos.
+`string` deve ter contrato formal como tipo intrínseco ou tipo da biblioteca padrão.
 
 ### 9.4. Chamadas
 
@@ -265,9 +265,9 @@ Condições devem aceitar somente valores booleanos não opcionais, salvo se a l
 
 A especificação deve definir tipos booleanos, inteiros com largura fixa, inteiros do tamanho da palavra, ponto flutuante, caracteres e ausência de valor. Sinal, largura, overflow, promoção aritmética e disponibilidade por alvo precisam ser normativos.
 
-`Byte` não deve ser simultaneamente descrito como inteiro com sinal e mapeado ambiguamente para tipos C com ou sem sinal. A decisão recomendada é separar inteiros assinados e não assinados por largura ou declarar de maneira única o sinal de cada tipo.
+`byte` não deve ser simultaneamente descrito como inteiro com sinal e mapeado ambiguamente para tipos C com ou sem sinal. A decisão recomendada é separar inteiros assinados e não assinados por largura ou declarar de maneira única o sinal de cada tipo.
 
-`Char` precisa representar um escalar Unicode ou um byte; “caractere UTF-8 de um byte” é conceitualmente insuficiente para texto Unicode. Se a prioridade embarcada exigir um byte, deve existir um tipo textual separado para caracteres Unicode.
+`char` precisa representar um escalar Unicode ou um byte; “caractere UTF-8 de um byte” é conceitualmente insuficiente para texto Unicode. Se a prioridade embarcada exigir um byte, deve existir um tipo textual separado para caracteres Unicode.
 
 ### 10.2. Tipos opcionais
 
@@ -563,7 +563,7 @@ Testes cruzados devem verificar tamanho de imagem, uso de RAM, layout, acesso vo
 
 ### Capítulo I — Constituição da linguagem
 
-Fechar o léxico, a terminologia, os tipos primitivos, `String`, Unicode, terminadores, argumentos nomeados, operadores de opcionais e a divisão entre safe, unsafe e raw.
+Fechar o léxico, a terminologia, os tipos primitivos, `string`, Unicode, terminadores, argumentos nomeados, operadores de opcionais e a divisão entre safe, unsafe e raw.
 
 ### Capítulo II — Gramática LR(1)
 
@@ -609,9 +609,9 @@ Somente depois da correção ponta a ponta, adicionar otimizações, cache incre
 
 Antes de congelar a versão inicial da linguagem, devem ser respondidas formalmente as seguintes questões:
 
-1. `String` é intrínseca, tipo da biblioteca padrão ou família de tipos?
-2. `Char` representa byte, code point Unicode ou grapheme?
-3. `Byte` é assinado ou não assinado?
+1. `string` é intrínseca, tipo da biblioteca padrão ou família de tipos?
+2. `char` representa byte, code point Unicode ou grapheme?
+3. `byte` é assinado ou não assinado?
 4. Opcionais aninhados são preservados ou normalizados?
 5. Qual é a semântica exata de igualdade segura?
 6. Qual grafia única representa force unwrap?

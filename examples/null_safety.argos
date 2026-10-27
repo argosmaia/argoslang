@@ -1,11 +1,11 @@
 protocol Profile(name: string);
 protocol User(profile: Profile?);
 
-func loadUser() -> User? {
+function loadUser() -> User? {
     return nil;
 }
 
-func displayName(user: User?) -> string {
+function displayName(user: User?) -> string {
     var name: string = user?.profile?.name ?? "Anonymous";
     return name;
 }

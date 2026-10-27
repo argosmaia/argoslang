@@ -1,0 +1,23 @@
+function identity(_ value: string, _ marker: int, _ ratio: double) -> string {
+    return value
+}
+
+function main() -> int {
+    var message: string = identity("ol\u{e1}", 3, 1.5)
+    print(message)
+
+    if message == "olá" {
+        print("same")
+    } else {
+        print("different")
+    }
+
+    if "a\0b" == "a\0b" {
+        print("nul-safe")
+    }
+
+    print("""line one
+line two""")
+
+    return 0
+}

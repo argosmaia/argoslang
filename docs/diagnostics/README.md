@@ -29,9 +29,9 @@ da falha clara e permite importar só a família necessária em cada fase.
 - `note`: contexto adicional ligado a outro diagnóstico.
 
 As mensagens aparecem com um título curto, um detalhe do trecho, uma explicação
-em linguagem simples e uma sugestão de correção. Por exemplo, `func` e `null`
-continuam aceitos apenas como compatibilidade, mas geram respectivamente
-`ARGOS-W0001` e `ARGOS-W0002`; prefira sempre `function` e `nil`.
+em linguagem simples e uma sugestão de correção. `func` e nomes de tipos com
+inicial maiúscula não são aceitos. O apelido antigo `null` ainda gera
+`ARGOS-W0002`; prefira `nil`.
 
 As fases importam definições de
 `compiler/include/argos/diagnostics/diagnostic_catalog.hpp` e emitem por

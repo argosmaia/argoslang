@@ -8,8 +8,8 @@
 > descreve o desenho futuro e não deve ser usada como lista de recursos
 > executáveis. Para o subconjunto que funciona hoje, consulte [mvp.md](mvp.md).
 > A grafia canônica é `function`, `var`/`var mut`, `nil` e tipos primitivos em
-> minúsculas (`int`, `bool`, `string`); exemplos antigos nesta especificação
-> não substituem essa forma canônica.
+> minúsculas (`int`, `bool`, `string`). As formas `func` e tipos com inicial
+> maiúscula não fazem parte da sintaxe aceita.
 
 ## 1. Escopo
 
@@ -138,7 +138,7 @@ ClassDecl ::= AttributeList? Visibility? ClassModifier*
 ClassInheritanceClause ::= ":" NamedType ("," NamedType)* ;
 ClassBody ::= "{" ClassMember* "}" ;
 
-ClassMember ::= FieldDecl | PropertyDecl | InitializerDecl
+ClassMember ::= FieldDecl | PropertyDecl | ConstructorDecl
               | DeinitializerDecl | MethodDecl | OperatorDecl
               | NestedTypeDecl | ForeignDecl | EmptyDecl ;
 
@@ -147,14 +147,13 @@ FieldDecl ::= AttributeList? Visibility? MemberModifier*
               ("=" Expression)? SEMI ;
 
 PropertyDecl ::= AttributeList? Visibility? MemberModifier*
-                 ("let" | "var") Identifier ":" Type PropertyBody ;
+                 "var" ("mut")? Identifier ":" Type PropertyBody ;
 PropertyBody ::= "{" PropertyAccessor+ "}" ;
-PropertyAccessor ::= Visibility? "get" (SEMI | FunctionBody)
-                   | Visibility? "set" ("(" Identifier ")")?
-                     (SEMI | FunctionBody) ;
+PropertyAccessor ::= "getter" "(" ")" (SEMI | FunctionBody)
+                   | "setter" "(" Identifier? ")" (SEMI | FunctionBody) ;
 
-InitializerDecl ::= AttributeList? Visibility? MemberModifier*
-                    "init" GenericParameterClause?
+ConstructorDecl ::= AttributeList? Visibility? MemberModifier*
+                    "construct" GenericParameterClause?
                     "(" ParameterList? ")" ThrowsClause?
                     WhereClause? FunctionBody ;
 DeinitializerDecl ::= AttributeList? "deinit" "(" ")" FunctionBody ;
@@ -174,7 +173,7 @@ OperatorToken ::= "+" | "-" | "*" | "/" | "%" | "==" | "!="
 EmptyDecl ::= SEMI ;
 ```
 
-Uma classe estende no máximo uma classe e implementa múltiplas interfaces. A classe-base, se houver, é o primeiro item. Todos os campos obrigatórios devem estar inicializados ao final de `init`. `deinit` é único e determinístico.
+Uma classe estende no máximo uma classe e implementa múltiplas interfaces. A classe-base, se houver, é o primeiro item. Todos os campos obrigatórios devem estar inicializados ao final de `construct`. `deinit` é único e determinístico.
 
 Corpos ausentes só são válidos em membro abstrato, requisito de interface ou declaração estrangeira.
 
@@ -213,8 +212,8 @@ Um `protocol` possui implicitamente:
 ```argos
 public protocol User<TId>(
     id: TId,
-    name: String,
-    email: String?
+    name: string,
+    email: string?
 ) : Serializable where TId: Hashable;
 ```
 
@@ -238,7 +237,10 @@ InterfaceMethodRequirement ::= AttributeList? Visibility?
 InterfacePropertyRequirement ::= AttributeList? Visibility?
                                  "var" ("mut")? Identifier ":" Type
                                  "{" AccessorRequirementList "}" ;
-AccessorRequirementList ::= "get" "set"? ;
+AccessorRequirementList ::= GetterRequirement SetterRequirement?
+                          | SetterRequirement GetterRequirement ;
+GetterRequirement ::= "getter" "(" ")" SEMI ;
+SetterRequirement ::= "setter" "(" Identifier? ")" SEMI ;
 AssociatedTypeDecl ::= "type" Identifier GenericBoundList? SEMI ;
 DefaultMethodDecl ::= AttributeList? Visibility?
                       FunctionSignature FunctionBody ;
@@ -290,7 +292,7 @@ Constraints após `:` expressam conformidade. `&` combina limites. `where` expre
 Para evitar o conflito entre argumentos genéricos e operadores `<`/`>` em contexto de expressão, especialização explícita usa `::<...>`:
 
 ```argos
-let value = parse::<Int>(text);
+let value = parse::<int>(text);
 ```
 
 ## 13. Funções e parâmetros
@@ -332,7 +334,7 @@ LambdaBody ::= Expression | Block ;
 ```
 
 ```argos
-let increment = (x: Int) -> Int => x + 1;
+let increment = (x: int) -> int => x + 1;
 
 let task = () => {
     counter += 1;
@@ -384,7 +386,7 @@ Sem tipo escrito, a declaração requer inicializador inferível. Sem inicializa
 | `void` | ausência de retorno | sem armazenamento |
 | `never` | computação que não retorna | inabitável |
 
-`Byte` é sem sinal para representar bytes, registradores e buffers. `SByte` é a contraparte assinada. `String` é tipo nominal intrínseco da biblioteca padrão, logicamente UTF-8.
+`byte` é sem sinal para representar bytes, registradores e buffers. `sbyte` é a contraparte assinada. `string` é tipo nominal intrínseco da biblioteca padrão, logicamente UTF-8.
 
 ```ebnf
 Type ::= FunctionType OptionalSuffix*
@@ -471,7 +473,7 @@ CatchClause ::= "catch" ("(" Pattern (":" Type)? ")")? Block ;
 FinallyClause ::= "finally" Block ;
 ```
 
-Condições exigem `Bool`, não `Bool?`. Funções não `Void` retornam em todos os caminhos alcançáveis.
+Condições exigem `bool`, não `bool?`. Funções não `void` retornam em todos os caminhos alcançáveis.
 
 ## 19. Expressões e precedência
 
@@ -560,7 +562,7 @@ Literal ::= IntegerLiteral | FloatLiteral | CharLiteral | StringLiteral
 ConstantExpression ::= Expression ;
 ```
 
-Atribuição exige l-value mutável. Operadores lógicos exigem `Bool`. Ranges são não associativos. Comparações encadeadas exigem conjunção. Ordem de avaliação é esquerda para direita, salvo short-circuit.
+Atribuição exige l-value mutável. Operadores lógicos exigem `bool`. Ranges são não associativos. Comparações encadeadas exigem conjunção. Ordem de avaliação é esquerda para direita, salvo short-circuit.
 
 ## 20. Herança e despacho
 
@@ -668,20 +670,20 @@ Sucesso silencioso é proibido.
 
 ```argos
 public interface Identifiable<TId> {
-    public let id: TId { get }
+    public var id: TId { getter(); }
 }
 
 public sealed class Account<TId> : Identifiable<TId>
 where TId: Hashable {
-    public let id: TId;
-    private var balance: Long;
+    public var id: TId;
+    private var mut balance: long;
 
-    public init(id: TId, initialBalance: Long = 0) {
+    public construct(id: TId, initialBalance: long = 0) {
         this.id = id;
         this.balance = initialBalance;
     }
 
-    public final func deposit(_ amount: Long) -> Void {
+    public final function deposit(_ amount: long) -> void {
         if amount > 0 {
             balance += amount;
         }
@@ -693,16 +695,16 @@ where TId: Hashable {
 
 ```argos
 public protocol SensorReading<T>(
-    sensor: String,
+    sensor: string,
     value: T,
-    timestamp: ULong
+    timestamp: ulong
 ) : Serializable where T: Numeric;
 ```
 
 ### 26.3. Null-safety
 
 ```argos
-func display(user: User?) -> String {
+function display(user: User?) -> string {
     return user?.profile?.name ?? "Desconhecido";
 }
 ```
@@ -711,8 +713,8 @@ func display(user: User?) -> String {
 
 ```argos
 @raw
-unsafe func writeRegister(address: USize, value: Byte) -> Void {
-    let register: *mut Byte = address as *mut Byte;
+unsafe function writeRegister(address: usize, value: byte) -> void {
+    let register: *mut byte = address as *mut byte;
     *register = value;
 }
 ```
@@ -729,7 +731,7 @@ Não existe etapa C, C++ ou LLVM. Cada backend Argos conhece diretamente ISA, AB
 
 ## 28. Perfil mínimo
 
-O primeiro perfil completo deve conter módulos simples, funções, variáveis, primitivos, `String` mínima, opcionais, classes finais, protocols, interfaces, generics monomorfizados, controle de fluxo, lambdas restritas, IR verificada, VM, um backend direto e FFI C com símbolos compilados.
+O primeiro perfil completo deve conter módulos simples, funções, variáveis, primitivos, `string` mínima, opcionais, classes finais, protocols, interfaces, generics monomorfizados, controle de fluxo, lambdas restritas, IR verificada, VM, um backend direto e FFI C com símbolos compilados.
 
 Recursos posteriores falham explicitamente até possuírem semântica e lowering.
 
@@ -768,3 +770,45 @@ Reconhecer sintaxe não significa implementar a linguagem.
            ↓
 [Binário Firmware (.hex / .bin)] → Gravação na Flash do Microcontrolador (Arduino / ESP32)
 ```
+
+## 32. Incremento implementado em 26/10/2026
+
+O parser manual agora representa classes, interfaces de métodos, `construct`, `new`,
+tipos de função e lambdas na AST. A análise valida visibilidade, inicialização,
+herança simples, conformidade, `virtual`/`abstract`/`override`/`final` e capturas
+imutáveis. Lambdas exigem tipos explícitos nos parâmetros; blocos sem tipo de
+retorno assumem `void`. Métodos são não virtuais por padrão.
+
+Classes concretas sem bases e closures com captura imutável têm lowering para
+IR, VM e x86-64. Propriedades computadas foram acrescentadas em 27/10/2026.
+Herança executável, genéricos e membros estáticos,
+`sealed`, captura mutável, ownership e destruição por escopo permanecem planos.
+A memória desta etapa é uma arena com duração da execução. Consulte a matriz
+atual em [mvp.md](mvp.md#poo-e-funções-como-valores-26-de-outubro-de-2026).
+
+
+## 33. Construtores e acessores — 27/10/2026
+
+O construtor é declarado exclusivamente com `construct(...)`. A sintaxe antiga
+`init(...)` foi removida, sem alias ou modo de compatibilidade. A construção
+continua sendo `new Tipo(...)`; `construct` não pode ser chamado como método de
+uma instância. Sem construtor explícito, todos os campos armazenados precisam
+de valor padrão. `deinit` permanece um recurso planejado independente.
+
+Propriedades computadas exigem tipo e `getter()`. Uma propriedade `var mut`
+pode declarar `setter()` ou `setter(nome)`. O parâmetro do setter tem o tipo da
+propriedade e chama-se `value` quando omitido. O getter tem retorno igual ao
+tipo da propriedade; o setter retorna `void`. Propriedades não armazenam um
+valor próprio e não aceitam inicializador: estado interno usa campos privados.
+
+A leitura `objeto.propriedade` invoca o getter; a atribuição invoca o setter.
+Atribuições compostas leem uma vez, avaliam o operando direito e escrevem uma
+vez, sem reavaliar o objeto receptor. Propriedades sem setter são somente
+leitura, inclusive em `construct`. Acessores só podem observar uma instância
+completamente inicializada. Modificadores de visibilidade pertencem à
+propriedade; não há visibilidade independente por acessor nesta etapa.
+
+Interfaces e propriedades `abstract` usam assinaturas `getter();` e `setter();`.
+A conformidade valida tipo, visibilidade e presença de setter quando exigido.
+A execução de propriedades de classes concretas sem bases funciona na VM e no
+x86-64; despacho por interfaces ou herança mantém os limites anteriores.

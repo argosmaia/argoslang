@@ -8,7 +8,8 @@ argosc repl
 
 Cada entrada passa pelo mesmo lexer, parser, análise semântica, IR tipada e VM
 usados por `argosc run`. O REPL mantém variáveis locais `int`/`bool` e funções
-entre entradas; não usa um interpretador AST separado.
+entre entradas; não usa um interpretador AST separado. Literais `string` podem
+ser impressos, mas variáveis `string` ainda não são guardadas entre entradas.
 
 ```text
 >>> var mut count: int = 0

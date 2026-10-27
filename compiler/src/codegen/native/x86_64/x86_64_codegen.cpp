@@ -34,6 +34,19 @@ std::string symbol(const argos::ir::Function &function) {
                                  : ".Largos_function_" + std::to_string(function.id);
 }
 
+bool pointer_type(argos::ir::ValueType type) {
+  return type == argos::ir::ValueType::string || type == argos::ir::ValueType::closure || type == argos::ir::ValueType::object;
+}
+
+std::uint64_t closure_signature(const std::vector<argos::ir::ValueType>& parameters,
+                                argos::ir::ValueType returned, bool environment) {
+  std::uint64_t value = static_cast<std::uint64_t>(returned) + 1;
+  unsigned shift = 4;
+  for (std::size_t i = environment ? 1 : 0; i < parameters.size(); ++i, shift += 4)
+    value |= (static_cast<std::uint64_t>(parameters[i]) + 1) << shift;
+  return value;
+}
+
 void validate(const argos::ir::Module &module, const argos::ir::Function &function,
               const argos::ir::Instruction &instruction) {
   using argos::ir::Opcode;
@@ -44,7 +57,19 @@ void validate(const argos::ir::Module &module, const argos::ir::Function &functi
     if (instruction.slot >= function.slot_count) throw std::runtime_error("IR: slot inválido");
   };
   switch (instruction.opcode) {
+  case Opcode::new_object:
+  case Opcode::load_field:
+  case Opcode::store_field:
+  case Opcode::make_closure:
+  case Opcode::load_capture:
+  case Opcode::call_closure:
+    // Full structural validation is performed by validate_module.
+    break;
   case Opcode::load_const:
+    valid_reg(instruction.dst);
+    if (instruction.constant >= module.constants.size()) throw std::runtime_error("IR: constante inválida");
+    break;
+  case Opcode::load_string:
     valid_reg(instruction.dst);
     if (instruction.constant >= module.constants.size()) throw std::runtime_error("IR: constante inválida");
     break;
@@ -87,6 +112,7 @@ void validate(const argos::ir::Module &module, const argos::ir::Function &functi
   case Opcode::print_string:
     if (instruction.constant >= module.constants.size()) throw std::runtime_error("IR: constante inválida");
     break;
+  case Opcode::print_string_value: valid_reg(instruction.src1); break;
   case Opcode::print_newline: break;
   case Opcode::ret: valid_reg(instruction.src1); break;
   default: throw std::runtime_error("IR: opcode não suportado pelo backend x86-64");
@@ -102,15 +128,26 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
       throw std::runtime_error("IR: backend x86-64 suporta até seis parâmetros");
   std::ostringstream o;
   std::set<argos::ir::ConstantId> string_constants;
+  std::set<argos::ir::ConstantId> literal_string_constants;
   std::set<argos::ir::ConstantId> double_constants;
   bool prints_integer = false;
   bool prints_boolean = false;
   bool prints_double = false;
   bool uses_modulo = false;
+  bool uses_closures = !m.objects.empty();
+  for (const auto& function : m.functions)
+    for (const auto& block : function.blocks)
+      for (const auto& instruction : block.instructions)
+        if (instruction.opcode == argos::ir::Opcode::load_capture ||
+            instruction.opcode == argos::ir::Opcode::new_object ||
+            instruction.opcode == argos::ir::Opcode::make_closure ||
+            instruction.opcode == argos::ir::Opcode::call_closure) uses_closures = true;
   for (const auto &function : m.functions)
     for (const auto &block : function.blocks)
       for (const auto &instruction : block.instructions)
         if (instruction.opcode == argos::ir::Opcode::print_string)
+          literal_string_constants.insert(instruction.constant);
+        else if (instruction.opcode == argos::ir::Opcode::load_string)
           string_constants.insert(instruction.constant);
         else if (instruction.opcode == argos::ir::Opcode::print_int)
           prints_integer = true;
@@ -125,20 +162,36 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
                      argos::ir::ValueType::float64)
           double_constants.insert(instruction.constant);
   const bool needs_print_format =
-      prints_integer || prints_boolean || prints_double || !string_constants.empty();
-  if (needs_print_format || uses_modulo || !double_constants.empty()) {
+      prints_integer || prints_boolean || prints_double ||
+      !literal_string_constants.empty() || !string_constants.empty();
+  if (needs_print_format || uses_modulo || uses_closures || !double_constants.empty()) {
     o << ".section .rodata\n";
     if (prints_integer)
       o << ".Largos_print_int_format:\n  .string \"%d\"\n";
     if (prints_double)
       o << ".Largos_print_double_format:\n  .string \"%.17g\"\n";
-    if (prints_boolean || !string_constants.empty())
+    if (prints_boolean || !literal_string_constants.empty())
       o << ".Largos_print_string_format:\n  .string \"%s\"\n";
     if (prints_boolean)
       o << ".Largos_true:\n  .string \"true\"\n"
         << ".Largos_false:\n  .string \"false\"\n";
-    for (const auto constant : string_constants)
-      o << ".Largos_string_" << constant << ":\n  .string "
+    for (const auto constant : string_constants) {
+      const auto &text = m.constants[constant].value;
+      o << ".p2align 3\n.Largos_string_" << constant << ":\n  .quad "
+        << text.size() << "\n  .byte ";
+      if (text.empty()) {
+        o << "0\n";
+      } else {
+        for (std::size_t index = 0; index < text.size(); ++index) {
+          if (index != 0) o << ", ";
+          o << static_cast<unsigned int>(
+              static_cast<unsigned char>(text[index]));
+        }
+        o << "\n";
+      }
+    }
+    for (const auto constant : literal_string_constants)
+      o << ".Largos_print_literal_" << constant << ":\n  .string "
         << m.constants[constant].value << "\n";
     for (const auto constant : double_constants) {
       double value{};
@@ -156,6 +209,21 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
         << "\\n\"\n";
   }
   o << ".text\n";
+  if (uses_closures) {
+    o << ".bss\n.p2align 3\n.Largos_heap_head:\n  .quad 0\n.text\n"
+      << ".Largos_alloc:\n  pushq %rbp\n  movq %rsp, %rbp\n"
+      << "  addq $8, %rdi\n  call malloc@PLT\n  testq %rax, %rax\n  je .Largos_closure_error\n"
+      << "  movq .Largos_heap_head(%rip), %rcx\n  movq %rcx, (%rax)\n"
+      << "  movq %rax, .Largos_heap_head(%rip)\n  addq $8, %rax\n  leave\n  ret\n"
+      << ".Largos_release:\n  pushq %rbp\n  movq %rsp, %rbp\n"
+      << ".Largos_release_loop:\n  movq .Largos_heap_head(%rip), %rdi\n"
+      << "  testq %rdi, %rdi\n  je .Largos_release_done\n"
+      << "  movq (%rdi), %rax\n  movq %rax, .Largos_heap_head(%rip)\n"
+      << "  call free@PLT\n  jmp .Largos_release_loop\n"
+      << ".Largos_release_done:\n  leave\n  ret\n"
+      << ".Largos_closure_error:\n  movl $70, %edi\n  call exit@PLT\n  ud2\n";
+  }
+
   for (const auto &f : m.functions) {
     const auto name = symbol(f);
     const auto stack_bytes = static_cast<std::uint64_t>(f.slot_count + f.register_count) * 8;
@@ -164,8 +232,12 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
     o << ".type " << name << ", @function\n"
       << name << ":\n  pushq %rbp\n  movq %rsp, %rbp\n";
     if (aligned != 0) o << "  subq $" << aligned << ", %rsp\n";
+    if (uses_closures && f.name == "main")
+      o << "  leaq .Largos_release(%rip), %rdi\n  call atexit@PLT\n";
     static constexpr const char *integer_argument_registers[] = {
         "%edi", "%esi", "%edx", "%ecx", "%r8d", "%r9d"};
+    static constexpr const char *pointer_argument_registers[] = {
+        "%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9"};
     static constexpr const char *double_argument_registers[] = {
         "%xmm0", "%xmm1", "%xmm2", "%xmm3", "%xmm4", "%xmm5"};
     std::size_t integer_parameter = 0;
@@ -174,18 +246,80 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
       if (f.parameter_types[index] == argos::ir::ValueType::float64) {
         o << "  movq " << double_argument_registers[double_parameter++]
           << ", %rax\n  movq %rax, " << slot_address(index) << "\n";
+      } else if (pointer_type(f.parameter_types[index])) {
+        o << "  movq " << pointer_argument_registers[integer_parameter++]
+          << ", %rax\n  movq %rax, " << slot_address(index) << "\n";
       } else {
         o << "  movslq " << integer_argument_registers[integer_parameter++]
           << ", %rax\n  movq %rax, " << slot_address(index) << "\n";
       }
     }
     std::size_t division_site = 0;
+    std::size_t string_comparison_site = 0;
     for (const auto &b : f.blocks) {
       o << label(f.id, b.label) << ":\n";
       for (const auto &i : b.instructions) {
         validate(m, f, i);
         using argos::ir::Opcode;
         switch (i.opcode) {
+        case Opcode::new_object:
+          o << "  movq $" << (8 + m.objects[i.constant].fields.size() * 8) << ", %rdi\n"
+            << "  call .Largos_alloc\n  movq $" << i.constant << ", (%rax)\n"
+            << "  movq %rax, " << register_address(f, i.dst) << "\n";
+          break;
+        case Opcode::load_field:
+        case Opcode::store_field:
+          o << "  movq " << register_address(f, i.src1) << ", %rax\n"
+            << "  testq %rax, %rax\n  je .Largos_closure_error\n"
+            << "  cmpq $" << i.constant << ", (%rax)\n  jne .Largos_closure_error\n";
+          if (i.opcode == Opcode::load_field)
+            o << "  movq " << 8 + static_cast<std::uint64_t>(i.count) * 8 << "(%rax), %rax\n"
+              << "  movq %rax, " << register_address(f, i.dst) << "\n";
+          else o << "  movq " << register_address(f, i.src2) << ", %rcx\n"
+                 << "  movq %rcx, " << 8 + static_cast<std::uint64_t>(i.count) * 8 << "(%rax)\n";
+          break;
+        case Opcode::make_closure: {
+          const auto& target = m.functions[i.function];
+          o << "  movq $" << (24 + i.arguments.size() * 8) << ", %rdi\n  call .Largos_alloc\n"
+            << "  leaq " << symbol(target) << "(%rip), %rcx\n  movq %rcx, (%rax)\n"
+            << "  movabsq $" << closure_signature(target.parameter_types, target.return_type, true)
+            << ", %rcx\n  movq %rcx, 8(%rax)\n  movq $" << i.function << ", 16(%rax)\n";
+          for (std::size_t index = 0; index < i.arguments.size(); ++index)
+            o << "  movq " << register_address(f, i.arguments[index]) << ", %rcx\n"
+              << "  movq %rcx, " << 24 + index * 8 << "(%rax)\n";
+          o << "  movq %rax, " << register_address(f, i.dst) << "\n";
+          break;
+        }
+        case Opcode::load_capture:
+          o << "  movq " << register_address(f, i.src1) << ", %rax\n"
+            << "  testq %rax, %rax\n  je .Largos_closure_error\n"
+            << "  cmpq $" << f.id << ", 16(%rax)\n  jne .Largos_closure_error\n"
+            << "  movq " << 24 + static_cast<std::uint64_t>(i.count) * 8 << "(%rax), %rax\n"
+            << "  movq %rax, " << register_address(f, i.dst) << "\n";
+          break;
+        case Opcode::call_closure: {
+          o << "  movq " << register_address(f, i.src1) << ", %r11\n"
+            << "  testq %r11, %r11\n  je .Largos_closure_error\n"
+            << "  movabsq $" << closure_signature(i.parameter_types, i.return_type, false)
+            << ", %rax\n  cmpq %rax, 8(%r11)\n  jne .Largos_closure_error\n"
+            << "  movq %r11, %rdi\n";
+          std::size_t integer_argument = 1, double_argument = 0;
+          for (std::size_t index = 0; index < i.arguments.size(); ++index) {
+            if (i.parameter_types[index] == argos::ir::ValueType::float64)
+              o << "  movq " << register_address(f, i.arguments[index]) << ", "
+                << double_argument_registers[double_argument++] << "\n";
+            else if (pointer_type(i.parameter_types[index]))
+              o << "  movq " << register_address(f, i.arguments[index]) << ", "
+                << pointer_argument_registers[integer_argument++] << "\n";
+            else o << "  movl " << register_address(f, i.arguments[index]) << ", "
+                   << integer_argument_registers[integer_argument++] << "\n";
+          }
+          o << "  call *(%r11)\n";
+          if (i.return_type == argos::ir::ValueType::float64) o << "  movq %xmm0, %rax\n";
+          else if (!pointer_type(i.return_type)) o << "  movslq %eax, %rax\n";
+          o << "  movq %rax, " << register_address(f, i.dst) << "\n";
+          break;
+        }
         case Opcode::load_const:
           if (f.register_types[i.dst] == argos::ir::ValueType::float64) {
             o << "  movsd .Largos_double_" << i.constant
@@ -196,6 +330,11 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
               << "  movslq %eax, %rax\n  movq %rax, "
               << register_address(f, i.dst) << "\n";
           }
+          break;
+        case Opcode::load_string:
+          o << "  leaq .Largos_string_" << i.constant
+            << "(%rip), %rax\n  movq %rax, "
+            << register_address(f, i.dst) << "\n";
           break;
         case Opcode::load_var:
           o << "  movq " << slot_address(i.slot) << ", %rax\n"
@@ -237,7 +376,32 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
         case Opcode::cmp_le:
         case Opcode::cmp_gt:
         case Opcode::cmp_ge:
-          if (i.opcode == Opcode::div ||
+          if (f.register_types[i.src1] == argos::ir::ValueType::object) {
+            o << "  movq " << register_address(f, i.src1) << ", %rax\n"
+              << "  cmpq " << register_address(f, i.src2) << ", %rax\n"
+              << (i.opcode == Opcode::cmp_eq ? "  sete %al\n" : "  setne %al\n")
+              << "  movzbl %al, %eax\n  movq %rax, " << register_address(f, i.dst) << "\n";
+          } else if (f.register_types[i.src1] == argos::ir::ValueType::string &&
+              (i.opcode == Opcode::cmp_eq || i.opcode == Opcode::cmp_ne)) {
+            const auto unequal_label =
+                ".Largos_" + std::to_string(f.id) + "_string_unequal_" +
+                std::to_string(string_comparison_site);
+            const auto done_label =
+                ".Largos_" + std::to_string(f.id) + "_string_compare_done_" +
+                std::to_string(string_comparison_site++);
+            o << "  movq " << register_address(f, i.src1) << ", %rdi\n"
+              << "  movq " << register_address(f, i.src2) << ", %rsi\n"
+              << "  movq (%rdi), %rdx\n"
+              << "  cmpq (%rsi), %rdx\n  jne " << unequal_label << "\n"
+              << "  leaq 8(%rdi), %rdi\n  leaq 8(%rsi), %rsi\n"
+              << "  call memcmp@PLT\n  testl %eax, %eax\n  "
+              << (i.opcode == Opcode::cmp_eq ? "sete" : "setne")
+              << " %al\n  jmp " << done_label << "\n"
+              << unequal_label << ":\n  movl $"
+              << (i.opcode == Opcode::cmp_eq ? "0" : "1") << ", %eax\n"
+              << done_label << ":\n  movzbl %al, %eax\n  movq %rax, "
+              << register_address(f, i.dst) << "\n";
+          } else if (i.opcode == Opcode::div ||
               f.register_types[i.src1] == argos::ir::ValueType::float64 ||
               f.register_types[i.dst] == argos::ir::ValueType::float64) {
             const auto emit_double_operand = [&](argos::ir::Register reg,
@@ -342,6 +506,10 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
               o << "  movq " << register_address(f, i.arguments[index])
                 << ", %rax\n  movq %rax, "
                 << double_argument_registers[double_argument++] << "\n";
+            } else if (pointer_type(callee.parameter_types[index])) {
+              o << "  movq " << register_address(f, i.arguments[index])
+                << ", " << pointer_argument_registers[integer_argument++]
+                << "\n";
             } else {
               o << "  movl " << register_address(f, i.arguments[index])
                 << ", " << integer_argument_registers[integer_argument++]
@@ -352,6 +520,8 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
           if (f.register_types[i.dst] == argos::ir::ValueType::float64)
             o << "  movq %xmm0, %rax\n  movq %rax, "
               << register_address(f, i.dst) << "\n";
+          else if (pointer_type(f.register_types[i.dst]))
+            o << "  movq %rax, " << register_address(f, i.dst) << "\n";
           else
             o << "  movslq %eax, %rax\n  movq %rax, "
               << register_address(f, i.dst) << "\n";
@@ -377,9 +547,18 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
             << "  movl $1, %eax\n  call printf@PLT\n";
           break;
         case Opcode::print_string:
-          o << "  leaq .Largos_string_" << i.constant << "(%rip), %rsi\n"
+          o << "  leaq .Largos_print_literal_" << i.constant << "(%rip), %rsi\n"
             << "  leaq .Largos_print_string_format(%rip), %rdi\n"
             << "  xorl %eax, %eax\n  call printf@PLT\n";
+          break;
+        case Opcode::print_string_value:
+          o << "  movq " << register_address(f, i.src1) << ", %rax\n"
+            << "  movq (%rax), %rdx\n"
+            << "  leaq 8(%rax), %rdi\n"
+            << "  movl $1, %esi\n"
+            << "  movq stdout@GOTPCREL(%rip), %rcx\n"
+            << "  movq (%rcx), %rcx\n"
+            << "  call fwrite@PLT\n";
           break;
         case Opcode::print_newline:
           o << "  movl $10, %edi\n  call putchar@PLT\n";
@@ -388,6 +567,8 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
           if (f.return_type == argos::ir::ValueType::float64)
             o << "  movq " << register_address(f, i.src1)
               << ", %xmm0\n";
+          else if (pointer_type(f.return_type))
+            o << "  movq " << register_address(f, i.src1) << ", %rax\n";
           else
             o << "  movl " << register_address(f, i.src1) << ", %eax\n";
           o << "  jmp .Largos_" << f.id << "_return\n";

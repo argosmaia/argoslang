@@ -18,6 +18,9 @@ namespace argos::ast {
         variable_declaration,
         function_declaration,
         protocol_declaration,
+        class_declaration,
+        lambda_expression,
+        new_expression,
 
         block_statement,
         expression_statement,
@@ -113,7 +116,9 @@ namespace argos::ast {
     };
 
     // Forward declarations
+    struct FunctionDeclaration;
     struct BlockStatement;
+    struct CallExpression;
 
     struct Expression : Node {
         protected:
@@ -129,7 +134,18 @@ namespace argos::ast {
             }
     };
 
+    enum class Visibility { internal_, public_, private_, protected_ };
+    struct Modifiers {
+        Visibility visibility{Visibility::internal_};
+        bool final_{false};
+        bool abstract_{false};
+        bool override_{false};
+        bool static_{false};
+        bool virtual_{false};
+    };
+
     struct Declaration : BlockItem {
+        Modifiers modifiers;
         protected:
             Declaration(NodeKind kind_value, source::SourceSpan span_value)
                 : BlockItem(kind_value, std::move(span_value)) {
@@ -151,6 +167,8 @@ namespace argos::ast {
     struct TypeSyntax final : Node {
         std::string name;
         std::size_t nullable_depth{0};
+        std::vector<std::unique_ptr<TypeSyntax>> parameter_types;
+        std::unique_ptr<TypeSyntax> result_type;
 
         TypeSyntax(
             std::string name_value,
@@ -201,6 +219,10 @@ namespace argos::ast {
         std::string name;
         TypeSyntaxPtr type;
         ExpressionPtr initializer;
+        bool is_property{false};
+        std::unique_ptr<FunctionDeclaration> getter;
+        std::unique_ptr<FunctionDeclaration> setter;
+        ~VariableDeclaration() override;
 
         VariableDeclaration(
             Mutability mutability_value,
@@ -208,13 +230,7 @@ namespace argos::ast {
             TypeSyntaxPtr type_value,
             ExpressionPtr initializer_value,
             source::SourceSpan span_value
-        )
-            : Declaration(NodeKind::variable_declaration, std::move(span_value)),
-                mutability(mutability_value),
-                name(std::move(name_value)),
-                type(std::move(type_value)),
-                initializer(std::move(initializer_value)) {
-        }
+        );
     };
 
     struct BlockStatement final : Statement {
@@ -250,6 +266,21 @@ namespace argos::ast {
         }
     };
 
+    inline VariableDeclaration::VariableDeclaration(
+            Mutability mutability_value,
+            std::string name_value,
+            TypeSyntaxPtr type_value,
+            ExpressionPtr initializer_value,
+            source::SourceSpan span_value
+        )
+            : Declaration(NodeKind::variable_declaration, std::move(span_value)),
+                mutability(mutability_value),
+                name(std::move(name_value)),
+                type(std::move(type_value)),
+                initializer(std::move(initializer_value)) {
+        }
+    inline VariableDeclaration::~VariableDeclaration() = default;
+
     struct ProtocolDeclaration final : Declaration {
         std::string name;
         std::vector<std::unique_ptr<VariableDeclaration>> components;
@@ -259,6 +290,32 @@ namespace argos::ast {
                             source::SourceSpan span_value)
             : Declaration(NodeKind::protocol_declaration, std::move(span_value)),
               name(std::move(name_value)), components(std::move(components_value)) {}
+    };
+
+    struct ClassDeclaration final : Declaration {
+        std::string name;
+        bool is_interface{false};
+        std::vector<std::string> bases;
+        std::vector<DeclarationPtr> members;
+        ClassDeclaration(std::string value, bool interface_value, source::SourceSpan location)
+            : Declaration(NodeKind::class_declaration, location),
+              name(std::move(value)), is_interface(interface_value) {}
+    };
+
+    struct LambdaExpression final : Expression {
+        std::vector<ParameterPtr> parameters;
+        TypeSyntaxPtr return_type;
+        ExpressionPtr expression_body;
+        std::unique_ptr<BlockStatement> body;
+        explicit LambdaExpression(source::SourceSpan location)
+            : Expression(NodeKind::lambda_expression, location) {}
+    };
+
+    struct NewExpression final : Expression {
+        TypeSyntaxPtr type;
+        std::unique_ptr<CallExpression> call;
+        explicit NewExpression(source::SourceSpan location);
+        ~NewExpression() override;
     };
 
     struct ExpressionStatement final : Statement {
@@ -567,4 +624,8 @@ namespace argos::ast {
             op(op_value) {
         }
     };
+    inline NewExpression::NewExpression(source::SourceSpan location)
+        : Expression(NodeKind::new_expression, location) {}
+    inline NewExpression::~NewExpression() = default;
+
 }

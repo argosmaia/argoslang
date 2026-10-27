@@ -1,4 +1,4 @@
-func choose(_ flag: bool, fallback value: int?) -> int {
+function choose(_ flag: bool, fallback value: int?) -> int {
     var resolved: int = value ?? 0;
     if flag {
         return resolved;

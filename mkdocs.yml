@@ -11,6 +11,7 @@ nav:
       - Variáveis e tipos: guide/03-variaveis-e-tipos.md
       - Expressões e operadores: guide/04-expressoes-e-operadores.md
       - Funções: guide/05-funcoes.md
+      - Classes e interfaces: guide/10-classes-e-interfaces.md
       - Fluxo de controle: guide/06-fluxo-de-controle.md
       - REPL: guide/07-repl.md
       - Ferramentas e diagnósticos: guide/08-ferramentas-e-diagnosticos.md

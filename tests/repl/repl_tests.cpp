@@ -63,6 +63,22 @@ TEST_CASE("REPL runs stored functions and prints booleans by semantic type") {
   session.reset();
 }
 
+TEST_CASE("REPL prints string literals through the shared VM") {
+  argos::repl::ReplSession session;
+  session.reset();
+  std::ostringstream output;
+  argos::diagnostics::DiagnosticEngine diagnostics;
+
+  REQUIRE(execute(session, "print(\"hello\")", output, diagnostics));
+  REQUIRE(output.str() == "hello\n");
+  output.str({});
+  output.clear();
+  REQUIRE_FALSE(execute(session, "var greeting: string = \"hello\"", output,
+                        diagnostics));
+  REQUIRE(diagnostics.has_errors());
+  session.reset();
+}
+
 TEST_CASE("REPL evaluates real division and persists double variables") {
   argos::repl::ReplSession session;
   session.reset();
@@ -133,5 +149,20 @@ TEST_CASE("REPL converts integers and doubles to float variables") {
   output.clear();
   REQUIRE(execute(session, "print(changed)", output, diagnostics));
   REQUIRE(output.str() == "1\n");
+  session.reset();
+}
+
+TEST_CASE("REPL rejects persistent closures without losing numeric state") {
+  argos::repl::ReplSession session;
+  session.reset();
+  std::ostringstream output;
+  argos::diagnostics::DiagnosticEngine first;
+  REQUIRE(execute(session, "var n = 3", output, first));
+  argos::diagnostics::DiagnosticEngine rejected;
+  REQUIRE_FALSE(execute(session, "var f = (x: int) => x + 1", output, rejected));
+  REQUIRE(rejected.has_errors());
+  argos::diagnostics::DiagnosticEngine last;
+  REQUIRE(execute(session, "n", output, last));
+  REQUIRE(output.str() == "3\n");
   session.reset();
 }

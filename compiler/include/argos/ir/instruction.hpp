@@ -7,6 +7,7 @@ namespace argos::ir {
 enum class Opcode {
   nop,
   load_const,
+  load_string,
   load_var,
   store_var,
   add,
@@ -26,10 +27,17 @@ enum class Opcode {
   jmp,
   jmp_if_false,
   call,
+  make_closure,
+  new_object,
+  load_field,
+  store_field,
+  load_capture,
+  call_closure,
   print_int,
   print_bool,
   print_double,
   print_string,
+  print_string_value,
   print_newline,
   ret,
   unwrap_check,
@@ -44,6 +52,8 @@ struct Instruction {
   LabelId label{};
   std::uint32_t count{};
   std::vector<Register> arguments;
+  std::vector<ValueType> parameter_types;
+  ValueType return_type{ValueType::void_type};
   std::string embedded_code;
 };
 const char *opcode_name(Opcode) noexcept;

@@ -1,0 +1,12 @@
+// check aceita; run/compile informam que o despacho polimórfico ainda falta.
+interface Readable { function read() -> int; }
+abstract class Source : Readable {
+    public abstract function read() -> int;
+}
+final class Constant : Source {
+    public override function read() -> int { return 42; }
+}
+function main() -> int {
+    var source: Readable = new Constant();
+    return source.read();
+}

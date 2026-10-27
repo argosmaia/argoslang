@@ -63,3 +63,43 @@ TEST_CASE("rejects calls with mismatched parameter counts") {
       module.functions[0].blocks[0].instructions.begin(), call);
   REQUIRE(argos::ir::validate_module(module).has_value());
 }
+
+TEST_CASE("rejects malformed closure and object IR", "[ir][oop][functional]") {
+  using namespace argos::ir;
+  auto module = valid_module();
+  auto& function = module.functions[0];
+  function.register_count = 2;
+  function.register_types = {ValueType::int32, ValueType::closure};
+  Instruction closure;
+  closure.opcode = Opcode::make_closure;
+  closure.dst = 1;
+  closure.function = 99;
+  function.blocks[0].instructions.insert(function.blocks[0].instructions.begin(), closure);
+  REQUIRE(validate_module(module).has_value());
+  function.blocks[0].instructions.front().function = 0;
+  REQUIRE(validate_module(module).has_value()); // main has no environment parameter
+
+  Instruction invoke;
+  invoke.opcode = Opcode::call_closure;
+  invoke.src1 = 1;
+  invoke.dst = 0;
+  invoke.return_type = ValueType::int32;
+  invoke.arguments = {0};
+  function.blocks[0].instructions.front() = invoke;
+  REQUIRE(validate_module(module).has_value()); // missing argument type
+
+  function.register_types[1] = ValueType::object;
+  module.objects.push_back({"A", {ValueType::int32}});
+  Instruction field;
+  field.opcode = Opcode::load_field;
+  field.src1 = 1;
+  field.dst = 0;
+  field.constant = 0;
+  field.count = 1;
+  function.blocks[0].instructions.front() = field;
+  REQUIRE(validate_module(module).has_value()); // field out of bounds
+  function.blocks[0].instructions.front().count = 0;
+  REQUIRE_FALSE(validate_module(module).has_value());
+  function.register_types[0] = ValueType::string;
+  REQUIRE(validate_module(module).has_value());
+}

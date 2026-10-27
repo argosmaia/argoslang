@@ -131,11 +131,13 @@ void AstPrinter::write_node(const Node &node) {
 
         case NodeKind::variable_declaration: {
             const auto &value = static_cast<const VariableDeclaration &>(node);
-            write_line("VariableDeclaration " +
+            write_line(std::string(value.is_property ? "PropertyDeclaration " : "VariableDeclaration ") +
                        std::string{mutability_name(value.mutability)} + " " +
                        value.name);
             IndentGuard indent{*this};
             if (value.type) write_type(*value.type);
+            if (value.getter) { write_label("getter"); write_node(*value.getter); }
+            if (value.setter) { write_label("setter"); write_node(*value.setter); }
             if (value.initializer != nullptr) {
                 write_label("initializer");
                 IndentGuard nested{*this};
@@ -163,15 +165,42 @@ void AstPrinter::write_node(const Node &node) {
                 if (value.return_type != nullptr) {
                     write_type(*value.return_type);
                 } else {
-                    write_line("Void (implicit)");
+                    write_line("void (implicit)");
                 }
             }
 
             write_label("body");
             {
                 IndentGuard nested{*this};
-                write_node(*value.body);
+                if (value.body) write_node(*value.body);
             }
+            return;
+        }
+
+        case NodeKind::class_declaration: {
+            const auto& value = static_cast<const ClassDeclaration&>(node);
+            write_line(std::string(value.is_interface ? "InterfaceDeclaration " : "ClassDeclaration ") + value.name);
+            IndentGuard indent{*this};
+            for (const auto& base : value.bases) write_line("Base " + base);
+            for (const auto& member : value.members) write_node(*member);
+            return;
+        }
+        case NodeKind::lambda_expression: {
+            const auto& value = static_cast<const LambdaExpression&>(node);
+            write_line("LambdaExpression");
+            IndentGuard indent{*this};
+            for (const auto& parameter : value.parameters) write_node(*parameter);
+            if (value.return_type) write_type(*value.return_type);
+            if (value.body) write_node(*value.body);
+            if (value.expression_body) write_node(*value.expression_body);
+            return;
+        }
+        case NodeKind::new_expression: {
+            const auto& value = static_cast<const NewExpression&>(node);
+            write_line("NewExpression");
+            IndentGuard indent{*this};
+            write_type(*value.type);
+            write_node(*value.call);
             return;
         }
 
@@ -431,6 +460,14 @@ void AstPrinter::write_node(const Node &node) {
 }
 
 void AstPrinter::write_type(const TypeSyntax &type) {
+    if (type.result_type) {
+        write_line("Type function");
+        IndentGuard indent{*this};
+        for (const auto& parameter : type.parameter_types) write_type(*parameter);
+        write_label("result");
+        write_type(*type.result_type);
+        return;
+    }
     std::string text = "TypeSyntax " + type.name;
     text.append(type.nullable_depth, '?');
     write_line(text);

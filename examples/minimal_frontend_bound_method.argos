@@ -1,0 +1,7 @@
+// Referências ligadas a métodos ainda não possuem lowering.
+class Value { public function read() -> int { return 42; } }
+function main() -> int {
+    var value = new Value();
+    var read = value.read;
+    return read();
+}

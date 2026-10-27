@@ -23,6 +23,13 @@ namespace {
 } // namespace
 
 std::int32_t VM::run() const {
+  closures_.clear();
+  objects_.clear();
+  struct HeapReset {
+    decltype(closures_)& closures;
+    decltype(objects_)& objects;
+    ~HeapReset() { closures.clear(); objects.clear(); }
+  } reset{closures_, objects_};
   if (module_ == nullptr)
     throw std::runtime_error("nenhum módulo foi carregado na VM");
   if (const auto error = argos::ir::validate_module(*module_))
@@ -103,6 +110,51 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
     switch (instruction.opcode) {
     case Opcode::nop:
       break;
+    case Opcode::new_object:
+      objects_.push_back({instruction.constant, std::vector<std::uint64_t>(module_->objects[instruction.constant].fields.size())});
+      set_register(instruction.dst, objects_.size());
+      break;
+    case Opcode::load_field:
+    case Opcode::store_field: {
+      const auto id = register_value(instruction.src1);
+      if (id == 0 || id > objects_.size() || objects_[id - 1].layout != instruction.constant)
+        invalid("objeto incompatível com layout do campo");
+      auto& object = objects_[id - 1];
+      if (instruction.opcode == Opcode::load_field) set_register(instruction.dst, object.fields[instruction.count]);
+      else object.fields[instruction.count] = register_value(instruction.src2);
+      break;
+    }
+    case Opcode::make_closure: {
+      Closure closure{instruction.function, {}};
+      for (const auto argument : instruction.arguments) closure.captures.push_back(register_value(argument));
+      closures_.push_back(std::move(closure));
+      set_register(instruction.dst, closures_.size());
+      break;
+    }
+    case Opcode::load_capture: {
+      const auto id = register_value(instruction.src1);
+      if (id == 0 || id > closures_.size()) invalid("ambiente de closure inválido");
+      const auto& closure = closures_[id - 1];
+      if (closure.function != function_id || instruction.count >= closure.captures.size())
+        invalid("captura fora do ambiente");
+      set_register(instruction.dst, closure.captures[instruction.count]);
+      break;
+    }
+    case Opcode::call_closure: {
+      const auto id = register_value(instruction.src1);
+      if (id == 0 || id > closures_.size()) invalid("closure inválida");
+      const auto target = closures_[id - 1].function;
+      const auto& signature = module_->functions[target];
+      if (signature.return_type != instruction.return_type ||
+          signature.parameter_types.size() != instruction.parameter_types.size() + 1)
+        invalid("assinatura de closure incompatível");
+      for (std::size_t i = 0; i < instruction.parameter_types.size(); ++i)
+        if (signature.parameter_types[i + 1] != instruction.parameter_types[i]) invalid("parâmetro de closure incompatível");
+      std::vector<std::uint64_t> values{id};
+      for (const auto argument : instruction.arguments) values.push_back(register_value(argument));
+      set_register(instruction.dst, execute(target, values));
+      break;
+    }
     case Opcode::load_const: {
       if (instruction.constant >= module_->constants.size())
         invalid("constante fora dos limites");
@@ -120,12 +172,18 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
         const auto [end, error] =
             std::from_chars(text.data(), text.data() + text.size(), value);
         if (error != std::errc{} || end != text.data() + text.size())
-          invalid("constante Int inválida");
+          invalid("constante int inválida");
         set_register(instruction.dst, static_cast<std::uint64_t>(
                                           static_cast<std::int64_t>(value)));
       }
       break;
     }
+    case Opcode::load_string:
+      if (instruction.constant >= module_->constants.size())
+        invalid("constante de string fora dos limites");
+      set_register(instruction.dst,
+                   static_cast<std::uint64_t>(instruction.constant) + 1);
+      break;
     case Opcode::load_var:
       if (instruction.slot >= slots.size())
         invalid("slot fora dos limites");
@@ -212,6 +270,18 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
       break;
     }
     case Opcode::cmp_eq:
+      if (function.register_types[instruction.src1] ==
+          argos::ir::ValueType::string) {
+        const auto left = register_value(instruction.src1);
+        const auto right = register_value(instruction.src2);
+        if (left == 0 || right == 0 || left > module_->constants.size() ||
+            right > module_->constants.size())
+          invalid("valor string inválido");
+        set_register(instruction.dst,
+                     module_->constants[left - 1].value ==
+                         module_->constants[right - 1].value);
+        break;
+      }
       set_register(instruction.dst,
                    function.register_types[instruction.src1] ==
                            argos::ir::ValueType::float64
@@ -221,6 +291,18 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
                              register_value(instruction.src2));
       break;
     case Opcode::cmp_ne:
+      if (function.register_types[instruction.src1] ==
+          argos::ir::ValueType::string) {
+        const auto left = register_value(instruction.src1);
+        const auto right = register_value(instruction.src2);
+        if (left == 0 || right == 0 || left > module_->constants.size() ||
+            right > module_->constants.size())
+          invalid("valor string inválido");
+        set_register(instruction.dst,
+                     module_->constants[left - 1].value !=
+                         module_->constants[right - 1].value);
+        break;
+      }
       set_register(instruction.dst,
                    function.register_types[instruction.src1] ==
                            argos::ir::ValueType::float64
@@ -286,6 +368,14 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
       const auto &literal = module_->constants[instruction.constant].value;
       if (literal.size() < 2) invalid("literal de string inválido");
       output << literal.substr(1, literal.size() - 2);
+      break;
+    }
+    case Opcode::print_string_value: {
+      const auto value = register_value(instruction.src1);
+      if (value == 0 || value > module_->constants.size())
+        invalid("valor string fora dos limites");
+      const auto &text = module_->constants[value - 1].value;
+      output.write(text.data(), static_cast<std::streamsize>(text.size()));
       break;
     }
     case Opcode::print_newline: output << '\n'; break;

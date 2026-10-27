@@ -1,0 +1,44 @@
+class Counter {
+    private var mut value: int = 0;
+    public function add(_ amount: int) -> int {
+        value = value + amount;
+        return value;
+    }
+}
+function counter() -> (int) -> int {
+    var instance = new Counter();
+    return (amount: int) => instance.add(amount);
+}
+class Mapping {
+    public var apply: (int) -> int;
+    public construct(_ operation: (int) -> int) { this.apply = operation; }
+}
+function difference(first: int, second: int) -> int { return first - second; }
+function realIdentity(_ x: double) -> double { return x; }
+function executeReal(_ f: (double) -> double) -> double { return f(2.5); }
+function main() -> int {
+    var increment = counter();
+    var first = increment(2);
+    print(first);
+    print(increment(3));
+    var transform = (x: double, text: string) -> string => text;
+    print(transform(1, "captured"));
+    var original = 10;
+    {
+        var original = (x: int) => x + original;
+        print(original(2));
+    }
+    var mapper = new Mapping((x: int) => x * 2);
+    print(mapper.apply(4));
+    var instance = new Counter();
+    print(difference(second: instance.add(1), first: instance.add(10)));
+    var use = (c: Counter) => c.add(1);
+    print(use(new Counter()));
+    print(executeReal(realIdentity));
+    var text = "retained";
+    var retain = () => text;
+    print(retain());
+    var task = () => { print("done"); };
+    task();
+    return 0;
+}

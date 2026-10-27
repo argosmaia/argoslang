@@ -1,0 +1,12 @@
+function plusOne(_ x: int) -> int { return x + 1; }
+function apply(_ f: (int) -> int, _ x: int) -> int { return f(x); }
+function makeAdder(_ base: int) -> (int) -> int {
+    return (x: int) -> int => x + base;
+}
+function main() -> int {
+    var add = makeAdder(10);
+    var twice = (f: (int) -> int) -> (int) -> int => (x: int) => f(f(x));
+    print(apply(add, 3));
+    print(twice(plusOne)(5));
+    return 0;
+}

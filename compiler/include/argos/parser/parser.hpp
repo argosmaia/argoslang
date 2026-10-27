@@ -62,6 +62,13 @@ private:
     ast::BlockItemPtr parse_function_declaration(
         const lexer::Token& keyword
     );
+    ast::Modifiers parse_modifiers();
+    void parse_accessors(ast::VariableDeclaration& property);
+    bool in_class_{false};
+    ast::BlockItemPtr parse_class_declaration(const lexer::Token& keyword);
+    ast::ExpressionPtr parse_lambda();
+    bool starts_lambda() const;
+    bool in_interface_{false};
     ast::BlockItemPtr parse_protocol_declaration(const lexer::Token& keyword);
 
     ast::StatementPtr parse_statement();

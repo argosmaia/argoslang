@@ -77,6 +77,12 @@ TEST_CASE("parses function declaration with return type and body") {
     REQUIRE(fn->body->items.size() == 1);
 }
 
+TEST_CASE("rejects the removed func declaration spelling") {
+    argos::diagnostics::DiagnosticEngine diagnostics;
+    (void)parse("func main() -> int { return 0; }", diagnostics);
+    REQUIRE(diagnostics.has_errors());
+}
+
 TEST_CASE("parses operator precedence and null-safety operators") {
     argos::diagnostics::DiagnosticEngine diagnostics;
 
@@ -150,11 +156,12 @@ TEST_CASE("rejects legacy postfix bang") {
     REQUIRE(diagnostics.has_errors());
 }
 
-TEST_CASE("reports unsupported nominal declarations") {
+TEST_CASE("parses classes without losing following declarations") {
     argos::diagnostics::DiagnosticEngine diagnostics;
     const auto program = parse("class User {} var x: int = 2;", diagnostics);
-    REQUIRE(diagnostics.has_errors());
-    REQUIRE(program.items.size() == 1);
+    REQUIRE_FALSE(diagnostics.has_errors());
+    REQUIRE(program.items.size() == 2);
+    REQUIRE(program.items[0]->kind == argos::ast::NodeKind::class_declaration);
 }
 
 TEST_CASE("reports unsupported match statements") {
@@ -206,4 +213,51 @@ TEST_CASE("same-line statements still require a separator") {
     argos::diagnostics::DiagnosticEngine diagnostics;
     (void)parse("function f() -> int { var x: int = 1 return x }", diagnostics);
     REQUIRE(diagnostics.has_errors());
+}
+
+TEST_CASE("parses computed properties and typed accessor signatures") {
+    argos::diagnostics::DiagnosticEngine diagnostics;
+    const auto program = parse(R"(
+      class Account {
+        construct(_ initial: int) {}
+        public var mut balance: int {
+          getter() { return 1; }
+          setter(incoming) { print(incoming); }
+        }
+        var mut flag: bool { getter() { return true; } setter() { print(value); } }
+      }
+    )", diagnostics);
+    REQUIRE_FALSE(diagnostics.has_errors());
+    const auto& type = static_cast<const argos::ast::ClassDeclaration&>(*program.items[0]);
+    const auto& constructor = static_cast<const argos::ast::FunctionDeclaration&>(*type.members[0]);
+    REQUIRE(constructor.name == "construct");
+    const auto& property = static_cast<const argos::ast::VariableDeclaration&>(*type.members[1]);
+    REQUIRE(property.is_property);
+    REQUIRE(property.getter->parameters.empty());
+    REQUIRE(property.getter->return_type->name == "int");
+    REQUIRE(property.setter->parameters.size() == 1);
+    REQUIRE(property.setter->parameters[0]->name == "incoming");
+    REQUIRE(property.setter->parameters[0]->type->name == "int");
+    REQUIRE(property.setter->return_type->name == "void");
+    const auto& flag = static_cast<const argos::ast::VariableDeclaration&>(*type.members[2]);
+    REQUIRE(flag.setter->parameters[0]->name == "value");
+}
+
+TEST_CASE("rejects old constructors and malformed accessor syntax") {
+    for (const auto& source : {
+        "class A { init() {} }", "class A { public init() {} }",
+        "class A { var x: int { get { return 1; } } }",
+        "class A { var mut x: int { setter() {} } }",
+        "class A { var x: int { getter() { return 1; } setter() {} } }",
+        "class A { var x: int { getter() { return 1; } getter() { return 2; } } }",
+        "class A { var x: int { getter(value) { return 1; } } }",
+        "class A { var mut x: int { getter() { return 1; } setter(a, b) {} } }",
+        "class A { var x: int = 0 { getter() { return 1; } } }",
+        "var x: int { getter() { return 1; } }"
+    }) {
+        CAPTURE(source);
+        argos::diagnostics::DiagnosticEngine diagnostics;
+        (void)parse(source, diagnostics);
+        REQUIRE(diagnostics.has_errors());
+    }
 }
