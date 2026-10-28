@@ -104,14 +104,37 @@ inline constexpr auto relational_type_mismatch = semantic_error("ARGOS-S0328", "
 inline constexpr auto lifted_equality_type_mismatch = semantic_error("ARGOS-S0329", "igualdade segura incompatível", "Compare opcionais com tipos-base compatíveis.");
 } // namespace operators
 namespace assignment {
-inline constexpr auto invalid_target = semantic_error("ARGOS-S0330", "alvo de atribuição inválido", "Atribua apenas a uma variável ou membro reatribuível.");
-inline constexpr auto immutable_target = semantic_error("ARGOS-S0331", "atribuição a variável imutável", "Declare a variável com var mut para reatribuí-la.");
-inline constexpr auto incompatible_value = semantic_error("ARGOS-S0332", "valor atribuído incompatível", "Atribua um valor compatível com o tipo do alvo.");
-inline constexpr auto compound_requires_numeric = semantic_error("ARGOS-S0333", "atribuição composta exige número", "Use +=, -=, *=, /= ou %= com números.");
-inline constexpr auto compound_type_mismatch = semantic_error("ARGOS-S0334", "atribuição composta incompatível", "Use valores numéricos compatíveis.");
-inline constexpr auto coalescing_value_mismatch = semantic_error("ARGOS-S0335", "valor de ?" "?= incompatível", "Atribua um valor compatível com o tipo desembrulhado.");
-inline constexpr auto safe_assignment_requires_optional = semantic_error("ARGOS-S0336", "?= exige alvo opcional", "Use ?= apenas em uma variável T?.");
-inline constexpr auto unknown_assignment_target = semantic_error("ARGOS-S0337", "alvo de atribuição não declarado", "Declare a variável antes de atribuir.");
+inline constexpr auto immutable_target =
+    semantic_error("ARGOS-S0330", "alvo não reatribuível",
+                   "Use um alvo mutável e acesso direto.");
+inline constexpr auto incompatible_value =
+    semantic_error("ARGOS-S0331", "valor atribuído incompatível",
+                   "Atribua valor compatível com o tipo do alvo.");
+inline constexpr auto safe_source_requires_optional = semantic_error(
+    "ARGOS-S0332", "?= exige fonte opcional", "Declare a fonte como T?.");
+inline constexpr auto safe_value_mismatch =
+    semantic_error("ARGOS-S0333", "valor desembrulhado incompatível",
+                   "O tipo desembrulhado deve ser compatível com o alvo.");
+inline constexpr auto coalescing_target_requires_optional =
+    semantic_error("ARGOS-S0334", "coalescência exige alvo opcional",
+                   "Use ?"
+                   "?= com um alvo T?.");
+inline constexpr auto coalescing_value_mismatch = semantic_error(
+    "ARGOS-S0335",
+    "valor de ?"
+    "?= incompatível",
+    "Atribua valor compatível com o alvo ou tipo desembrulhado.");
+inline constexpr auto compound_requires_numeric =
+    semantic_error("ARGOS-S0336", "atribuição aritmética exige números",
+                   "Desembrulhe opcionais antes de fazer aritmética.");
+inline constexpr auto compound_requires_initialized_target =
+    semantic_error("ARGOS-S0337", "alvo composto não inicializado",
+                   "Inicialize o alvo por atribuição simples antes de usá-lo.");
+inline constexpr auto force_source = semantic_error(
+    "ARGOS-S0338", "!!= exige fonte opcional", "Use uma fonte T?.");
+inline constexpr auto force_type =
+    semantic_error("ARGOS-S0339", "valor de !!= incompatível",
+                   "O tipo desembrulhado deve caber no alvo.");
 } // namespace assignment
 namespace control {
 inline constexpr DiagnosticDefinition return_outside_function{"ARGOS-S0200", Severity::error, "return fora de função", "return só pode encerrar uma function.", "Mova-o para o corpo de uma função."};
@@ -123,21 +146,56 @@ inline constexpr DiagnosticDefinition continue_outside_loop{"ARGOS-S0204", Sever
 namespace types {
 inline constexpr DiagnosticDefinition unknown_type{"ARGOS-S0400", Severity::error, "tipo não declarado", "O nome de tipo não foi encontrado.", "Use um tipo primitivo ou declare o tipo antes do uso."};
 inline constexpr DiagnosticDefinition condition_not_boolean{"ARGOS-S0370", Severity::error, "condição não booleana", "if e while exigem uma expressão bool.", "Use uma comparação ou expressão booleana."};
-inline constexpr auto conditional_branch_mismatch = semantic_error("ARGOS-S0380", "ramos condicionais incompatíveis", "Faça os dois ramos produzirem tipos compatíveis.");
+inline constexpr auto invalid_lvalue = semantic_error(
+    "ARGOS-S0380", "alvo não é um l-value",
+    "Use uma variável, campo, propriedade ou elemento de array reatribuível.");
+inline constexpr auto invalid_optional =
+    semantic_error("ARGOS-S0401", "tipo opcional inválido",
+                   "Use tipo habitável e até 4095 camadas opcionais.");
+inline constexpr auto index_base = semantic_error(
+    "ARGOS-S0375", "base de indexação incompatível",
+    "Use [] em array presente ou ?[ em array com uma camada opcional.");
+inline constexpr auto index_type =
+    semantic_error("ARGOS-S0376", "índice incompatível",
+                   "O índice deve ser int não opcional.");
+inline constexpr auto array_type = semantic_error(
+    "ARGOS-S0377", "tipo de array inválido",
+    "Use elementos homogêneos habitáveis e anote arrays vazios ou só com nil.");
+inline constexpr auto array_element =
+    semantic_error("ARGOS-S0378", "elemento incompatível",
+                   "Use elementos atribuíveis ao tipo declarado do array.");
 } // namespace types
 namespace members {
-inline constexpr auto optional_member_requires_safe_access = semantic_error("ARGOS-S0350", "membro de opcional exige acesso seguro", "Use ?. ou desembrulhe o valor antes do acesso.");
-inline constexpr auto member_base_not_nominal = semantic_error("ARGOS-S0351", "acesso de membro em tipo não nominal", "Acesse membros apenas de valores que os declaram.");
-inline constexpr auto unknown_member = semantic_error("ARGOS-S0352", "membro não declarado", "Corrija o nome do membro ou declare-o no tipo.");
-inline constexpr auto unsafe_access_on_optional = semantic_error("ARGOS-S0353", "acesso inseguro em opcional", "Use ?. para acesso condicional.");
+inline constexpr auto safe_access_requires_optional = semantic_error(
+    "ARGOS-S0350", "?. exige uma camada opcional",
+    "Use ?. em T?; desembrulhe camadas adicionais explicitamente.");
+inline constexpr auto unsafe_access_on_optional =
+    semantic_error("ARGOS-S0351", "acesso direto em opcional",
+                   "Use ?. ou desembrulhe com !!.");
+inline constexpr auto member_base_not_nominal =
+    semantic_error("ARGOS-S0352", "base sem membros nominais",
+                   "Use um tipo que declare membros.");
+inline constexpr auto unknown_member = semantic_error(
+    "ARGOS-S0353", "membro não declarado", "Corrija o nome do membro.");
 } // namespace members
 namespace postfix {
-inline constexpr auto increment_requires_mutable_numeric = semantic_error("ARGOS-S0360", "incremento exige variável numérica mutável", "Use ++ apenas em var mut numérica.");
-inline constexpr auto decrement_requires_mutable_numeric = semantic_error("ARGOS-S0361", "decremento exige variável numérica mutável", "Use -- apenas em var mut numérica.");
-inline constexpr auto unwrap_requires_optional = semantic_error("ARGOS-S0362", "desembrulhamento exige opcional", "Use !! apenas em um valor T?.");
-inline constexpr auto unsafe_unwrap = semantic_error("ARGOS-S0363", "desembrulhamento inseguro", "Verifique nil antes de usar !!.");
-inline constexpr auto unsupported_propagation = semantic_error("ARGOS-S0364", "propagação pós-fixa indisponível", "Esse operador ainda não pertence à gramática atual.");
-inline constexpr auto invalid_postfix_not = semantic_error("ARGOS-S0365", "! pós-fixo inválido", "Use ! para negação ou !! para desembrulhar opcional.");
+inline constexpr auto propagate_requires_optional =
+    semantic_error("ARGOS-S0360", "propagação exige opcional",
+                   "O operador ? pós-fixo não é suportado.");
+inline constexpr auto unwrap_requires_optional = semantic_error(
+    "ARGOS-S0361", "!! exige opcional", "Use !! apenas em um valor T?.");
+inline constexpr auto increment_requires_numeric =
+    semantic_error("ARGOS-S0362", "incremento exige número não opcional",
+                   "Desembrulhe antes de incrementar.");
+inline constexpr auto increment_requires_mutable_target =
+    semantic_error("ARGOS-S0363", "incremento exige alvo mutável",
+                   "Use variável numérica mutável.");
+inline constexpr auto unsupported_propagation =
+    semantic_error("ARGOS-S0364", "propagação pós-fixa indisponível",
+                   "Use ?? ou !! para consumir opcionais.");
+inline constexpr auto invalid_postfix_not =
+    semantic_error("ARGOS-S0365", "! pós-fixo inválido",
+                   "Use ! para negação ou !! para desembrulhar.");
 } // namespace postfix
 namespace protocols {
 inline constexpr auto duplicate_protocol_component = semantic_error("ARGOS-S0500", "componente de protocolo duplicado", "Cada componente precisa ter nome único.");
@@ -244,14 +302,16 @@ find_definition(std::string_view code) noexcept {
       &operators::logical_operands,
       &operators::relational_type_mismatch,
       &operators::lifted_equality_type_mismatch,
-      &assignment::invalid_target,
+      &assignment::force_source,
+      &assignment::force_type,
       &assignment::immutable_target,
       &assignment::incompatible_value,
-      &assignment::compound_requires_numeric,
-      &assignment::compound_type_mismatch,
+      &assignment::safe_source_requires_optional,
+      &assignment::safe_value_mismatch,
+      &assignment::coalescing_target_requires_optional,
       &assignment::coalescing_value_mismatch,
-      &assignment::safe_assignment_requires_optional,
-      &assignment::unknown_assignment_target,
+      &assignment::compound_requires_numeric,
+      &assignment::compound_requires_initialized_target,
       &control::return_outside_function,
       &control::incompatible_return,
       &control::missing_return,
@@ -259,15 +319,20 @@ find_definition(std::string_view code) noexcept {
       &control::continue_outside_loop,
       &types::unknown_type,
       &types::condition_not_boolean,
-      &types::conditional_branch_mismatch,
-      &members::optional_member_requires_safe_access,
+      &types::invalid_lvalue,
+      &types::invalid_optional,
+      &types::index_base,
+      &types::index_type,
+      &types::array_type,
+      &types::array_element,
+      &members::safe_access_requires_optional,
+      &members::unsafe_access_on_optional,
       &members::member_base_not_nominal,
       &members::unknown_member,
-      &members::unsafe_access_on_optional,
-      &postfix::increment_requires_mutable_numeric,
-      &postfix::decrement_requires_mutable_numeric,
+      &postfix::propagate_requires_optional,
       &postfix::unwrap_requires_optional,
-      &postfix::unsafe_unwrap,
+      &postfix::increment_requires_numeric,
+      &postfix::increment_requires_mutable_target,
       &postfix::unsupported_propagation,
       &postfix::invalid_postfix_not,
       &protocols::duplicate_protocol_component,

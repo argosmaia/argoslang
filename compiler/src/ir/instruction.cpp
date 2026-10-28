@@ -2,6 +2,18 @@
 namespace argos::ir {
 const char* opcode_name(Opcode o) noexcept {
  switch(o){
+ case Opcode::make_nil:
+   return "MAKE_NIL";
+ case Opcode::make_optional:
+   return "MAKE_OPTIONAL";
+ case Opcode::is_nil:
+   return "IS_NIL";
+ case Opcode::make_array:
+   return "MAKE_ARRAY";
+ case Opcode::array_store:
+   return "ARRAY_STORE";
+ case Opcode::array_load:
+   return "ARRAY_LOAD";
  case Opcode::nop:return "NOP"; case Opcode::load_const:return "LOAD_CONST";
  case Opcode::load_string:return "LOAD_STRING";
  case Opcode::load_var:return "LOAD_VAR"; case Opcode::store_var:return "STORE_VAR";

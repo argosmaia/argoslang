@@ -365,3 +365,73 @@ TEST_CASE("checks interface property contracts and required setters", "[oop][acc
     REQUIRE(has_code(check_source("interface I { var x: int { getter() { return 1; } } }"), "ARGOS-S0607"));
     REQUIRE(has_code(check_source("interface R { var x: int { getter(); } } interface W { var mut x: int { getter(); setter(); } } class A : R, W { public var x: int { getter() { return 1; } } }"), "ARGOS-S0606"));
 }
+
+TEST_CASE("null safety enforces optional boundaries", "[optional]") {
+  REQUIRE(check_source("var a: int? = 0; var yes: bool = a ?== 0; var mut b: "
+                       "int = 1; b !!= a;")
+              .valid);
+  REQUIRE(check_source("var a: void? = nil;").valid == false);
+  REQUIRE_FALSE(check_source("var a: int = nil;").valid);
+  REQUIRE_FALSE(check_source("var a: int? = 1; var b: int = a;").valid);
+  REQUIRE_FALSE(check_source("var a: int?; var b = a ?? 0;").valid);
+  REQUIRE_FALSE(check_source("var a: int? = nil; a ?"
+                             "?= 1;")
+                    .valid);
+  REQUIRE_FALSE(check_source("var mut a: int = 1; a !!= 2;").valid);
+  REQUIRE_FALSE(
+      check_source("var mut a: int = 1; var b: string? = nil; a !!= b;").valid);
+  REQUIRE_FALSE(check_source("var a: int? = 1; if a { }").valid);
+  REQUIRE_FALSE(check_source("var a: int? = 1; var b = a + 1;").valid);
+  REQUIRE_FALSE(check_source("var a: int = 1; var b = a!!;").valid);
+  REQUIRE_FALSE(check_source("var a: int? = nil; var b = a?;").valid);
+}
+
+TEST_CASE("optional arrays use typed safe subscripts", "[optional][array]") {
+  REQUIRE(
+      check_source("var a: [int]? = [1, 2]; var b: int = a?[0] ?? 3;").valid);
+  REQUIRE(
+      check_source("var a: [int?]? = [nil, 2]; var b: int? = a?[0];").valid);
+  REQUIRE_FALSE(check_source("var a: [int]? = nil; var b = a[0];").valid);
+  REQUIRE_FALSE(check_source("var a = [1, 2]; var b = a?[0];").valid);
+  REQUIRE_FALSE(check_source("var a: [int]? = nil; var b = a?[true];").valid);
+  REQUIRE_FALSE(check_source("var a: [int]? = nil; a?[0] = 2;").valid);
+  REQUIRE_FALSE(check_source("var a = [1, 2]; a[0] = 2;").valid);
+  REQUIRE_FALSE(check_source("var a: [void]? = nil;").valid);
+  REQUIRE_FALSE(check_source("var a: [int] = [1, true];").valid);
+}
+
+TEST_CASE("lazy optional paths do not establish definite initialization",
+          "[optional]") {
+  REQUIRE_FALSE(
+      check_source(
+          "var y: int; var a: int? = 1; var z = a ?? (y = 2); print(y);")
+          .valid);
+  REQUIRE_FALSE(check_source("var y: int; var mut a: int? = nil; a ?"
+                             "?= (y = 2); print(y);")
+                    .valid);
+  REQUIRE_FALSE(
+      check_source(
+          "var y: int; var a: [int]? = nil; var z = a?[(y = 0)]; print(y);")
+          .valid);
+  REQUIRE_FALSE(check_source("var mut a: [int]; a[0] = 1;").valid);
+  REQUIRE_FALSE(
+      check_source(
+          "class C { public function f(_ x: int) -> int { return x; } } var c: "
+          "C? = nil; var y: int; var z = c?.f(y = 1); print(y);")
+          .valid);
+  REQUIRE_FALSE(
+      check_source("var mut x: int?; var y: int? = 1; x ?= y;").valid);
+}
+
+TEST_CASE(
+    "optional arrays allow multiline index and explicit unwrap for writing",
+    "[optional][array]") {
+  REQUIRE(
+      check_source("var mut a: [int]? = [1, 2]; a!![0] = 3; var b = a?[\n0\n];")
+          .valid);
+  REQUIRE(check_source("var a: [int] = []; function f(_ x: [int]) -> [int] { "
+                       "return []; } var b = f([]);")
+              .valid);
+  REQUIRE_FALSE(check_source("var a = [];").valid);
+  REQUIRE_FALSE(check_source("var a: [[int]]? = nil;").valid);
+}

@@ -63,7 +63,9 @@ Type Type::unwrapped() const {
   if (nullable_depth == 0) {
     return *this;
   }
-  return Type{kind, nullable_depth - 1, nominal_name};
+  auto result = *this;
+  --result.nullable_depth;
+  return result;
 }
 
 std::string_view type_kind_name(TypeKind kind) noexcept {
@@ -99,6 +101,8 @@ std::string_view type_kind_name(TypeKind kind) noexcept {
   case TypeKind::string_type: return "string";
   case TypeKind::nominal_type: return "<nominal>";
   case TypeKind::function_type: return "function";
+  case TypeKind::array_type:
+    return "array";
   case TypeKind::never_type: return "never";
   case TypeKind::null_type:
     return "null";
@@ -119,6 +123,8 @@ std::string type_name(const Type &type) {
     }
     result += ") -> " + type_name(type.signature.back());
   }
+  if (type.kind == TypeKind::array_type && !type.signature.empty())
+    result = "[" + type_name(type.signature.front()) + "]";
   for (std::size_t i = 0; i < type.nullable_depth; ++i) {
     result += '?';
   }
@@ -215,6 +221,17 @@ bool SemanticAnalyzer::analyze(const ast::Program &program) {
 }
 
 void SemanticAnalyzer::enter_scope() { scopes_.push_back(Scope{}); }
+
+void SemanticAnalyzer::restore_initialization(
+    const std::vector<Scope> &before) {
+  for (std::size_t i = 0; i < before.size(); ++i)
+    for (const auto &[name, previous] : before[i].symbols) {
+      auto &symbol = scopes_[i].symbols.at(name);
+      symbol.initialized = previous.initialized;
+      if (symbol.id < symbol_records_.size())
+        symbol_records_[symbol.id].initialized = symbol.initialized;
+    }
+}
 
 void SemanticAnalyzer::leave_scope() {
   if (!scopes_.empty()) {
@@ -384,7 +401,12 @@ void SemanticAnalyzer::analyze_variable_declaration(
   }
 
   if (declaration.initializer) {
-    const Type initializer_type = analyze_expression(*declaration.initializer);
+    if (declared_type.kind == TypeKind::array_type &&
+        dynamic_cast<const ast::ArrayExpression *>(
+            declaration.initializer.get()))
+      expression_coercions_[declaration.initializer.get()] = declared_type;
+    const Type initializer_type =
+        analyze_expression(*declaration.initializer, declared_type);
     if (!declaration.type) {
       if (initializer_type.is_null() || initializer_type.is_unknown()) {
         report("ARGOS-S0102", declaration.initializer->span,
@@ -554,7 +576,7 @@ void SemanticAnalyzer::analyze_return(const ast::ReturnStatement &statement) {
   functions_.back().saw_return = true;
   const Type expected = functions_.back().return_type;
   const Type actual = statement.expression
-                          ? analyze_expression(*statement.expression)
+                          ? analyze_expression(*statement.expression, expected)
                           : Type{TypeKind::void_type, 0};
 
   const bool return_assignable = statement.expression
@@ -600,7 +622,11 @@ void SemanticAnalyzer::analyze_expression_statement(
   (void)analyze_expression(*statement.expression);
 }
 
-Type SemanticAnalyzer::analyze_expression(const ast::Expression &expression) {
+Type SemanticAnalyzer::analyze_expression(const ast::Expression &expression,
+                                          std::optional<Type> expected) {
+  if (expected && expected->kind == TypeKind::array_type &&
+      dynamic_cast<const ast::ArrayExpression *>(&expression))
+    expression_coercions_[&expression] = *expected;
   Type result = error_type();
 
   switch (expression.kind) {
@@ -654,7 +680,8 @@ Type SemanticAnalyzer::analyze_expression(const ast::Expression &expression) {
     break;
   case ast::NodeKind::grouping_expression:
     result = analyze_expression(
-        *static_cast<const ast::GroupingExpression &>(expression).expression);
+        *static_cast<const ast::GroupingExpression &>(expression).expression,
+        expected);
     break;
   case ast::NodeKind::unary_expression:
     result =
@@ -671,6 +698,70 @@ Type SemanticAnalyzer::analyze_expression(const ast::Expression &expression) {
   case ast::NodeKind::call_expression:
     result = analyze_call(static_cast<const ast::CallExpression &>(expression));
     break;
+  case ast::NodeKind::array_expression: {
+    const auto &array = static_cast<const ast::ArrayExpression &>(expression);
+    const auto context = coercion_of(expression);
+    Type element = context && context->kind == TypeKind::array_type &&
+                           !context->signature.empty()
+                       ? context->signature.front()
+                       : unknown_type();
+    for (const auto &item : array.elements) {
+      const auto type = analyze_expression(*item);
+      if (element.is_unknown() && !type.is_null())
+        element = type;
+    }
+    if (!element.is_unknown() && !element.is_optional())
+      for (const auto &item : array.elements)
+        if (type_of(*item).is_null() && !context) {
+          ++element.nullable_depth;
+          break;
+        }
+    if (element.is_unknown() || element.kind == TypeKind::void_type ||
+        element.kind == TypeKind::array_type) {
+      report("ARGOS-S0377", expression.span,
+             "array exige elementos homogêneos habitáveis; array vazio ou "
+             "somente nil exige contexto tipado");
+      result = error_type();
+      break;
+    }
+    for (const auto &item : array.elements) {
+      const auto type = type_of(*item);
+      if (!is_assignable_expression(type, element, *item))
+        report("ARGOS-S0378", item->span,
+               "elemento incompatível com tipo do array");
+      else
+        record_coercion(*item, type, element);
+    }
+    result = Type{TypeKind::array_type};
+    result.signature.push_back(element);
+    break;
+  }
+  case ast::NodeKind::index_expression: {
+    const auto &index = static_cast<const ast::IndexExpression &>(expression);
+    const bool target_context = analyzing_assignment_target_;
+    analyzing_assignment_target_ = false;
+    const Type base = analyze_expression(*index.base);
+    const auto before_index = scopes_;
+    const Type offset = analyze_expression(*index.index);
+    if (index.safe)
+      restore_initialization(before_index);
+    analyzing_assignment_target_ = target_context;
+    if (base.kind != TypeKind::array_type || base.signature.empty() ||
+        base.nullable_depth != (index.safe ? 1u : 0u)) {
+      report("ARGOS-S0375", expression.span,
+             "indexação exige array; '?[' exige array opcional e '[' exige "
+             "array não opcional");
+      result = error_type();
+    } else if (offset.kind != TypeKind::int_type || offset.is_optional()) {
+      report("ARGOS-S0376", expression.span, "índice exige int não opcional");
+      result = error_type();
+    } else {
+      result = base.signature.front();
+      if (index.safe && !result.is_optional())
+        ++result.nullable_depth;
+    }
+    break;
+  }
   case ast::NodeKind::member_access_expression:
     result = analyze_member_access(
         static_cast<const ast::MemberAccessExpression &>(expression));
@@ -684,6 +775,11 @@ Type SemanticAnalyzer::analyze_expression(const ast::Expression &expression) {
     break;
   }
 
+  if (result.nullable_depth > 4095) {
+    report("ARGOS-S0401", expression.span,
+           "profundidade opcional excede 4095 camadas");
+    result = error_type();
+  }
   expression_types_[&expression] = result;
   return result;
 }
@@ -759,7 +855,15 @@ Type SemanticAnalyzer::analyze_unary(const ast::UnaryExpression &expression) {
 
 Type SemanticAnalyzer::analyze_binary(const ast::BinaryExpression &expression) {
   const Type left = analyze_expression(*expression.left);
-  const Type right = analyze_expression(*expression.right);
+  const auto before_right = scopes_;
+  const Type right = analyze_expression(
+      *expression.right, expression.op == ast::BinaryOperator::null_coalescing
+                             ? std::optional<Type>{left.unwrapped()}
+                             : std::nullopt);
+  if (expression.op == ast::BinaryOperator::null_coalescing ||
+      expression.op == ast::BinaryOperator::logical_and ||
+      expression.op == ast::BinaryOperator::logical_or)
+    restore_initialization(before_right);
   if (left.is_error() || right.is_error())
     return error_type();
 
@@ -837,19 +941,31 @@ Type SemanticAnalyzer::analyze_binary(const ast::BinaryExpression &expression) {
              "operandos de igualdade possuem tipos incompatíveis");
     }
     return Type{TypeKind::bool_type, 0};
-  case ast::BinaryOperator::lifted_equal:
+  case ast::BinaryOperator::lifted_equal: {
     if (!left.is_optional() && !left.is_null() && !right.is_optional() &&
         !right.is_null()) {
       report("ARGOS-S0323", expression.span,
-             "'?==' exige valores opcionais ou null");
+             "'?==' exige valores opcionais ou nil");
       return error_type();
     }
-    if (!is_equality_comparable(left, right)) {
+    auto l = left;
+    auto r = right;
+    if (!l.is_null() && !r.is_null() && l.nullable_depth != r.nullable_depth) {
+      if (l.nullable_depth + 1 == r.nullable_depth) {
+        l.nullable_depth = r.nullable_depth;
+        record_coercion(*expression.left, left, l);
+      } else if (r.nullable_depth + 1 == l.nullable_depth) {
+        r.nullable_depth = l.nullable_depth;
+        record_coercion(*expression.right, right, r);
+      }
+    }
+    if (!is_equality_comparable(l, r)) {
       report("ARGOS-S0329", expression.span,
              "'?==' exige tipos-base compatíveis");
       return error_type();
     }
     return Type{TypeKind::bool_type, 0};
+  }
   case ast::BinaryOperator::null_coalescing:
     if (!left.is_optional()) {
       report("ARGOS-S0324", expression.span,
@@ -875,7 +991,10 @@ Type SemanticAnalyzer::analyze_assignment(
   analyzing_assignment_target_ = true;
   const Type target = analyze_expression(*expression.target);
   analyzing_assignment_target_ = previous_assignment_target;
-  const Type value = analyze_expression(*expression.value);
+  const auto before_value = scopes_;
+  const Type value = analyze_expression(*expression.value, target);
+  if (expression.op == ast::AssignmentOperator::null_coalescing_assign)
+    restore_initialization(before_value);
   if (target.is_error() || value.is_error())
     return error_type();
 
@@ -945,6 +1064,17 @@ Type SemanticAnalyzer::analyze_assignment(
     }
     record_coercion(*expression.value, value, target);
     return mark_initialized();
+  case ast::AssignmentOperator::force_unwrap_assign:
+    if (!value.is_optional()) {
+      report("ARGOS-S0338", expression.span, "'!!=' exige fonte opcional");
+      return error_type();
+    }
+    if (!is_assignable(value.unwrapped(), target)) {
+      report("ARGOS-S0339", expression.span,
+             "valor desembrulhado de '!!=' incompatível com alvo");
+      return error_type();
+    }
+    return mark_initialized();
   case ast::AssignmentOperator::conditional_assign:
     if (!value.is_optional()) {
       report("ARGOS-S0332", expression.span,
@@ -1001,7 +1131,12 @@ Type SemanticAnalyzer::analyze_call(const ast::CallExpression &expression) {
     expression_symbols_[&expression] = symbol->id;
     expression_symbols_[expression.callee.get()] = symbol->id;
   }
-  const Type type = analyze_expression(*expression.callee);
+  Type type = analyze_expression(*expression.callee);
+  const auto *safe_member = dynamic_cast<const ast::MemberAccessExpression *>(
+      expression.callee.get());
+  const bool safe_call = safe_member && safe_member->safe;
+  if (safe_call && type.is_optional())
+    type = type.unwrapped();
   if (type.kind != TypeKind::function_type || type.is_optional() || type.signature.empty()) {
     report(diagnostics::catalog::semantic::calls::non_named_callee.code, expression.callee->span,
            "chamada exige valor de tipo função não opcional");
@@ -1017,7 +1152,14 @@ Type SemanticAnalyzer::analyze_call(const ast::CallExpression &expression) {
     callable.parameter_labels.assign(callable.parameter_types.size(), "");
     callable.return_type = type.signature.back();
   }
-  return check_call(expression, callable);
+  const auto before_arguments = scopes_;
+  auto returned = check_call(expression, callable);
+  if (safe_call)
+    restore_initialization(before_arguments);
+  if (safe_call && returned.kind != TypeKind::void_type &&
+      !returned.is_optional())
+    ++returned.nullable_depth;
+  return returned;
 }
 
 Type SemanticAnalyzer::check_call(const ast::CallExpression& expression, const Symbol& callable) {
@@ -1025,7 +1167,6 @@ Type SemanticAnalyzer::check_call(const ast::CallExpression& expression, const S
   std::vector<bool> bound(function->parameter_types.size(), false);
   std::size_t next_positional = 0;
   for (std::size_t i = 0; i < expression.arguments.size(); ++i) {
-    const Type actual = analyze_expression(*expression.arguments[i]);
     const std::string label = i < expression.argument_labels.size()
                                   ? expression.argument_labels[i] : "";
     std::size_t parameter = function->parameter_types.size();
@@ -1043,6 +1184,11 @@ Type SemanticAnalyzer::check_call(const ast::CallExpression& expression, const S
         report(diagnostics::catalog::semantic::calls::unknown_argument_label.code, expression.arguments[i]->span,
                "rótulo de argumento " + quoted(label) + " inexistente");
     }
+    const Type actual = analyze_expression(
+        *expression.arguments[i],
+        parameter < bound.size()
+            ? std::optional<Type>{function->parameter_types[parameter]}
+            : std::nullopt);
     if (parameter < bound.size()) {
       if (bound[parameter])
         report(diagnostics::catalog::semantic::calls::duplicate_argument.code, expression.arguments[i]->span,
@@ -1080,7 +1226,7 @@ Type SemanticAnalyzer::analyze_member_access(
     return base;
 
   if (expression.safe) {
-    if (!base.is_optional()) {
+    if (base.nullable_depth != 1) {
       report("ARGOS-S0350", expression.base->span,
              "'?.' exige uma base opcional");
       return error_type();
@@ -1115,7 +1261,8 @@ Type SemanticAnalyzer::analyze_member_access(
         report("ARGOS-S0614", expression.span, "método exige instância completamente inicializada");
     }
     Type result = member->type;
-    if (expression.safe) ++result.nullable_depth;
+    if (expression.safe && !result.is_optional())
+      ++result.nullable_depth;
     return result;
   }
   const auto nominal = nominal_fields_.find(base.nominal_name);
@@ -1127,9 +1274,8 @@ Type SemanticAnalyzer::analyze_member_access(
     return error_type();
   }
   Type result = nominal->second.at(expression.member);
-  if (expression.safe)
-    result.nullable_depth = std::max<std::size_t>(
-        1, std::max(base.nullable_depth, result.nullable_depth));
+  if (expression.safe && !result.is_optional())
+    ++result.nullable_depth;
   return result;
 }
 
@@ -1168,8 +1314,7 @@ Type SemanticAnalyzer::analyze_postfix(
     return error_type();
   case ast::PostfixOperator::force_unwrap:
     if (!operand.is_optional()) {
-      report("ARGOS-S0361", expression.span,
-             "'!'/'!!' exigem um tipo opcional");
+      report("ARGOS-S0361", expression.span, "'!!' exige um tipo opcional");
       return error_type();
     }
     return operand.unwrapped();
@@ -1178,6 +1323,25 @@ Type SemanticAnalyzer::analyze_postfix(
 }
 
 Type SemanticAnalyzer::resolve_type(const ast::TypeSyntax &syntax) {
+  if (syntax.nullable_depth > 4095) {
+    report("ARGOS-S0401", syntax.span,
+           "profundidade opcional excede 4095 camadas");
+    return error_type();
+  }
+  if (syntax.element_type) {
+    auto element = resolve_type(*syntax.element_type);
+    if (element.kind == TypeKind::void_type ||
+        element.kind == TypeKind::never_type ||
+        element.kind == TypeKind::array_type) {
+      report("ARGOS-S0377", syntax.span,
+             "array exige elemento habitável; arrays multidimensionais ainda "
+             "não são suportados");
+      return error_type();
+    }
+    Type type{TypeKind::array_type, syntax.nullable_depth};
+    type.signature.push_back(element);
+    return type;
+  }
   if (syntax.result_type) {
     Type result{TypeKind::function_type, syntax.nullable_depth};
     for (const auto& parameter : syntax.parameter_types) {
@@ -1231,6 +1395,12 @@ Type SemanticAnalyzer::resolve_type(const ast::TypeSyntax &syntax) {
     return error_type();
   }
 
+  if ((kind == TypeKind::void_type || kind == TypeKind::never_type) &&
+      syntax.nullable_depth) {
+    report("ARGOS-S0401", syntax.span,
+           "tipo sem valores não admite opcionalidade");
+    return error_type();
+  }
   return Type{kind, syntax.nullable_depth};
 }
 
@@ -1318,13 +1488,20 @@ bool SemanticAnalyzer::is_assignable(Type from, Type to) const {
   }
   if (from.kind == TypeKind::nominal_type &&
       !is_subtype(from.nominal_name, to.nominal_name)) return false;
-  if (from.kind == TypeKind::function_type && from.signature != to.signature) return false;
+  if ((from.kind == TypeKind::function_type ||
+       from.kind == TypeKind::array_type) &&
+      from.signature != to.signature)
+    return false;
 
   return from.nullable_depth == to.nullable_depth ||
          from.nullable_depth + 1 == to.nullable_depth;
 }
 
 bool SemanticAnalyzer::is_equality_comparable(Type left, Type right) noexcept {
+  if (left.is_null())
+    return right.is_optional() || right.is_null();
+  if (right.is_null())
+    return left.is_optional();
   if (left.kind == TypeKind::function_type || right.kind == TypeKind::function_type ||
       left.kind == TypeKind::void_type || right.kind == TypeKind::void_type) return false;
   if (left.is_error() || right.is_error())
@@ -1334,8 +1511,10 @@ bool SemanticAnalyzer::is_equality_comparable(Type left, Type right) noexcept {
     return right.is_optional() || right.is_null();
   if (right.is_null())
     return left.is_optional();
-  return left.kind == right.kind && left.nullable_depth == right.nullable_depth &&
-         left.nominal_name == right.nominal_name;
+  return left.kind == right.kind &&
+         left.nullable_depth == right.nullable_depth &&
+         left.nominal_name == right.nominal_name &&
+         left.signature == right.signature;
 }
 
 Type SemanticAnalyzer::common_numeric_type(Type left, Type right) noexcept {
@@ -1365,7 +1544,8 @@ bool SemanticAnalyzer::require_boolean(Type type,
 
 bool SemanticAnalyzer::require_lvalue(const ast::Expression &expression,
                                       std::string_view context) {
-  if (dynamic_cast<const ast::IdentifierExpression *>(&expression) != nullptr ||
+  if (dynamic_cast<const ast::IndexExpression *>(&expression) != nullptr ||
+      dynamic_cast<const ast::IdentifierExpression *>(&expression) != nullptr ||
       dynamic_cast<const ast::MemberAccessExpression *>(&expression) !=
           nullptr) {
     return true;
@@ -1377,6 +1557,13 @@ bool SemanticAnalyzer::require_lvalue(const ast::Expression &expression,
 
 bool SemanticAnalyzer::is_mutable_lvalue(
     const ast::Expression &expression) const {
+  if (const auto *postfix =
+          dynamic_cast<const ast::PostfixExpression *>(&expression);
+      postfix && postfix->op == ast::PostfixOperator::force_unwrap)
+    return is_mutable_lvalue(*postfix->operand);
+  if (const auto *index =
+          dynamic_cast<const ast::IndexExpression *>(&expression))
+    return !index->safe && is_mutable_lvalue(*index->base);
   if (const auto *identifier =
           dynamic_cast<const ast::IdentifierExpression *>(&expression)) {
     const Symbol *symbol = lookup(identifier->name);
@@ -1762,9 +1949,9 @@ void SemanticAnalyzer::analyze_class(const ast::ClassDeclaration& declaration) {
         report("ARGOS-S0614", field->span, "campo sem inicializador exige construct");
       if (field->initializer) {
         initializing_field_ = true;
-        const auto actual = analyze_expression(*field->initializer);
-        initializing_field_ = false;
         const auto expected = classes_.at(declaration.name).members.at(field->name).type;
+        const auto actual = analyze_expression(*field->initializer, expected);
+        initializing_field_ = false;
         if (!is_assignable_expression(actual, expected, *field->initializer))
           report("ARGOS-S0101", field->span, "inicializador de campo incompatível");
         else record_coercion(*field->initializer, actual, expected);

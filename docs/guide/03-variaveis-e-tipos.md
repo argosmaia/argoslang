@@ -69,26 +69,22 @@ concatenação com `+`.
 
 ## Coleções
 
-Uma coleção guardaria vários valores juntos, como uma lista de nomes. A
-ArgosLang ainda não tem listas, mapas ou conjuntos disponíveis para programas
-executáveis. Por enquanto, use variáveis separadas:
+Arrays homogêneos já executam em arquivos:
 
 ```argos
-var first: int = 10
-var second: int = 20
+var mut values: [int] = [1, 2, 3]
+values[0] = 4
+var optional: [int]? = values
+print(optional?[0] ?? 0)
 ```
 
-Não tente usar `var numbers = [1, 2, 3]` como uma lista do MVP: coleções ainda
-não estão prontas.
+O tamanho é fixado na criação. `?[` trata ausência do array, sem ocultar
+índices fora dos limites. Mapas, conjuntos, crescimento e `for` permanecem
+pendentes. Veja [opcionais e arrays](11-null-safety-e-opcionais.md).
 
 ## Opcionais
 
-`T?` representa um valor que pode estar ausente. A ausência explícita é `nil`:
-
-```argos
-var nickname: string? = nil
-var display: string = nickname ?? "Anonymous"
-```
-
-O REPL interpreta esse exemplo. A rota de VM e compilação nativa ainda possui
-um subconjunto menor de tipos; consulte a página de ferramentas.
+`T?` admite presença de `T` ou ausência (`nil`); `T` não admite ausência.
+Os operadores `??`, `?.`, `?[`, `?=`, `?==`, `??=`, `!!` e `!!=` executam
+na VM e no nativo. O REPL preserva opcionais numéricos e booleanos.
+O [capítulo 11](11-null-safety-e-opcionais.md) explica regras e limitações.

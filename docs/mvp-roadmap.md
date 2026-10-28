@@ -296,3 +296,41 @@ antes da consolidação dos demais itens deste roteiro:
 Os itens anteriores sobre coleções, texto, I/O e consolidação continuam abertos.
 Esta etapa não declara o roteiro inteiro concluído. A matriz e os limites
 executáveis estão em [mvp.md](mvp.md#poo-e-funções-como-valores-26-de-outubro-de-2026).
+
+## Null-safety e arrays opcionais — implementação de 28/10/2026
+
+- [x] `T?`, `nil` e camadas aninhadas com presença explícita, sem sentinelas
+      que confundam zero, false ou string vazia com ausência.
+- [x] Parser/AST/semântica de `!!=`, inclusive tokenização como operador único.
+- [x] `??`, `?=`, `?==`, `??=`, `!!`, `!!=` executáveis na VM e no x86-64/Linux.
+- [x] `?.` de campos, propriedades e chamadas de métodos de classes concretas,
+      com receptor único e omissão de argumentos/getters quando ausente.
+- [x] Arrays homogêneos `[T]`, literais, leitura/escrita `[]` e `?[` inspirado
+      no Dart para arrays opcionais; ausência omite o índice.
+- [x] Erro localizado de unwrap ausente e índice inválido, com status 70.
+- [x] Tipos na IR, wrapping/unwrapping validados, ABI de valores boxed e
+      preservação em parâmetros, retornos, campos e capturas.
+- [x] Rejeição de unwrap implícito, `void?`, uso antes da inicialização,
+      escrita em alvos imutáveis e inicialização garantida por ramo pulável.
+- [x] Persistência de opcionais numéricos/bool no REPL, com camadas aninhadas
+      e recuperação após erro de runtime.
+- [x] Conformidade de saída e efeitos entre VM, binário nativo e assembly.
+- [ ] Persistência de opcionais de strings, objetos, arrays e closures no REPL.
+- [ ] Arrays multidimensionais, crescimento, slices/views, `[T; N]` e `for`.
+- [ ] Integração executável com herança, interfaces e tipos-base ainda sem
+      backend, conforme os limites gerais do MVP.
+
+O [capítulo de opcionais](guide/11-null-safety-e-opcionais.md) define tipos,
+curto-circuito, ordem dos efeitos, aninhamento, propriedades e limitações.
+Navegação/indexação segura conserva a opcionalidade de membros/elementos que
+já são opcionais; `T??` explicitamente declarado continua tendo duas camadas.
+
+### O que continua faltando no MVP
+
+Opcionais não concluem o roteiro inteiro. Continuam pendentes texto persistente
+no REPL, operações de strings, `char`/Unicode, fechamento das regras numéricas,
+coleções além dos arrays mínimos, `for`, entrada básica, polimorfismo executável,
+ownership/destruição, persistência de objetos/closures e consolidação de
+instalação, diagnósticos e CI. As seções anteriores sobre ausência de coleções
+devem ser lidas agora como ausência de uma biblioteca ampla: arrays mínimos
+foram implementados nesta etapa.

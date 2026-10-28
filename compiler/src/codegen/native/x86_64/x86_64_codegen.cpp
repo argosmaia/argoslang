@@ -35,15 +35,28 @@ std::string symbol(const argos::ir::Function &function) {
 }
 
 bool pointer_type(argos::ir::ValueType type) {
-  return type == argos::ir::ValueType::string || type == argos::ir::ValueType::closure || type == argos::ir::ValueType::object;
+  return argos::ir::is_optional(type) ||
+         argos::ir::payload_type(type) == argos::ir::ValueType::array ||
+         type == argos::ir::ValueType::string ||
+         type == argos::ir::ValueType::closure ||
+         type == argos::ir::ValueType::object;
 }
 
 std::uint64_t closure_signature(const std::vector<argos::ir::ValueType>& parameters,
                                 argos::ir::ValueType returned, bool environment) {
-  std::uint64_t value = static_cast<std::uint64_t>(returned) + 1;
-  unsigned shift = 4;
-  for (std::size_t i = environment ? 1 : 0; i < parameters.size(); ++i, shift += 4)
-    value |= (static_cast<std::uint64_t>(parameters[i]) + 1) << shift;
+  // Hash complete type words, including optional depth (four-bit packing
+  // aliases them).
+  std::uint64_t value = 1469598103934665603ULL;
+  const auto mix = [&](std::uint32_t word) {
+    for (unsigned byte = 0; byte < 4; ++byte) {
+      value ^= (word >> (byte * 8)) & 255u;
+      value *= 1099511628211ULL;
+    }
+  };
+  mix(static_cast<std::uint32_t>(returned));
+  mix(static_cast<std::uint32_t>(parameters.size() - (environment ? 1 : 0)));
+  for (std::size_t i = environment ? 1 : 0; i < parameters.size(); ++i)
+    mix(static_cast<std::uint32_t>(parameters[i]));
   return value;
 }
 
@@ -57,6 +70,13 @@ void validate(const argos::ir::Module &module, const argos::ir::Function &functi
     if (instruction.slot >= function.slot_count) throw std::runtime_error("IR: slot inválido");
   };
   switch (instruction.opcode) {
+  case Opcode::make_nil:
+  case Opcode::make_optional:
+  case Opcode::is_nil:
+  case Opcode::unwrap_check:
+  case Opcode::array_load:
+  case Opcode::array_store:
+  case Opcode::make_array:
   case Opcode::new_object:
   case Opcode::load_field:
   case Opcode::store_field:
@@ -139,9 +159,15 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
     for (const auto& block : function.blocks)
       for (const auto& instruction : block.instructions)
         if (instruction.opcode == argos::ir::Opcode::load_capture ||
+            instruction.opcode == argos::ir::Opcode::make_optional ||
+            instruction.opcode == argos::ir::Opcode::unwrap_check ||
+            instruction.opcode == argos::ir::Opcode::array_load ||
+            instruction.opcode == argos::ir::Opcode::array_store ||
+            instruction.opcode == argos::ir::Opcode::make_array ||
             instruction.opcode == argos::ir::Opcode::new_object ||
             instruction.opcode == argos::ir::Opcode::make_closure ||
-            instruction.opcode == argos::ir::Opcode::call_closure) uses_closures = true;
+            instruction.opcode == argos::ir::Opcode::call_closure)
+          uses_closures = true;
   for (const auto &function : m.functions)
     for (const auto &block : function.blocks)
       for (const auto &instruction : block.instructions)
@@ -208,6 +234,28 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
         << "  .string \"" << division_error_message.substr(0, division_error_message.size() - 1)
         << "\\n\"\n";
   }
+  o << ".section .rodata\n";
+  for (const auto &f : m.functions) {
+    unsigned site = 0;
+    for (const auto &b : f.blocks)
+      for (const auto &i : b.instructions) {
+        if (i.opcode != argos::ir::Opcode::unwrap_check &&
+            i.opcode != argos::ir::Opcode::array_load &&
+            i.opcode != argos::ir::Opcode::array_store)
+          continue;
+        const auto message = std::string("argosc: erro de execução: ") +
+                             (i.opcode == argos::ir::Opcode::unwrap_check
+                                  ? "tentativa de desembrulhar nil em "
+                                  : "índice fora dos limites em ") +
+                             f.name + ":" + std::to_string(i.source_line) +
+                             ":" + std::to_string(i.source_column) + "\n";
+        o << ".Largos_optional_message_" << f.id << "_" << site++
+          << ":\n  .byte ";
+        for (const char c : message)
+          o << static_cast<unsigned>(static_cast<unsigned char>(c)) << ", ";
+        o << "0\n";
+      }
+  }
   o << ".text\n";
   if (uses_closures) {
     o << ".bss\n.p2align 3\n.Largos_heap_head:\n  .quad 0\n.text\n"
@@ -224,6 +272,11 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
       << ".Largos_closure_error:\n  movl $70, %edi\n  call exit@PLT\n  ud2\n";
   }
 
+  o << ".Largos_optional_error:\n  pushq %rbp\n  movq %rsp, %rbp\n  subq $16, "
+       "%rsp\n"
+    << "  movq %rdi, -8(%rbp)\n  call strlen@PLT\n  movq %rax, %rdx\n"
+    << "  movq -8(%rbp), %rsi\n  movl $2, %edi\n  call write@PLT\n"
+    << "  movl $70, %edi\n  call exit@PLT\n  ud2\n";
   for (const auto &f : m.functions) {
     const auto name = symbol(f);
     const auto stack_bytes = static_cast<std::uint64_t>(f.slot_count + f.register_count) * 8;
@@ -254,6 +307,7 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
           << ", %rax\n  movq %rax, " << slot_address(index) << "\n";
       }
     }
+    unsigned optional_site = 0;
     std::size_t division_site = 0;
     std::size_t string_comparison_site = 0;
     for (const auto &b : f.blocks) {
@@ -262,6 +316,59 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
         validate(m, f, i);
         using argos::ir::Opcode;
         switch (i.opcode) {
+        case Opcode::make_array:
+          o << "  movq $" << (8 + i.arguments.size() * 8)
+            << ", %rdi\n  call .Largos_alloc\n"
+            << "  movq $" << i.arguments.size() << ", (%rax)\n";
+          for (std::size_t n = 0; n < i.arguments.size(); ++n)
+            o << "  movq " << register_address(f, i.arguments[n])
+              << ", %rcx\n  movq %rcx, " << 8 + n * 8 << "(%rax)\n";
+          o << "  movq %rax, " << register_address(f, i.dst) << "\n";
+          break;
+        case Opcode::make_nil:
+          o << "  movq $0, " << register_address(f, i.dst) << "\n";
+          break;
+        case Opcode::make_optional:
+          o << "  movq $8, %rdi\n  call .Largos_alloc\n"
+            << "  movq " << register_address(f, i.src1)
+            << ", %rcx\n  movq %rcx, (%rax)\n"
+            << "  movq %rax, " << register_address(f, i.dst) << "\n";
+          break;
+        case Opcode::is_nil:
+          o << "  cmpq $0, " << register_address(f, i.src1)
+            << "\n  sete %al\n  movzbl %al, %eax\n"
+            << "  movq %rax, " << register_address(f, i.dst) << "\n";
+          break;
+        case Opcode::unwrap_check:
+        case Opcode::array_store:
+        case Opcode::array_load: {
+          const auto site = optional_site++;
+          const auto error = ".Largos_optional_error_" + std::to_string(f.id) +
+                             "_" + std::to_string(site);
+          const auto done = error + "_done";
+          o << "  movq " << register_address(f, i.src1) << ", %rax\n";
+          if (i.opcode == Opcode::unwrap_check)
+            o << "  testq %rax, %rax\n  je " << error
+              << "\n  movq (%rax), %rax\n";
+          else
+            o << "  movq " << register_address(f, i.src2) << ", %rcx\n"
+              << "  testq %rcx, %rcx\n  js " << error
+              << "\n  cmpq (%rax), %rcx\n  jae " << error << "\n"
+              << (i.opcode == Opcode::array_load
+                      ? "  movq 8(%rax,%rcx,8), %rax\n"
+                      : "");
+          if (i.opcode == Opcode::array_store)
+            o << "  movq " << register_address(f, i.arguments[0])
+              << ", %rdx\n  movq %rdx, 8(%rax,%rcx,8)\n";
+          if (i.opcode != Opcode::array_store)
+            o << "  movq %rax, " << register_address(f, i.dst) << "\n";
+          o << "  jmp " << done << "\n"
+            << error << ":\n  leaq .Largos_optional_message_" << f.id << "_"
+            << site << "(%rip), %rdi\n"
+            << "  call .Largos_optional_error\n"
+            << done << ":\n";
+          break;
+        }
         case Opcode::new_object:
           o << "  movq $" << (8 + m.objects[i.constant].fields.size() * 8) << ", %rdi\n"
             << "  call .Largos_alloc\n  movq $" << i.constant << ", (%rax)\n"
@@ -376,13 +483,16 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
         case Opcode::cmp_le:
         case Opcode::cmp_gt:
         case Opcode::cmp_ge:
-          if (f.register_types[i.src1] == argos::ir::ValueType::object) {
+          if (f.register_types[i.src1] == argos::ir::ValueType::object ||
+              argos::ir::payload_type(f.register_types[i.src1]) ==
+                  argos::ir::ValueType::array) {
             o << "  movq " << register_address(f, i.src1) << ", %rax\n"
               << "  cmpq " << register_address(f, i.src2) << ", %rax\n"
               << (i.opcode == Opcode::cmp_eq ? "  sete %al\n" : "  setne %al\n")
               << "  movzbl %al, %eax\n  movq %rax, " << register_address(f, i.dst) << "\n";
           } else if (f.register_types[i.src1] == argos::ir::ValueType::string &&
-              (i.opcode == Opcode::cmp_eq || i.opcode == Opcode::cmp_ne)) {
+                     (i.opcode == Opcode::cmp_eq ||
+                      i.opcode == Opcode::cmp_ne)) {
             const auto unequal_label =
                 ".Largos_" + std::to_string(f.id) + "_string_unequal_" +
                 std::to_string(string_comparison_site);
@@ -402,8 +512,9 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
               << done_label << ":\n  movzbl %al, %eax\n  movq %rax, "
               << register_address(f, i.dst) << "\n";
           } else if (i.opcode == Opcode::div ||
-              f.register_types[i.src1] == argos::ir::ValueType::float64 ||
-              f.register_types[i.dst] == argos::ir::ValueType::float64) {
+                     f.register_types[i.src1] ==
+                         argos::ir::ValueType::float64 ||
+                     f.register_types[i.dst] == argos::ir::ValueType::float64) {
             const auto emit_double_operand = [&](argos::ir::Register reg,
                                                   const char *xmm) {
               if (f.register_types[reg] == argos::ir::ValueType::float64)

@@ -1,0 +1,51 @@
+class Cell {
+    public var number: int = 7
+    public function value(_ x: int) -> int { return this.number + x; }
+    public function log(_ x: int) { print(x); }
+}
+class Store {
+    public var mut items: [int?] = [nil, 1]
+}
+function fetch(_ store: Store) -> Store { print("receiver"); return store; }
+function offset() -> int { print("offset"); return 0; }
+function effect() -> int { print("effect"); return 2; }
+function identity(_ array: [int]?) -> [int]? { return array; }
+function empty() -> [int] { return ([]); }
+function main() -> int {
+    var absent: Cell? = nil
+    print(absent?.value(effect()) ?? 0)
+    absent?.log(effect())
+    var present: Cell? = new Cell()
+    print(present?.value(effect()) ?? 0)
+    present?.log(effect())
+    var a: [int]? = [3, 4]
+    print(identity(a)?[1]!!)
+    var zero: [int] = empty()
+    var b: [int]? = (nil)
+    print(b?[effect()] ?? 8)
+    var mut elements: [int?] = [nil, 1]
+    elements[0] ??= 5
+    elements[1] !!= identity(a)?[0]
+    elements[0] ?= b?[0]
+    print(elements[0]!!, elements[1]!!)
+    var objects: [Cell]? = [new Cell()]
+    print(objects?[0]?.number ?? 0)
+    var texts: [string]? = ["", "hello"]
+    print(texts?[0] ?== "", texts?[1] ?? "none")
+    var doubles: [double]? = [1, 2.5]
+    print(doubles?[0]!!)
+    var inner: int? = nil
+    var outer: int?? = inner
+    var mut nested: int?? = nil
+    nested ??= inner
+    print(outer ?== nested, (outer ?? inner) ?== nil)
+    var callable: (() -> int)? = nil
+    print(callable ?== nil, nil ?== callable, callable == nil)
+    var store = new Store()
+    fetch(store).items[offset()] ??= effect()
+    print(store.items[0]!!)
+    var mut writable: [int]? = [1, 2]
+    writable!![0] = 8
+    print(writable?[0]!!)
+    return 0
+}

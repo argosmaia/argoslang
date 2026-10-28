@@ -15,24 +15,16 @@ std::optional<std::string> validate_function(const Module &module,
       function.slot_types.size() != function.slot_count ||
       function.register_types.size() != function.register_count)
     return "metadados de tipos não correspondem aos tamanhos da função";
-  if (function.return_type != ValueType::int32 &&
-      function.return_type != ValueType::boolean &&
-      function.return_type != ValueType::float64 &&
-      function.return_type != ValueType::string &&
-      function.return_type != ValueType::closure &&
-      function.return_type != ValueType::object &&
-      function.return_type != ValueType::void_type)
+  if (!valid_type(function.return_type, true))
     return "tipo de retorno desconhecido";
   for (const auto type : function.slot_types)
-    if (type == ValueType::void_type)
-      return "slot não pode armazenar void";
+    if (!valid_type(type))
+      return "slot possui tipo inválido";
   for (const auto type : function.parameter_types)
-    if (type == ValueType::void_type)
-      return "parâmetro não pode ter tipo void";
+    if (!valid_type(type))
+      return "parâmetro possui tipo inválido";
   for (const auto type : function.register_types)
-    if (type != ValueType::int32 && type != ValueType::boolean &&
-        type != ValueType::float64 && type != ValueType::string && type != ValueType::closure && type != ValueType::object &&
-        type != ValueType::void_type)
+    if (!valid_type(type, true))
       return "registrador possui tipo desconhecido";
   for (std::size_t index = 0; index < function.parameter_types.size(); ++index) {
     if (function.parameter_types[index] != function.slot_types[index])
@@ -69,6 +61,61 @@ std::optional<std::string> validate_function(const Module &module,
   for (const auto &block : function.blocks) {
     for (const auto &instruction : block.instructions) {
       switch (instruction.opcode) {
+      case Opcode::make_nil:
+        if (!valid_register(instruction.dst) ||
+            !is_optional(register_type(instruction.dst)))
+          return "nil exige destino opcional";
+        break;
+      case Opcode::make_optional:
+        if (!valid_register(instruction.dst) ||
+            !valid_register(instruction.src1) ||
+            !is_optional(register_type(instruction.dst)) ||
+            unwrap_type(register_type(instruction.dst)) !=
+                register_type(instruction.src1))
+          return "presença exige destino com uma camada opcional a mais";
+        break;
+      case Opcode::is_nil:
+        if (!has_register_type(instruction.dst, ValueType::boolean) ||
+            !valid_register(instruction.src1) ||
+            !is_optional(register_type(instruction.src1)))
+          return "teste de ausência exige origem opcional e resultado bool";
+        break;
+      case Opcode::unwrap_check:
+        if (!valid_register(instruction.dst) ||
+            !valid_register(instruction.src1) ||
+            !is_optional(register_type(instruction.src1)) ||
+            unwrap_type(register_type(instruction.src1)) !=
+                register_type(instruction.dst))
+          return "unwrap exige origem opcional e destino desembrulhado";
+        break;
+      case Opcode::make_array:
+        if (!valid_register(instruction.dst) ||
+            is_optional(register_type(instruction.dst)) ||
+            payload_type(register_type(instruction.dst)) != ValueType::array)
+          return "array exige destino array";
+        for (const auto r : instruction.arguments)
+          if (!has_register_type(r,
+                                 array_element(register_type(instruction.dst))))
+            return "elemento de array incompatível";
+        break;
+      case Opcode::array_store:
+      case Opcode::array_load:
+        if (!valid_register(instruction.src1) ||
+            is_optional(register_type(instruction.src1)) ||
+            payload_type(register_type(instruction.src1)) != ValueType::array ||
+            !has_register_type(instruction.src2, ValueType::int32))
+          return "indexação exige array e índice int";
+        if (instruction.opcode == Opcode::array_store) {
+          if (instruction.arguments.size() != 1 ||
+              !has_register_type(
+                  instruction.arguments[0],
+                  array_element(register_type(instruction.src1))))
+            return "escrita de array incompatível";
+        } else if (!has_register_type(
+                       instruction.dst,
+                       array_element(register_type(instruction.src1))))
+          return "leitura de array incompatível";
+        break;
       case Opcode::nop:
       case Opcode::print_newline:
         break;
@@ -169,6 +216,10 @@ std::optional<std::string> validate_function(const Module &module,
         } else if (!same_register_type(instruction.src1, instruction.src2) ||
                    !has_register_type(instruction.dst, ValueType::boolean)) {
           return "comparação exige operandos compatíveis e resultado bool";
+        } else if (is_optional(register_type(instruction.src1)) ||
+                   register_type(instruction.src1) == ValueType::void_type ||
+                   register_type(instruction.src1) == ValueType::closure) {
+          return "igualdade exige payload desembrulhado comparável";
         } else if (instruction.opcode != Opcode::cmp_eq &&
                    instruction.opcode != Opcode::cmp_ne &&
                    register_type(instruction.src1) != ValueType::int32 &&
@@ -282,7 +333,6 @@ std::optional<std::string> validate_function(const Module &module,
           return "tipo do valor retornado não corresponde à função";
         }
         break;
-      case Opcode::unwrap_check:
       case Opcode::c_embed:
         return "opcode ainda não pertence ao subconjunto executável";
       }
@@ -297,10 +347,7 @@ std::optional<std::string> validate_module(const Module &module) {
   if (module.functions.empty())
     return "módulo sem funções";
 
-  const auto storage_type = [](ValueType type) {
-    return type == ValueType::int32 || type == ValueType::boolean || type == ValueType::float64 ||
-           type == ValueType::string || type == ValueType::closure || type == ValueType::object;
-  };
+  const auto storage_type = [](ValueType type) { return valid_type(type); };
   for (const auto& layout : module.objects)
     for (const auto type : layout.fields)
       if (!storage_type(type)) return "campo possui tipo de armazenamento inválido";

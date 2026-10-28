@@ -36,6 +36,7 @@ compile_commands.json
 /docs/*
 !/docs/architecture.md
 !/docs/grammar-spec.md
+!/docs/argoslang-v0.0.1.md
 !/docs/mvp.md
 !/docs/mvp-roadmap.md
 !/docs/testing-and-compiler-guide.md

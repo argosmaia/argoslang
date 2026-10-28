@@ -23,13 +23,22 @@ namespace {
 } // namespace
 
 std::int32_t VM::run() const {
+  arrays_.clear();
+  optionals_.clear();
   closures_.clear();
   objects_.clear();
   struct HeapReset {
+    decltype(arrays_) &arrays;
+    decltype(optionals_) &optionals;
     decltype(closures_)& closures;
     decltype(objects_)& objects;
-    ~HeapReset() { closures.clear(); objects.clear(); }
-  } reset{closures_, objects_};
+    ~HeapReset() {
+      arrays.clear();
+      optionals.clear();
+      closures.clear();
+      objects.clear();
+    }
+  } reset{arrays_, optionals_, closures_, objects_};
   if (module_ == nullptr)
     throw std::runtime_error("nenhum módulo foi carregado na VM");
   if (const auto error = argos::ir::validate_module(*module_))
@@ -108,6 +117,55 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
 
     using argos::ir::Opcode;
     switch (instruction.opcode) {
+    case Opcode::make_nil:
+      set_register(instruction.dst, 0);
+      break;
+    case Opcode::make_optional:
+      optionals_.push_back(register_value(instruction.src1));
+      set_register(instruction.dst, optionals_.size());
+      break;
+    case Opcode::is_nil:
+      set_register(instruction.dst, register_value(instruction.src1) == 0);
+      break;
+    case Opcode::unwrap_check: {
+      const auto id = register_value(instruction.src1);
+      if (!id)
+        throw std::runtime_error("tentativa de desembrulhar nil em " +
+                                 function.name + ":" +
+                                 std::to_string(instruction.source_line) + ":" +
+                                 std::to_string(instruction.source_column));
+      if (id > optionals_.size())
+        invalid("handle opcional inválido");
+      set_register(instruction.dst, optionals_[id - 1]);
+      break;
+    }
+    case Opcode::make_array: {
+      std::vector<std::uint64_t> values;
+      for (const auto r : instruction.arguments)
+        values.push_back(register_value(r));
+      arrays_.push_back(std::move(values));
+      set_register(instruction.dst, arrays_.size());
+      break;
+    }
+    case Opcode::array_store:
+    case Opcode::array_load: {
+      const auto id = register_value(instruction.src1);
+      if (!id || id > arrays_.size())
+        invalid("array inválido");
+      const auto index = integer_value(instruction.src2);
+      auto &values = arrays_[id - 1];
+      if (index < 0 || static_cast<std::size_t>(index) >= values.size())
+        throw std::runtime_error("índice fora dos limites em " + function.name +
+                                 ":" + std::to_string(instruction.source_line) +
+                                 ":" +
+                                 std::to_string(instruction.source_column));
+      if (instruction.opcode == Opcode::array_load)
+        set_register(instruction.dst, values[static_cast<std::size_t>(index)]);
+      else
+        values[static_cast<std::size_t>(index)] =
+            register_value(instruction.arguments[0]);
+      break;
+    }
     case Opcode::nop:
       break;
     case Opcode::new_object:

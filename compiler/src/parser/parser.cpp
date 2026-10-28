@@ -29,18 +29,21 @@ ast::TypeSyntaxPtr clone_type(const ast::TypeSyntax* type) {
     for (const auto& parameter : type->parameter_types)
         result->parameter_types.push_back(clone_type(parameter.get()));
     if (type->result_type) result->result_type = clone_type(type->result_type.get());
+    if (type->element_type)
+      result->element_type = clone_type(type->element_type.get());
     return result;
 }
 
 bool is_assignment_operator(lexer::TokenKind kind) noexcept {
-    return kind == lexer::TokenKind::Equal
-        || kind == lexer::TokenKind::PlusEqual
-        || kind == lexer::TokenKind::MinusEqual
-        || kind == lexer::TokenKind::StarEqual
-        || kind == lexer::TokenKind::SlashEqual
-        || kind == lexer::TokenKind::PercentEqual
-        || kind == lexer::TokenKind::SafeAssign
-        || kind == lexer::TokenKind::NullCoalescingAssign;
+  return kind == lexer::TokenKind::Equal ||
+         kind == lexer::TokenKind::PlusEqual ||
+         kind == lexer::TokenKind::MinusEqual ||
+         kind == lexer::TokenKind::StarEqual ||
+         kind == lexer::TokenKind::SlashEqual ||
+         kind == lexer::TokenKind::PercentEqual ||
+         kind == lexer::TokenKind::ForceUnwrapAssign ||
+         kind == lexer::TokenKind::SafeAssign ||
+         kind == lexer::TokenKind::NullCoalescingAssign;
 }
 
 bool is_postfix_operator(lexer::TokenKind kind) noexcept {
@@ -891,6 +894,19 @@ ast::StatementPtr Parser::parse_expression_statement() {
 }
 
 ast::TypeSyntaxPtr Parser::parse_type() {
+  if (match(lexer::TokenKind::LeftBracket)) {
+    const auto begin = previous().span.begin;
+    auto type = std::make_unique<ast::TypeSyntax>("array", 0, previous().span);
+    type->element_type = parse_type();
+    consume(lexer::TokenKind::RightBracket, "esperado ']' no tipo de array");
+    while (check(lexer::TokenKind::Question) ||
+           check(lexer::TokenKind::NullCoalescing)) {
+      type->nullable_depth +=
+          advance().kind == lexer::TokenKind::NullCoalescing ? 2 : 1;
+    }
+    type->span = span_from(begin, previous().span.end);
+    return type;
+  }
     if (match(lexer::TokenKind::LeftParen)) {
         const auto begin = previous().span.begin;
         auto type = std::make_unique<ast::TypeSyntax>("function", 0, previous().span);
@@ -900,6 +916,16 @@ ast::TypeSyntaxPtr Parser::parse_type() {
             if (index_ == before || !match(lexer::TokenKind::Comma)) break;
         }
         consume(lexer::TokenKind::RightParen, "esperado ')' no tipo de função");
+        if (!check(lexer::TokenKind::Arrow) &&
+            type->parameter_types.size() == 1) {
+          auto grouped = std::move(type->parameter_types.front());
+          while (check(lexer::TokenKind::Question) ||
+                 check(lexer::TokenKind::NullCoalescing))
+            grouped->nullable_depth +=
+                advance().kind == lexer::TokenKind::NullCoalescing ? 2 : 1;
+          grouped->span = span_from(begin, previous().span.end);
+          return grouped;
+        }
         consume(lexer::TokenKind::Arrow, "esperado '->' no tipo de função");
         type->result_type = parse_type();
         type->span = span_from(begin, type->result_type->span.end);
@@ -939,6 +965,19 @@ ast::ExpressionPtr Parser::parse_expression(
     auto left = parse_prefix_expression();
 
     while (!is_at_end()) {
+      if ((check(lexer::TokenKind::LeftBracket) ||
+           check(lexer::TokenKind::QuestionLeftBracket)) &&
+          postfix_precedence >= minimum_binding_power) {
+        const bool safe =
+            advance().kind == lexer::TokenKind::QuestionLeftBracket;
+        auto index = parse_expression();
+        const auto end =
+            consume(lexer::TokenKind::RightBracket, "esperado ']' após índice");
+        const auto span = span_from(left->span.begin, end.span.end);
+        left = std::make_unique<ast::IndexExpression>(
+            std::move(left), std::move(index), safe, span);
+        continue;
+      }
         if (
             check(lexer::TokenKind::LeftParen)
             && postfix_precedence >= minimum_binding_power
@@ -1033,6 +1072,19 @@ ast::ExpressionPtr Parser::parse_prefix_expression() {
 
 ast::ExpressionPtr Parser::parse_primary_expression() {
     if (starts_lambda()) return parse_lambda();
+    if (match(lexer::TokenKind::LeftBracket)) {
+      const auto begin = previous().span.begin;
+      std::vector<ast::ExpressionPtr> elements;
+      while (!check(lexer::TokenKind::RightBracket) && !is_at_end()) {
+        elements.push_back(parse_expression());
+        if (!match(lexer::TokenKind::Comma))
+          break;
+      }
+      const auto end =
+          consume(lexer::TokenKind::RightBracket, "esperado ']' após array");
+      return std::make_unique<ast::ArrayExpression>(
+          std::move(elements), span_from(begin, end.span.end));
+    }
     if (match(lexer::TokenKind::KwNew)) {
         auto node = std::make_unique<ast::NewExpression>(previous().span);
         node->type = parse_type();
@@ -1230,6 +1282,7 @@ std::optional<Parser::BindingPower> Parser::infix_binding_power(
         case lexer::TokenKind::StarEqual:
         case lexer::TokenKind::SlashEqual:
         case lexer::TokenKind::PercentEqual:
+        case lexer::TokenKind::ForceUnwrapAssign:
         case lexer::TokenKind::SafeAssign:
         case lexer::TokenKind::NullCoalescingAssign:
             return BindingPower{
@@ -1359,6 +1412,8 @@ ast::AssignmentOperator Parser::assignment_operator(
         case lexer::TokenKind::StarEqual: return ast::AssignmentOperator::multiply_assign;
         case lexer::TokenKind::SlashEqual: return ast::AssignmentOperator::divide_assign;
         case lexer::TokenKind::PercentEqual: return ast::AssignmentOperator::modulo_assign;
+        case lexer::TokenKind::ForceUnwrapAssign:
+          return ast::AssignmentOperator::force_unwrap_assign;
         case lexer::TokenKind::SafeAssign:
             return ast::AssignmentOperator::conditional_assign;
         case lexer::TokenKind::NullCoalescingAssign:

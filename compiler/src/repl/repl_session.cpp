@@ -51,25 +51,46 @@ std::string variable_source(const Variable &variable) {
 }
 
 std::optional<std::string> executable_type(const semantics::Type &type) {
-  if (type.nullable_depth != 0) return std::nullopt;
-  if (type.kind == semantics::TypeKind::int_type) return "int";
-  if (type.kind == semantics::TypeKind::bool_type) return "bool";
-  if (type.kind == semantics::TypeKind::float_type) return "float";
-  if (type.kind == semantics::TypeKind::double_type) return "double";
+  if (type.kind == semantics::TypeKind::int_type)
+    return "int" + std::string(type.nullable_depth, '?');
+  if (type.kind == semantics::TypeKind::bool_type)
+    return "bool" + std::string(type.nullable_depth, '?');
+  if (type.kind == semantics::TypeKind::float_type)
+    return "float" + std::string(type.nullable_depth, '?');
+  if (type.kind == semantics::TypeKind::double_type)
+    return "double" + std::string(type.nullable_depth, '?');
   return std::nullopt;
 }
 
 std::optional<std::string> executable_type(const ast::TypeSyntax &type) {
-  if (type.nullable_depth != 0) return std::nullopt;
-  if (type.name == "int") return "int";
-  if (type.name == "bool") return "bool";
-  if (type.name == "float") return "float";
-  if (type.name == "double") return "double";
+  if (!type.element_type && type.name == "int")
+    return "int" + std::string(type.nullable_depth, '?');
+  if (!type.element_type && type.name == "bool")
+    return "bool" + std::string(type.nullable_depth, '?');
+  if (!type.element_type && type.name == "float")
+    return "float" + std::string(type.nullable_depth, '?');
+  if (!type.element_type && type.name == "double")
+    return "double" + std::string(type.nullable_depth, '?');
   return std::nullopt;
 }
 
 bool is_string_type(const ast::TypeSyntax &type) {
-  return type.nullable_depth == 0 && type.name == "string";
+  return !type.element_type && type.name == "string";
+}
+
+// Snapshot source, not raw boxed handles: reconstruct every present optional
+// layer.
+std::string snapshot_source(std::string expression, std::string type,
+                            std::string prefix = {}, std::string suffix = {}) {
+  if (!type.empty() && type.back() == '?') {
+    type.pop_back();
+    return "if " + expression + " ?== nil { print(\"" + prefix + "nil" +
+           suffix + "\") } else { " +
+           snapshot_source("(" + expression + "!!)", type,
+                           prefix + "((v: " + type + ") => v)(", ")" + suffix) +
+           " }\n";
+  }
+  return "print(\"" + prefix + "\", " + expression + ", \"" + suffix + "\")\n";
 }
 
 std::string compose_source(const std::vector<std::string> &functions,
@@ -98,7 +119,7 @@ std::string compose_source(const std::vector<std::string> &functions,
     content += "print(\"" + std::string(state_marker) + "\")\n";
     for (const auto &variable : snapshot_variables)
       if (variable.initialized)
-        content += "print(`" + variable.name + "`)\n";
+        content += snapshot_source("`" + variable.name + "`", variable.type);
   }
   content += "return 0\n}\n";
   return content;
@@ -175,8 +196,11 @@ public:
             type = executable_type(
                 probe_analyzer.type_of(*declaration->initializer));
           if (!type) {
-            diagnostics.emit(diagnostics::catalog::compiler::unsupported_lowering, declaration->span,
-                             "o REPL ainda não consegue preservar closures ou objetos entre entradas");
+            diagnostics.emit(
+                diagnostics::catalog::compiler::unsupported_lowering,
+                declaration->span,
+                "o REPL ainda não consegue preservar closures, objetos ou "
+                "arrays entre entradas");
             return false;
           }
           if (type) {

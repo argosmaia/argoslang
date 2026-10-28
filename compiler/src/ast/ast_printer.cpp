@@ -60,6 +60,8 @@ std::string_view binary_operator_name(BinaryOperator op) noexcept {
 
 std::string_view assignment_operator_name(AssignmentOperator op) noexcept {
     switch (op) {
+        case AssignmentOperator::force_unwrap_assign:
+            return "!!=";
         case AssignmentOperator::assign:
             return "=";
         case AssignmentOperator::add_assign:
@@ -438,6 +440,15 @@ void AstPrinter::write_node(const Node &node) {
             return;
         }
 
+        case NodeKind::index_expression: {
+            const auto &value = static_cast<const IndexExpression &>(node);
+            write_line(value.safe ? "SafeIndexExpression" : "IndexExpression");
+            IndentGuard indent{*this};
+            write_node(*value.base);
+            write_node(*value.index);
+            return;
+        }
+
         case NodeKind::member_access_expression: {
             const auto &value = static_cast<const MemberAccessExpression &>(node);
             write_line(std::string{value.safe ? "SafeMemberAccessExpression "
@@ -460,8 +471,14 @@ void AstPrinter::write_node(const Node &node) {
 }
 
 void AstPrinter::write_type(const TypeSyntax &type) {
+    if (type.element_type) {
+        write_line("ArrayType" + std::string(type.nullable_depth, '?'));
+        IndentGuard indent{*this};
+        write_type(*type.element_type);
+        return;
+    }
     if (type.result_type) {
-        write_line("Type function");
+        write_line("Type function" + std::string(type.nullable_depth, '?'));
         IndentGuard indent{*this};
         for (const auto& parameter : type.parameter_types) write_type(*parameter);
         write_label("result");

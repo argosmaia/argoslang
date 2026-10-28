@@ -27,6 +27,8 @@ private:
     std::vector<std::uint64_t> captures;
   };
   mutable std::vector<Closure> closures_;
+  mutable std::vector<std::uint64_t> optionals_;
+  mutable std::vector<std::vector<std::uint64_t>> arrays_;
   struct Object {
     std::uint32_t layout;
     std::vector<std::uint64_t> fields;

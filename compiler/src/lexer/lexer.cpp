@@ -113,6 +113,8 @@ bool can_end_statement(TokenKind kind) noexcept {
 
 bool begins_continuation(char current, char next) noexcept {
   if (current == '-' && next == '>') return true;
+  if (current == '!' && next == '!')
+    return true;
   switch (current) {
   case '.': case '?': case '+': case '-': case '*': case '/': case '%':
   case '=': case '<': case '>': case '&': case '|': case '^': case ':':
@@ -160,6 +162,7 @@ std::vector<Token> Lexer::tokenize() {
     const auto is_eof = token.kind == TokenKind::EndOfFile;
     switch (token.kind) {
     case TokenKind::LeftParen:
+    case TokenKind::QuestionLeftBracket:
     case TokenKind::LeftBracket: ++delimiter_depth_; break;
     case TokenKind::RightParen:
     case TokenKind::RightBracket: if (delimiter_depth_ > 0) --delimiter_depth_; break;
@@ -414,6 +417,8 @@ Token Lexer::scan_token() {
 
   case '!':
     if (match('!')) {
+      if (match('='))
+        return make_token(TokenKind::ForceUnwrapAssign, begin);
       return make_token(TokenKind::ForceUnwrap, begin);
     }
     if (match('=')) {

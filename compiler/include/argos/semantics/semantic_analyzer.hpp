@@ -31,6 +31,7 @@ enum class TypeKind : std::uint8_t {
   string_type,
   nominal_type,
   function_type,
+  array_type,
   never_type,
   null_type,
   unknown,
@@ -116,6 +117,7 @@ private:
 
   void enter_scope();
   void leave_scope();
+  void restore_initialization(const std::vector<Scope> &before);
 
   [[nodiscard]] Symbol *lookup(std::string_view name);
   [[nodiscard]] const Symbol *lookup(std::string_view name) const;
@@ -165,7 +167,8 @@ private:
   void analyze_if(const ast::IfStatement &statement);
   void analyze_expression_statement(const ast::ExpressionStatement &statement);
 
-  Type analyze_expression(const ast::Expression &expression);
+  Type analyze_expression(const ast::Expression &expression,
+                          std::optional<Type> expected = std::nullopt);
   Type analyze_identifier(const ast::IdentifierExpression &expression);
   Type analyze_unary(const ast::UnaryExpression &expression);
   Type analyze_binary(const ast::BinaryExpression &expression);

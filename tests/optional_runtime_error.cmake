@@ -1,0 +1,16 @@
+execute_process(COMMAND "${ARGOSC}" run "${SOURCE}"
+    RESULT_VARIABLE status ERROR_VARIABLE error TIMEOUT 5)
+if(NOT status EQUAL 70 OR NOT error MATCHES "${EXPECTED_ERROR}.*:3:12")
+    message(FATAL_ERROR "Erro VM inesperado: ${status}: ${error}")
+endif()
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+    execute_process(COMMAND "${ARGOSC}" compile "${SOURCE}" -o "${BINARY}"
+        RESULT_VARIABLE status ERROR_VARIABLE error)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "Compilação falhou: ${error}")
+    endif()
+    execute_process(COMMAND "${BINARY}" RESULT_VARIABLE status ERROR_VARIABLE error TIMEOUT 5)
+    if(NOT status EQUAL 70 OR NOT error MATCHES "${EXPECTED_ERROR}.*:3:12")
+        message(FATAL_ERROR "Erro nativo inesperado: ${status}: ${error}")
+    endif()
+endif()

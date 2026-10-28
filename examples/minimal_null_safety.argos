@@ -1,0 +1,66 @@
+class Box {
+    public var mut value: int? = nil
+    public var mut reads: int = 0
+    public var mut writes: int = 0
+    public var mut item: int? {
+        getter() { this.reads += 1; return this.value; }
+        setter() { this.writes += 1; this.value = value; }
+    }
+}
+function fallback() -> int { print("fallback"); return 9; }
+function index() -> int { print("index"); return 1; }
+function identity(_ x: int?) -> int? { return x; }
+function captured(_ x: int?) -> () -> int? { return () => x; }
+function main() -> int {
+    var mut number: int? = nil
+    print(number ?? fallback())
+    number ??= 0
+    number ??= fallback()
+    print(number!!, number ?== 0, number ?== nil)
+    var mut target: int = 3
+    target ?= identity(nil)
+    print(target)
+    target ?= identity(7)
+    print(target)
+    target !!= number
+    print(target)
+    var empty: int? = nil
+    var nested: int?? = empty
+    print(nested ?== nil, nested!! ?== nil)
+    var nestedEmpty: int?? = nil
+    print(nestedEmpty ?== nested)
+    print(captured(4)()!!)
+    var absentText: string? = (nil)
+    print(absentText ?? "empty")
+    var text: string? = ""
+    print(text ?== "", text ?? "fallback")
+    var flag: bool? = false
+    print(flag!!)
+    var real: double? = 1.5
+    print(real!!)
+    var mut box = new Box()
+    box.item ??= 5
+    box.item ??= fallback()
+    box.item ?= identity(nil)
+    box.item !!= identity(8)
+    print(box.value!!, box.reads, box.writes)
+    var missing: Box? = nil
+    print(missing?.item ?? 10)
+    var present: Box? = box
+    print(present?.item ?? 0)
+    var mut values: [int] = [10, 20, 30]
+    values[1] = 21
+    values[1] += 1
+    print(values[1])
+    var absent: [int]? = nil
+    print(absent?[index()] ?? 99)
+    var available: [int]? = values
+    print(available?[index()] ?? 99)
+    var optionalValues: [int?] = [nil, 4]
+    var nullableValues: [int?]? = optionalValues
+    print(nullableValues?[0] ?? 33)
+    print(nullableValues?[1]!!)
+    var optionalFunction: (() -> int?)? = captured(6)
+    print(optionalFunction!!()!!)
+    return 0
+}

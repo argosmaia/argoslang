@@ -215,3 +215,10 @@ TEST_CASE("lexes construct and accessors without legacy constructor keyword") {
     REQUIRE(kinds == std::vector<K>{K::KwConstruct, K::KwGetter, K::KwSetter,
                                    K::Identifier, K::Identifier, K::Identifier, K::EndOfFile});
 }
+
+TEST_CASE("force unwrap assignment is one token", "[optional]") {
+  argos::diagnostics::DiagnosticEngine diagnostics;
+  const auto kinds = kinds_of("x !!= value;", diagnostics);
+  REQUIRE_FALSE(diagnostics.has_errors());
+  REQUIRE(kinds[1] == argos::lexer::TokenKind::ForceUnwrapAssign);
+}

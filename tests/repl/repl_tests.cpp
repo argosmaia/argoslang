@@ -166,3 +166,45 @@ TEST_CASE("REPL rejects persistent closures without losing numeric state") {
   REQUIRE(output.str() == "3\n");
   session.reset();
 }
+
+TEST_CASE("REPL persists optional layers and rolls back failed unwrap",
+          "[optional]") {
+  argos::repl::ReplSession session;
+  session.reset();
+  std::ostringstream output;
+  argos::diagnostics::DiagnosticEngine diagnostics;
+  REQUIRE(execute(session, "var mut x: int? = nil", output, diagnostics));
+  REQUIRE(execute(session,
+                  "x ?"
+                  "?= 0",
+                  output, diagnostics));
+  REQUIRE(execute(session, "x!!", output, diagnostics));
+  REQUIRE(output.str() == "0\n0\n");
+  REQUIRE(execute(session, "var inner: int? = nil", output, diagnostics));
+  REQUIRE(execute(session, "var outer: int?? = inner", output, diagnostics));
+  REQUIRE(execute(session, "outer ?== nil", output, diagnostics));
+  REQUIRE(execute(session, "outer!! ?== nil", output, diagnostics));
+  REQUIRE(output.str() == "0\n0\nfalse\ntrue\n");
+  argos::diagnostics::DiagnosticEngine failed;
+  REQUIRE_FALSE(execute(session, "x = nil; x!!", output, failed));
+  argos::diagnostics::DiagnosticEngine next;
+  output.str({});
+  REQUIRE(execute(session, "x!!", output, next));
+  REQUIRE(output.str() == "0\n");
+  session.reset();
+}
+
+TEST_CASE("REPL executes optional arrays and preserves optional scalar payloads", "[optional]") {
+  argos::repl::ReplSession session;
+  session.reset();
+  std::ostringstream output;
+  argos::diagnostics::DiagnosticEngine diagnostics;
+  REQUIRE(execute(session, "function items() -> [int]? { return [3, 4]; }", output, diagnostics));
+  REQUIRE(execute(session, "items()?[1]", output, diagnostics));
+  REQUIRE(execute(session, "var flag: bool? = false", output, diagnostics));
+  REQUIRE(execute(session, "var real: double? = 1.5", output, diagnostics));
+  REQUIRE(execute(session, "flag!!", output, diagnostics));
+  REQUIRE(execute(session, "real!!", output, diagnostics));
+  REQUIRE(output.str() == "4\nfalse\n1.5\n");
+  session.reset();
+}

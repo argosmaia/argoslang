@@ -40,6 +40,12 @@ enum class Opcode {
   print_string_value,
   print_newline,
   ret,
+  make_nil,
+  make_optional,
+  is_nil,
+  array_load,
+  array_store,
+  make_array,
   unwrap_check,
   c_embed
 };
@@ -55,6 +61,7 @@ struct Instruction {
   std::vector<ValueType> parameter_types;
   ValueType return_type{ValueType::void_type};
   std::string embedded_code;
+  std::uint32_t source_line{}, source_column{};
 };
 const char *opcode_name(Opcode) noexcept;
 } // namespace argos::ir

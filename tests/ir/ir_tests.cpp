@@ -20,6 +20,8 @@ argos::ir::Module valid_module() {
                      .parameter_count = 0,
                      .slot_count = 0,
                      .register_count = 1,
+                     .parameter_types = {},
+                     .slot_types = {},
                      .register_types = {ValueType::int32},
                      .blocks = {{.label = 0, .instructions = {load, ret}}}}}};
 }
@@ -102,4 +104,60 @@ TEST_CASE("rejects malformed closure and object IR", "[ir][oop][functional]") {
   REQUIRE_FALSE(validate_module(module).has_value());
   function.register_types[0] = ValueType::string;
   REQUIRE(validate_module(module).has_value());
+}
+
+TEST_CASE("optional IR rejects forged wrapping and unwrapping",
+          "[optional][ir]") {
+  using namespace argos::ir;
+  auto module = valid_module();
+  auto &f = module.functions[0];
+  f.register_count = 2;
+  f.register_types = {ValueType::int32, optional_type(ValueType::int32)};
+  Instruction wrap;
+  wrap.opcode = Opcode::make_optional;
+  wrap.src1 = 0;
+  wrap.dst = 1;
+  f.blocks[0].instructions.insert(f.blocks[0].instructions.begin() + 1, wrap);
+  REQUIRE_FALSE(validate_module(module));
+  f.register_types[1] = optional_type(ValueType::boolean);
+  REQUIRE(validate_module(module));
+  f.register_types[1] = optional_type(ValueType::int32);
+  f.blocks[0].instructions[1].opcode = Opcode::unwrap_check;
+  REQUIRE(validate_module(module));
+  f.blocks[0].instructions[1].src1 = 1;
+  f.blocks[0].instructions[1].dst = 0;
+  REQUIRE_FALSE(validate_module(module));
+  f.register_types[1] = with_depth(ValueType::void_type, 1);
+  REQUIRE(validate_module(module));
+}
+
+TEST_CASE("array IR verifies element and index types",
+          "[optional][ir][array]") {
+  using namespace argos::ir;
+  auto module = valid_module();
+  auto &f = module.functions[0];
+  f.register_count = 3;
+  f.register_types = {ValueType::int32,
+                      array_type(optional_type(ValueType::int32)),
+                      optional_type(ValueType::int32)};
+  Instruction array;
+  array.opcode = Opcode::make_array;
+  array.dst = 1;
+  array.arguments = {0};
+  f.blocks[0].instructions.insert(f.blocks[0].instructions.begin() + 1, array);
+  REQUIRE(validate_module(module));
+  f.blocks[0].instructions[1].arguments = {2};
+  REQUIRE_FALSE(validate_module(module));
+  Instruction index;
+  index.opcode = Opcode::array_load;
+  index.dst = 2;
+  index.src1 = 1;
+  index.src2 = 0;
+  f.blocks[0].instructions.insert(f.blocks[0].instructions.begin() + 2, index);
+  REQUIRE_FALSE(validate_module(module));
+  f.blocks[0].instructions[2].dst = 0;
+  REQUIRE(validate_module(module));
+  f.blocks[0].instructions[2].dst = 2;
+  f.blocks[0].instructions[2].src2 = 2;
+  REQUIRE(validate_module(module));
 }

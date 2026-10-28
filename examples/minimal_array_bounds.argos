@@ -1,0 +1,4 @@
+function main() -> int {
+    var array: [int]? = [1, 2]
+    return array?[2] ?? 0
+}

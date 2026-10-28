@@ -36,6 +36,8 @@ foreach(example IN ITEMS
     minimal_branch
     minimal_loop
     minimal_optional
+    minimal_null_safety
+    minimal_optional_arrays
     minimal_call
     minimal_nested
     minimal_signed
@@ -78,6 +80,9 @@ add_test(
 
 foreach(example_expected IN ITEMS
     "minimal_literal:42"
+    "minimal_optional:9"
+    "minimal_null_safety:0"
+    "minimal_optional_arrays:0"
     "minimal_arithmetic:14"
     "minimal_branch:7"
     "minimal_loop:6"
@@ -103,7 +108,11 @@ foreach(example_expected IN ITEMS
     list(GET example_parts 0 example)
     list(GET example_parts 1 expected)
     set(expected_stdout "")
-    if(example STREQUAL "minimal_closures")
+    if(example STREQUAL "minimal_optional_arrays")
+        set(expected_stdout "0\neffect\n9\neffect\n2\n4\n8\n53\n7\ntruehello\n1\ntruetrue\ntruetruetrue\nreceiver\noffset\neffect\n2\n8")
+    elseif(example STREQUAL "minimal_null_safety")
+        set(expected_stdout "fallback\n9\n0truefalse\n3\n7\n0\nfalsetrue\nfalse\n4\nempty\ntrue\nfalse\n1.5\n832\n10\n8\n22\n99\nindex\n22\n33\n4\n6")
+    elseif(example STREQUAL "minimal_closures")
         set(expected_stdout "13\n7")
     elseif(example STREQUAL "minimal_object_closure")
         set(expected_stdout "2\n5\ncaptured\n12\n8\n10\n1\n2.5\nretained\ndone")
@@ -142,6 +151,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
     find_program(ARGOS_ASSEMBLY_CC cc REQUIRED)
     foreach(example_expected IN ITEMS
         "minimal_literal:42"
+        "minimal_optional:9"
+        "minimal_null_safety:0"
+        "minimal_optional_arrays:0"
         "minimal_arithmetic:14"
         "minimal_branch:7"
         "minimal_loop:6"
@@ -167,7 +179,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
         list(GET example_parts 0 example)
         list(GET example_parts 1 expected)
         set(expected_stdout "")
-        if(example STREQUAL "minimal_closures")
+        if(example STREQUAL "minimal_optional_arrays")
+            set(expected_stdout "0\neffect\n9\neffect\n2\n4\n8\n53\n7\ntruehello\n1\ntruetrue\ntruetruetrue\nreceiver\noffset\neffect\n2\n8")
+        elseif(example STREQUAL "minimal_null_safety")
+            set(expected_stdout "fallback\n9\n0truefalse\n3\n7\n0\nfalsetrue\nfalse\n4\nempty\ntrue\nfalse\n1.5\n832\n10\n8\n22\n99\nindex\n22\n33\n4\n6")
+        elseif(example STREQUAL "minimal_closures")
             set(expected_stdout "13\n7")
         elseif(example STREQUAL "minimal_properties")
             set(expected_stdout "target\nget\nrhs\nset\nget\n5\nget\nset\nget\n2.5\nupdated\ntrue\n5\n6\n4")
@@ -223,7 +239,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
             "-DSHORT_FORM=ON"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/compile_example.cmake"
     )
-    foreach(example IN ITEMS minimal_optional null_safety minimal_frontend_inheritance minimal_frontend_bound_method)
+    foreach(example IN ITEMS null_safety minimal_frontend_inheritance minimal_frontend_bound_method)
         add_test(
             NAME "example_${example}_native_rejected"
             COMMAND "${CMAKE_COMMAND}"
@@ -257,3 +273,16 @@ add_test(
         "-DARGOSC=$<TARGET_FILE:argosc>"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/legacy_constructor_rejection.cmake"
 )
+
+foreach(example_error IN ITEMS "minimal_nil_unwrap:tentativa de desembrulhar nil" "minimal_array_bounds:índice fora dos limites")
+    string(REPLACE ":" ";" parts "${example_error}")
+    list(GET parts 0 example)
+    list(GET parts 1 error)
+    add_test(NAME "${example}_runtime_safety"
+        COMMAND "${CMAKE_COMMAND}"
+            "-DARGOSC=$<TARGET_FILE:argosc>"
+            "-DSOURCE=${PROJECT_SOURCE_DIR}/examples/${example}.argos"
+            "-DBINARY=${CMAKE_BINARY_DIR}/bin/${example}-safety"
+            "-DEXPECTED_ERROR=${error}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/optional_runtime_error.cmake")
+endforeach()

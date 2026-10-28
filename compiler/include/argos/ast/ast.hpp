@@ -42,6 +42,7 @@ namespace argos::ast {
         identifier_expression,
         call_expression,
         member_access_expression,
+        index_expression,
         array_expression,
         assignment_expression,
         conditional_expression,
@@ -86,6 +87,7 @@ namespace argos::ast {
         multiply_assign,
         divide_assign,
         modulo_assign,
+        force_unwrap_assign,
         conditional_assign,
         null_coalescing_assign,
     };
@@ -169,6 +171,7 @@ namespace argos::ast {
         std::size_t nullable_depth{0};
         std::vector<std::unique_ptr<TypeSyntax>> parameter_types;
         std::unique_ptr<TypeSyntax> result_type;
+        std::unique_ptr<TypeSyntax> element_type;
 
         TypeSyntax(
             std::string name_value,
@@ -586,6 +589,24 @@ namespace argos::ast {
             callee(std::move(callee_value)),
             arguments(std::move(arguments_value)) {
             argument_labels.resize(arguments.size());
+        }
+    };
+
+    struct IndexExpression final : Expression {
+        ExpressionPtr base;
+        ExpressionPtr index;
+        bool safe;
+
+        IndexExpression(
+            ExpressionPtr base_value,
+            ExpressionPtr index_value,
+            bool safe_value,
+            source::SourceSpan span_value
+        )
+            : Expression(NodeKind::index_expression, std::move(span_value)),
+              base(std::move(base_value)),
+              index(std::move(index_value)),
+              safe(safe_value) {
         }
     };
 

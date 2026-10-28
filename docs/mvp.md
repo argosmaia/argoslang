@@ -41,11 +41,20 @@ escreve os bytes sem adicionar separadores entre argumentos e termina com uma
 quebra de linha. Ainda não há concatenação de strings nem suporte a `char`
 executável.
 
-`nil` representa a ausência de um valor opcional. O frontend reconhece
-opcionais e protocolos, mas esses recursos não fazem parte
-da rota executável do MVP. Tipos como `byte`, `char` e os demais inteiros
-estreitos ou sem sinal também ainda não são executáveis. `float` e `double`
-usam atualmente representação IEEE-754 binary64.
+`nil` representa ausência em `T?`. Opcionais, inclusive camadas aninhadas,
+executam em arquivos na VM e no nativo: `??`, `?==`, `?=`, `??=`, `!!`, `!!=` e
+`?.` de classes concretas. Arrays homogêneos `[T]` têm literais, leitura/escrita
+`[]` e indexação `?[` de arrays opcionais, inspirada no Dart: ausência omite a
+avaliação do índice; índice inválido em array presente é erro. Arrays têm
+tamanho fixado na criação, identidade por referência e escrita por base mutável.
+
+`!!`/`!!=` sobre ausência e índices fora dos limites encerram com status 70,
+função, linha e coluna. A análise rejeita unwrap implícito, `void?`, alvos
+imutáveis, leituras antes da inicialização e inicialização somente em ramos
+que podem ser pulados. Consulte o [contrato de null-safety](guide/11-null-safety-e-opcionais.md).
+
+Tipos como `byte`, `char` e os demais inteiros estreitos ou sem sinal ainda não
+são executáveis. `float` e `double` usam IEEE-754 binary64.
 
 ## Estado atual do pipeline
 
@@ -57,7 +66,7 @@ usam atualmente representação IEEE-754 binary64.
   textual de inspeção, não um formato de bytecode carregável.
 - O backend nativo gera assembly x86-64 e usa `cc` para montar e ligar.
 - O REPL compila cada entrada pela mesma semântica, IR e VM, mantendo valores
-  locais `int`/`bool`/`float`/`double` entre entradas. Literais string podem ser
+  locais `int`/`bool`/`float`/`double` e seus opcionais, inclusive aninhados, entre entradas. Literais string podem ser
   impressos, mas variáveis string ainda não são preservadas entre entradas.
   Não é um interpretador AST paralelo.
 - `/` é divisão real, inclusive com operandos `int`; `%` continua inteiro e
@@ -139,3 +148,23 @@ um getter com corpo; setters exigem `var mut` e usam o parâmetro implícito
 `value` ou o nome escrito em `setter(nome)`. Não há acessores automáticos nem
 visibilidade independente por acessor. Propriedades sem setter são somente
 leitura. Elas não exigem inicialização em `construct`, pois não armazenam estado.
+
+
+## Null-safety e arrays opcionais (28 de outubro de 2026)
+
+A implementação cobre presença/ausência na IR, VM e x86-64, valores em
+parâmetros/retornos/campos/capturas, curto-circuito e igualdade de camadas.
+`?.` e `?[` tornam o resultado opcional conservando membros/elementos já
+opcionais. `T??` declarado explicitamente mantém estados distintos de ausência
+externa e presença com ausência interna. Funções opcionais precisam de unwrap
+antes da chamada; métodos podem ser chamados por `obj?.metodo(...)`.
+
+O REPL preserva opcionais numéricos/bool e o estado anterior após entradas
+com erro. Continua rejeitando persistência de strings, objetos, arrays e
+closures. Arrays multidimensionais, redimensionamento, slices/views, `[T; N]`
+e `for` permanecem pendentes. Herança e protocolos continuam fora do lowering.
+
+Exemplos de conformidade: `minimal_null_safety.argos`,
+`minimal_optional_arrays.argos`, `minimal_nil_unwrap.argos` e
+`minimal_array_bounds.argos`. Consulte o [roadmap](mvp-roadmap.md) para o restante
+do MVP e o [capítulo 11](guide/11-null-safety-e-opcionais.md) para as regras.

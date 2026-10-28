@@ -16,6 +16,8 @@ referência é da versão `0.0.1`.
 7. [Strings e caracteres](09-strings-e-caracteres.md)
 8. [REPL](07-repl.md)
 9. [Compilar, executar e diagnosticar](08-ferramentas-e-diagnosticos.md)
+10. [Classes e interfaces](10-classes-e-interfaces.md)
+11. [Null-safety e tipos opcionais](11-null-safety-e-opcionais.md)
 
 ## O que existe hoje
 
@@ -24,8 +26,8 @@ escrever texto com `print`, tomar decisões com `if` e repetir tarefas com
 `while`. O guia marca os recursos que ainda não funcionam, para você não perder
 tempo tentando usar uma parte que ainda está no desenho.
 
-Coleções como listas e mapas, laços `for` e expressões `when`
-ainda não estão disponíveis. Veja os detalhes em [variáveis e tipos](03-variaveis-e-tipos.md),
+Arrays homogêneos `[T]` e arrays opcionais já executam. Mapas, conjuntos,
+laços `for` e expressões `when` ainda não estão disponíveis. Veja os detalhes em [variáveis e tipos](03-variaveis-e-tipos.md),
 [funções](05-funcoes.md) e [fluxo de controle](06-fluxo-de-controle.md).
 
 ## Objetos e funções como valores
@@ -50,3 +52,11 @@ métodos de classes concretas. Consulte os exemplos e os limites de execução e
 
 - [Classes, interfaces e closures](10-classes-e-interfaces.md): subconjunto
   executável de POO e limites atuais de herança.
+
+
+## Opcionais e arrays — 28/10/2026
+
+O [capítulo 11](11-null-safety-e-opcionais.md) documenta a implementação
+executável: `T?`, `nil`, `??`, `?.`, `?[`, `?=`, `?==`, `??=`, `!!` e `!!=`,
+com tipos rigorosos, curto-circuito, arrays opcionais no estilo Dart,
+falhas localizadas e persistência de opcionais numéricos no REPL.
