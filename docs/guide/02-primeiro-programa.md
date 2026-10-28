@@ -58,4 +58,4 @@ function sum(_ left: int, _ right: int) -> int {
 }
 ```
 
-Os recursos que o compilador executa hoje estão listados em [MVP](../mvp.md).
+Os recursos que o compilador executa hoje estão listados em [MVP](../geral.md#mvp).

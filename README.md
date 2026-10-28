@@ -14,7 +14,7 @@ The current frontend supports variables, functions, non-generic data protocols,
 basic control flow, primitive and intrinsic `String` types, optionals, named
 arguments, Unicode identifiers and source-backed diagnostics. The parser is
 still handwritten; the canonical LR(1) generator and the broader grammar in
-`docs/grammar-spec.md` remain future work. Classes, interfaces, generics,
+[referência geral](docs/geral.md#gramatica) remain future work. Classes, interfaces, generics,
 modules, lambdas, ownership and foreign executors are not available yet.
 `examples/null_safety.argos` declares its nominal types and passes `check`.
 
@@ -89,16 +89,10 @@ echo $?  # 42
 
 ## Documentation & Guides
 
-- [docs/guide/README.md](docs/guide/README.md): Guia principal por capítulos: instalação, sintaxe, tipos, funções, fluxo, REPL e diagnósticos.
-- [docs/architecture.md](docs/architecture.md): Direção arquitetural e limites das fases.
-- [docs/grammar-spec.md](docs/grammar-spec.md): Gramática e semântica planejadas.
-- [docs/testing-and-compiler-guide.md](docs/testing-and-compiler-guide.md): Guia de testes do compilador.
-- [docs/teachings/compilar.md](docs/teachings/compilar.md): Compilação de `.argos` e execução nativa do subconjunto disponível.
-- [docs/teachings/interpretar.md](docs/teachings/interpretar.md): Estado e fluxo planejado da VM.
-- [docs/teachings/executar-em-maquinas.md](docs/teachings/executar-em-maquinas.md): Hosts, alvos e portabilidade.
-- [docs/mvp.md](docs/mvp.md): Contrato do subconjunto executável, VM, nativo e REPL.
-- [docs/language-evolution.md](docs/language-evolution.md): Decisões e ordem de evolução após o MVP.
-- [docs/argoslang-v0.0.1.md](docs/argoslang-v0.0.1.md): Referência de instalação e uso da versão v0.0.1.
+- [Guia da linguagem](docs/guide/README.md): capítulos de uso e catálogo de diagnósticos.
+- [Compilar, interpretar e executar](docs/teaching.md): construção, VM, execução nativa e plataformas.
+- [Arquitetura](docs/architecture.md): organização do compilador e limites das fases.
+- [Referência geral](docs/geral.md): MVP, roadmap, gramática, versão, testes e decisões históricas.
 
 ### Gerar assembly
 

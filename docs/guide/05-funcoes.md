@@ -26,7 +26,7 @@ Parâmetros e retornos podem usar `int`, `bool`, `float`, `double`, `string`,
 tipos de função e classes concretas sem bases. Funções comuns aceitam até seis
 parâmetros; métodos, construtores e chamadas indiretas reservam uma posição
 interna e aceitam até cinco parâmetros explícitos. Consulte os limites em
-[MVP](../mvp.md).
+[MVP](../geral.md#mvp).
 
 No REPL, uma declaração de função permanece disponível até `:reset`:
 

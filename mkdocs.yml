@@ -11,14 +11,13 @@ nav:
       - Variáveis e tipos: guide/03-variaveis-e-tipos.md
       - Expressões e operadores: guide/04-expressoes-e-operadores.md
       - Funções: guide/05-funcoes.md
-      - Classes e interfaces: guide/10-classes-e-interfaces.md
       - Fluxo de controle: guide/06-fluxo-de-controle.md
+      - Strings e caracteres: guide/09-strings-e-caracteres.md
+      - Classes e interfaces: guide/10-classes-e-interfaces.md
+      - Null-safety e opcionais: guide/11-null-safety-e-opcionais.md
       - REPL: guide/07-repl.md
-      - Ferramentas e diagnósticos: guide/08-ferramentas-e-diagnosticos.md
-  - Referência v0.0.1: argoslang-v0.0.1.md
+      - Ferramentas: guide/08-ferramentas-e-diagnosticos.md
+      - Catálogo de diagnósticos: guide/12-diagnosticos.md
+  - Compilar, interpretar e executar: teaching.md
   - Arquitetura: architecture.md
-  - Gramática: grammar-spec.md
-  - Diagnósticos:
-      - Visão geral: diagnostics/README.md
-      - Chamadas de função: diagnostics/semantic-calls.md
-  - MVP: mvp.md
+  - Referência geral: geral.md

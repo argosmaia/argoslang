@@ -74,4 +74,4 @@ while number < 5 {
 
 Esses nomes podem aparecer em documentos de planejamento ou na gramática de
 referência. Isso não quer dizer que o compilador já saiba executá-los. A lista
-do subconjunto que funciona está em [MVP](../mvp.md).
+do subconjunto que funciona está em [MVP](../geral.md#mvp).

@@ -211,7 +211,7 @@ não garante que ela esteja inicializada depois da expressão.
 | Persistência de string/objeto/closure/array | — | Duração da execução | Duração da execução | Não |
 
 O suporte sempre depende do tipo-base executável. Protocolos, interfaces e
-herança continuam com os limites descritos no [MVP](../mvp.md).
+herança continuam com os limites descritos no [MVP](../geral.md#mvp).
 `print` aceita opcionais dos tipos primitivos imprimíveis, escrevendo `nil`
 para ausência; não imprime objetos, funções ou arrays.
 
@@ -230,6 +230,8 @@ cobrem execução e efeitos em VM, nativo e assembly montado externamente.
 runtime. A suíte também verifica rejeições semânticas, IR malformada, o token
 único `!!=`, inicialização condicional e persistência/recuperação do REPL.
 
+
+<a id="diagnosticos-erros-opcionais"></a>
 
 ## Diagnósticos principais
 

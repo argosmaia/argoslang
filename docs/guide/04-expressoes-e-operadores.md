@@ -56,7 +56,7 @@ var displayName: string = nickname ?? "Visitante"
 ```
 
 Outros operadores de opcionais (`?.`, `?=`, `?==` e `!!`) também não fazem
-parte da execução completa do MVP. Consulte [MVP](../mvp.md) antes de usá-los
+parte da execução completa do MVP. Consulte [MVP](../geral.md#mvp) antes de usá-los
 em um programa que precisa rodar.
 
 No REPL, uma expressão sem efeito é exibida automaticamente:

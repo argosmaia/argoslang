@@ -34,5 +34,5 @@ gravado em arquivo: ele e todo o contexto são apagados ao sair do REPL.
 
 Uma expressão como `count + 1` calcula e mostra o resultado, mas não altera
 `count`. Para atualizá-la, declare-a com `var mut` e use uma atribuição.
-O REPL executa o mesmo subconjunto descrito em [mvp.md](../mvp.md); por
+O REPL executa o mesmo subconjunto descrito em [ArgosLang MVP](../geral.md#mvp); por
 exemplo, opcionais e valores `string` armazenados ainda não são executáveis.

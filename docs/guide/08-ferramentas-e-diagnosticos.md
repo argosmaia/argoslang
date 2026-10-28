@@ -16,7 +16,7 @@ argosc compile examples/control_flow.argos -o control-flow
 
 `run` usa a VM. `compile` usa o backend nativo x86-64/Linux. O REPL também
 compila cada entrada para a mesma IR e executa pela mesma VM; todos compartilham
-o subconjunto executável descrito em [mvp.md](../mvp.md).
+o subconjunto executável descrito em [ArgosLang MVP](../geral.md#mvp).
 
 ## Diagnósticos
 
@@ -41,3 +41,7 @@ arquivo.argos:4:12: error[ARGOS-S0301]: variável "answer" usada antes da inicia
 
 Corrija primeiro o erro de menor linha e coluna: diagnósticos posteriores podem
 ser apenas consequência do primeiro problema.
+
+
+O [catálogo de diagnósticos](12-diagnosticos.md) reúne o formato das mensagens,
+as severidades e os códigos de resolução de chamadas.

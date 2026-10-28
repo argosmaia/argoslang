@@ -18,6 +18,7 @@ referência é da versão `0.0.1`.
 9. [Compilar, executar e diagnosticar](08-ferramentas-e-diagnosticos.md)
 10. [Classes e interfaces](10-classes-e-interfaces.md)
 11. [Null-safety e tipos opcionais](11-null-safety-e-opcionais.md)
+12. [Catálogo de diagnósticos](12-diagnosticos.md)
 
 ## O que existe hoje
 
@@ -40,11 +41,13 @@ métodos de classes concretas. Consulte os exemplos e os limites de execução e
 
 | Área | Página |
 | --- | --- |
-| Sintaxe formal e precedência | [Especificação gramatical](../grammar-spec.md) |
+| Sintaxe formal e precedência | [Especificação gramatical](../geral.md#gramatica) |
+| Compilar, interpretar e executar | [Explicações e exemplos](../teaching.md) |
+| Diagnósticos e códigos de erro | [Catálogo](12-diagnosticos.md) |
 | Arquitetura do compilador | [Arquitetura](../architecture.md) |
-| Escopo e prioridades do MVP | [MVP](../mvp.md) |
-| O que falta para consolidar o MVP | [Roteiro de consolidação](../mvp-roadmap.md) |
-| Referência compacta v0.0.1 | [ArgosLang v0.0.1](../argoslang-v0.0.1.md) |
+| Escopo e prioridades do MVP | [MVP](../geral.md#mvp) |
+| O que falta para consolidar o MVP | [Roteiro de consolidação](../geral.md#roadmap) |
+| Referência compacta v0.0.1 | [ArgosLang v0.0.1](../geral.md#referencia) |
 
 > A linguagem usa `function`, `var`, `var mut`, tipos em minúsculas e `nil`.
 > `func` não é uma palavra-chave. `null` ainda é aceito como apelido temporário

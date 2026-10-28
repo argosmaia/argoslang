@@ -32,20 +32,13 @@ compile_commands.json
 .vscode/
 .idea/
 
-# Exclude other docs and examples from repo
+# Documentation entrypoints and language guide
 /docs/*
 !/docs/architecture.md
-!/docs/grammar-spec.md
-!/docs/argoslang-v0.0.1.md
-!/docs/mvp.md
-!/docs/mvp-roadmap.md
-!/docs/testing-and-compiler-guide.md
+!/docs/geral.md
+!/docs/teaching.md
 !/docs/guide/
 !/docs/guide/*.md
-!/docs/diagnostics/
-!/docs/diagnostics/*.md
-!/docs/teachings/
-!/docs/teachings/*.md
 /examples/*
 !/examples/frontend_core.argos
 !/examples/null_safety.argos
