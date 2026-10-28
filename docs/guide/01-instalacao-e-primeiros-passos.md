@@ -36,6 +36,28 @@ Ele gera o compilador em `./build-clang/bin/argosc` usando
 O executável gerado é `./build/bin/argosc`. A mensagem `ninja: no work to do`
 significa apenas que o build já está atualizado.
 
+### Erros de ligação com `std::cout`, `std::cerr` ou `__cxa_*`
+
+Se o build usar `clang` no lugar de `clang++`, o driver pode compilar os
+arquivos C++ sem ligar a biblioteca padrão. O CMake agora verifica isso
+na configuração. A escolha do compilador fica salva no diretório de build;
+mudar apenas o `PATH` não corrige o cache existente. O comando abaixo usa
+as ferramentas do sistema durante a configuração, evitando wrappers do Swift.
+
+Com CMake 3.24 ou superior, reconfigure:
+
+```bash
+env PATH=/usr/bin:/bin cmake --fresh -S . -B build -G Ninja \
+  -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
+  -DCMAKE_AR=/usr/bin/ar -DCMAKE_RANLIB=/usr/bin/ranlib \
+  -DARGOS_BUILD_TESTS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+Com CMake anterior, configure em um diretório novo. `g++` também é suportado;
+no Ubuntu, use `-DCMAKE_CXX_COMPILER=/usr/bin/g++`.
+
 ## Usar no terminal
 
 Durante a sessão atual:

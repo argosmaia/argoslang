@@ -40,10 +40,25 @@ sudo apt install -y \
 ```bash
 cmake -S . -B build -G Ninja \
   -DCMAKE_BUILD_TYPE=Debug \
-  -DARGOS_BUILD_TESTS=ON
+  -DARGOS_BUILD_TESTS=ON \
+  -DCMAKE_CXX_COMPILER=/usr/bin/g++
 
 cmake --build build
 ```
+
+Use a C++ driver (`g++` or `clang++`), not `gcc` or `clang`. If an existing
+build reports undefined references to `std::cout`, `std::cerr` or `__cxa_*`,
+reconfigure its cached toolchain (CMake 3.24+):
+
+```bash
+env PATH=/usr/bin:/bin cmake --fresh -S . -B build -G Ninja \
+  -DCMAKE_CXX_COMPILER=/usr/bin/clang++ \
+  -DCMAKE_AR=/usr/bin/ar -DCMAKE_RANLIB=/usr/bin/ranlib \
+  -DARGOS_BUILD_TESTS=ON
+cmake --build build
+```
+
+With older CMake, use a new build directory instead of `--fresh`.
 
 ## Run tests
 
