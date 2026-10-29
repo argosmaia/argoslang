@@ -25,3 +25,19 @@ TEST_CASE("catalog diagnostics retain title, explanation, and help") {
   REQUIRE(output.str().find("falando simples:") != std::string::npos);
   REQUIRE(output.str().find("tente assim:") != std::string::npos);
 }
+
+TEST_CASE("object safety diagnostics provide actionable explanations",
+          "[diagnostics][oop]") {
+  for (const auto code :
+       {"ARGOS-S0620", "ARGOS-S0621", "ARGOS-S0622", "ARGOS-S0623",
+        "ARGOS-S0624", "ARGOS-S0625", "ARGOS-S0626", "ARGOS-S0627",
+        "ARGOS-S0628", "ARGOS-S0629", "ARGOS-S0630", "ARGOS-S0631",
+        "ARGOS-S0632"}) {
+    const auto *definition =
+        argos::diagnostics::catalog::semantic::find_definition(code);
+    REQUIRE(definition != nullptr);
+    REQUIRE_FALSE(definition->title.empty());
+    REQUIRE_FALSE(definition->explanation.empty());
+    REQUIRE_FALSE(definition->help.empty());
+  }
+}

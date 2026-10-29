@@ -17,7 +17,6 @@ namespace argos::ast {
         
         variable_declaration,
         function_declaration,
-        protocol_declaration,
         class_declaration,
         lambda_expression,
         new_expression,
@@ -130,20 +129,30 @@ namespace argos::ast {
     };
 
     struct BlockItem : Node {
-        protected:
-            BlockItem(NodeKind kind_value, source::SourceSpan span_value)
-                : Node(kind_value, std::move(span_value)) {
-            }
+      std::string package_name;
+
+    protected:
+      BlockItem(NodeKind kind_value, source::SourceSpan span_value)
+          : Node(kind_value, std::move(span_value)) {}
     };
 
-    enum class Visibility { internal_, public_, private_, protected_ };
+    enum class Visibility {
+      internal_,
+      public_,
+      private_,
+      protected_,
+      package_
+    };
     struct Modifiers {
         Visibility visibility{Visibility::internal_};
         bool final_{false};
+        bool sealed_{false};
         bool abstract_{false};
         bool override_{false};
         bool static_{false};
         bool virtual_{false};
+        bool overload_{false};
+        bool explicit_visibility{false};
     };
 
     struct Declaration : BlockItem {
@@ -167,21 +176,17 @@ namespace argos::ast {
     using StatementPtr = std::unique_ptr<Statement>;
 
     struct TypeSyntax final : Node {
-        std::string name;
-        std::size_t nullable_depth{0};
-        std::vector<std::unique_ptr<TypeSyntax>> parameter_types;
-        std::unique_ptr<TypeSyntax> result_type;
-        std::unique_ptr<TypeSyntax> element_type;
+      mutable std::string resolved_name;
+      std::string name;
+      std::size_t nullable_depth{0};
+      std::vector<std::unique_ptr<TypeSyntax>> parameter_types;
+      std::unique_ptr<TypeSyntax> result_type;
+      std::unique_ptr<TypeSyntax> element_type;
 
-        TypeSyntax(
-            std::string name_value,
-            std::size_t nullable_depth_value,
-            source::SourceSpan span_value
-        )
-            : Node(NodeKind::type_syntax, std::move(span_value)),
-                name(std::move(name_value)),
-                nullable_depth(nullable_depth_value) {
-        }
+      TypeSyntax(std::string name_value, std::size_t nullable_depth_value,
+                 source::SourceSpan span_value)
+          : Node(NodeKind::type_syntax, std::move(span_value)),
+            name(std::move(name_value)), nullable_depth(nullable_depth_value) {}
     };
 
     using TypeSyntaxPtr = std::unique_ptr<TypeSyntax>;
@@ -207,6 +212,7 @@ namespace argos::ast {
 
     struct Program final : Node {
         std::vector<BlockItemPtr> items;
+        std::string package_name;
 
         Program(
             std::vector<BlockItemPtr> items_value,
@@ -249,24 +255,23 @@ namespace argos::ast {
     };
 
     struct FunctionDeclaration final : Declaration {
-        std::string name;
-        std::vector<ParameterPtr> parameters;
-        TypeSyntaxPtr return_type;
-        std::unique_ptr<BlockStatement> body;
+      enum class Builtin { none, data_hash, data_text };
+      Builtin builtin{Builtin::none};
+      std::string name;
+      std::vector<ParameterPtr> parameters;
+      TypeSyntaxPtr return_type;
+      std::unique_ptr<BlockStatement> body;
 
-        FunctionDeclaration(
-            std::string name_value,
-            std::vector<ParameterPtr> parameters_value,
-            TypeSyntaxPtr return_type_value,
-            std::unique_ptr<BlockStatement> body_value,
-            source::SourceSpan span_value
-        )
-            : Declaration(NodeKind::function_declaration, std::move(span_value)),
-                name(std::move(name_value)),
-                parameters(std::move(parameters_value)),
-                return_type(std::move(return_type_value)),
-                body(std::move(body_value)) {
-        }
+      FunctionDeclaration(std::string name_value,
+                          std::vector<ParameterPtr> parameters_value,
+                          TypeSyntaxPtr return_type_value,
+                          std::unique_ptr<BlockStatement> body_value,
+                          source::SourceSpan span_value)
+          : Declaration(NodeKind::function_declaration, std::move(span_value)),
+            name(std::move(name_value)),
+            parameters(std::move(parameters_value)),
+            return_type(std::move(return_type_value)),
+            body(std::move(body_value)) {}
     };
 
     inline VariableDeclaration::VariableDeclaration(
@@ -284,21 +289,16 @@ namespace argos::ast {
         }
     inline VariableDeclaration::~VariableDeclaration() = default;
 
-    struct ProtocolDeclaration final : Declaration {
-        std::string name;
-        std::vector<std::unique_ptr<VariableDeclaration>> components;
-
-        ProtocolDeclaration(std::string name_value,
-                            std::vector<std::unique_ptr<VariableDeclaration>> components_value,
-                            source::SourceSpan span_value)
-            : Declaration(NodeKind::protocol_declaration, std::move(span_value)),
-              name(std::move(name_value)), components(std::move(components_value)) {}
-    };
-
     struct ClassDeclaration final : Declaration {
         std::string name;
         bool is_interface{false};
+        bool is_data{false};
         std::vector<std::string> bases;
+        std::vector<std::string> interfaces;
+        std::vector<std::string> components;
+        std::string enclosing_type;
+        std::string simple_name;
+        std::vector<std::string> permited;
         std::vector<DeclarationPtr> members;
         ClassDeclaration(std::string value, bool interface_value, source::SourceSpan location)
             : Declaration(NodeKind::class_declaration, location),

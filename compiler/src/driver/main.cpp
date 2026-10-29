@@ -51,17 +51,31 @@ char** repl_completion(const char* text, int start, int end) {
 }
 
 void print_usage(std::string_view executable) {
-    std::cerr
-        << "ArgosLang compiler bootstrap\n\n"
-        << "Uso:\n"
-        << "  " << executable << " lex <arquivo.argos>    - Analisa os tokens lexicais do arquivo\n"
-        << "  " << executable << " parse <arquivo.argos>  - Realiza o parsing gramatical da sintaxe (AST)\n"
-        << "  " << executable << " ast <arquivo.argos>    - Imprime a Árvore de Sintaxe Abstrata (AST) formatada\n"
-        << "  " << executable << " check <arquivo.argos>  - Executa a análise semântica (verificação de tipos e escopos)\n"
-        << "  " << executable << " run <arquivo.argos>    - Executa pela VM o subconjunto suportado\n"
-        << "  " << executable << " repl                 - Abre o shell interativo da VM\n"
-        << "  " << executable << " <arquivo.argos> [-S] [-o saída] - Compila no host x86-64/Linux\n"
-        << "  " << executable << " compile <arquivo.argos> [-S] [-o saída] - Mesmo comando explícito\n";
+  std::cerr
+      << "ArgosLang compiler bootstrap\n\n"
+      << "Uso:\n"
+      << "  " << executable
+      << " lex <arquivo.argos>    - Analisa os tokens lexicais do arquivo\n"
+      << "  " << executable
+      << " parse <arquivo.argos>  - Realiza o parsing gramatical da sintaxe "
+         "(AST)\n"
+      << "  " << executable
+      << " ast <arquivo.argos>    - Imprime a Árvore de Sintaxe Abstrata (AST) "
+         "formatada\n"
+      << "  " << executable
+      << " check <arquivo.argos> [outros.argos...]  - Executa a análise "
+         "semântica (verificação de tipos e escopos)\n"
+      << "  " << executable
+      << " run <arquivo.argos> [outros.argos...]    - Executa pela VM o "
+         "subconjunto suportado\n"
+      << "  " << executable
+      << " repl                 - Abre o shell interativo da VM\n"
+      << "  " << executable
+      << " <arquivo.argos> [outros.argos...] [-S] [-o saída] - Compila no host "
+         "x86-64/Linux\n"
+      << "  " << executable
+      << " compile <arquivo.argos> [outros.argos...] [-S] [-o saída] - Mesmo "
+         "comando explícito\n";
 }
 
 void print_diagnostics(
@@ -129,14 +143,19 @@ int main(int argc, char** argv) {
     }
     std::filesystem::path source_path;
     std::filesystem::path output_path;
+    std::vector<std::filesystem::path> additional_sources;
     bool assembly_only = false;
     if (command == "lex" || command == "parse" ||
         command == "ast" || command == "check" || command == "run") {
-        if (argc != 3) {
-            print_usage(argv[0]);
-            return 64;
-        }
+      if (argc < 3 ||
+          ((command == "lex" || command == "parse" || command == "ast") &&
+           argc != 3)) {
+        print_usage(argv[0]);
+        return 64;
+      }
         source_path = argv[2];
+        for (int index = 3; index < argc; ++index)
+          additional_sources.emplace_back(argv[index]);
     } else {
         const int first = command == "compile" ? 2 : 1;
         command = "compile";
@@ -152,11 +171,14 @@ int main(int argc, char** argv) {
                     print_usage(argv[0]);
                     return 64;
                 }
-            } else if (!argument.starts_with("-") && source_path.empty()) {
+            } else if (!argument.starts_with("-")) {
+              if (source_path.empty())
                 source_path = argv[index];
+              else
+                additional_sources.emplace_back(argv[index]);
             } else {
-                print_usage(argv[0]);
-                return 64;
+              print_usage(argv[0]);
+              return 64;
             }
         }
     }
@@ -188,6 +210,19 @@ int main(int argc, char** argv) {
         }
     }
 
+    for (const auto &input : additional_sources) {
+      std::error_code error;
+      const bool same_output =
+          command == "compile" && std::filesystem::exists(output_path) &&
+          std::filesystem::equivalent(input, output_path, error);
+      if (input.extension() != ".argos" || same_output ||
+          (command == "compile" &&
+           std::filesystem::absolute(input).lexically_normal() ==
+               std::filesystem::absolute(output_path).lexically_normal())) {
+        std::cerr << "argosc: arquivo-fonte adicional ou saída inválida\n";
+        return 64;
+      }
+    }
     argos::source::SourceManager source_manager;
     std::string load_error;
 
@@ -224,13 +259,37 @@ int main(int argc, char** argv) {
     }
 
     argos::parser::Parser parser{std::move(tokens), diagnostics};
-    const auto program = parser.parse_program();
+    auto program = parser.parse_program();
 
     if (diagnostics.has_errors()) {
         print_diagnostics(*source_file, diagnostics);
         return 65;
     }
 
+    for (const auto &input : additional_sources) {
+      std::string error;
+      const auto source = source_manager.load(input, error);
+      if (!source) {
+        std::cerr << "argosc: " << error << '\n';
+        return 66;
+      }
+      argos::diagnostics::DiagnosticEngine local_diagnostics;
+      argos::lexer::Lexer local_lexer{*source, local_diagnostics};
+      argos::parser::Parser local_parser{local_lexer.tokenize(),
+                                         local_diagnostics};
+      auto unit = local_parser.parse_program();
+      for (auto diagnostic : local_diagnostics.diagnostics()) {
+        diagnostic.span.begin.source_file = input.string();
+        diagnostic.span.end.source_file = input.string();
+        diagnostics.report(std::move(diagnostic));
+      }
+      if (diagnostics.has_errors()) {
+        print_diagnostics(*source_file, diagnostics);
+        return 65;
+      }
+      for (auto &item : unit.items)
+        program.items.push_back(std::move(item));
+    }
     if (command == "parse") {
         std::cout
             << "[ArgosLang Compiler] Parsing concluído com sucesso para: "

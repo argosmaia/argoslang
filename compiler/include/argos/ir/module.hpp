@@ -19,10 +19,14 @@ struct Function {
 struct ObjectLayout {
   std::string name;
   std::vector<ValueType> fields;
+  std::vector<std::uint32_t> ancestors{};
+  std::vector<FunctionId> methods{};
+  std::vector<std::uint32_t> owned_fields{};
 };
 struct Module {
   std::vector<ObjectLayout> objects{};
   std::vector<Constant> constants;
   std::vector<Function> functions;
+  std::vector<FunctionId> virtual_functions{};
 };
 } // namespace argos::ir

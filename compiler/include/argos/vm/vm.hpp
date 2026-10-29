@@ -32,8 +32,10 @@ private:
   struct Object {
     std::uint32_t layout;
     std::vector<std::uint64_t> fields;
+    std::uint64_t owner{0};
   };
   mutable std::vector<Object> objects_;
+  mutable std::vector<std::string> strings_;
   const argos::ir::Module *module_{nullptr};
   std::ostream *output_{nullptr};
 };

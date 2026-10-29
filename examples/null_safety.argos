@@ -1,17 +1,22 @@
-protocol Profile(name: string);
-protocol User(profile: Profile?);
+data Profile(name: string) { public function getName() -> string { return name; } }
+data User(profile: Profile?) { public function getProfile() -> Profile? { return profile; } }
 
 function loadUser() -> User? {
     return nil;
 }
 
 function displayName(user: User?) -> string {
-    var name: string = user?.profile?.name ?? "Anonymous";
+    var name: string = user?.getProfile()?.getName() ?? "Anonymous";
     return name;
 }
 
+function main() -> int {
 var mut cachedUser: User? = nil;
 cachedUser ??= loadUser();
 
 var mut preferredName: string = "Unknown";
-preferredName ?= cachedUser?.profile?.name;
+preferredName ?= cachedUser?.getProfile()?.getName();
+
+    print(displayName(user: cachedUser));
+    return 0;
+}

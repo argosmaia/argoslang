@@ -30,6 +30,16 @@ const char* opcode_name(Opcode o) noexcept {
  case Opcode::make_closure:return "MAKE_CLOSURE";
  case Opcode::load_capture:return "LOAD_CAPTURE";
  case Opcode::call_closure:return "CALL_CLOSURE";
+ case Opcode::check_uint8:
+   return "CHECK_UINT8";
+ case Opcode::hash_scalar:
+   return "HASH_SCALAR";
+ case Opcode::stringify_scalar:
+   return "STRINGIFY_SCALAR";
+ case Opcode::concat_strings:
+   return "CONCAT_STRINGS";
+ case Opcode::call_virtual:
+   return "CALL_VIRTUAL";
  case Opcode::call:return "CALL"; case Opcode::print_int:return "PRINT_INT";
  case Opcode::print_bool:return "PRINT_BOOL"; case Opcode::print_double:return "PRINT_DOUBLE";
  case Opcode::print_string:return "PRINT_STRING"; case Opcode::print_string_value:return "PRINT_STRING_VALUE";

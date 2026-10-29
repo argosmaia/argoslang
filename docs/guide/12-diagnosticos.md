@@ -113,3 +113,46 @@ report(non_named_callee.code, span, std::string{non_named_callee.title});
 
 Mensagens podem incluir contexto local, como o nome da função ou do rótulo,
 mas não devem mudar o código nem o significado documentado dele.
+
+## Herança, sobrecarga, super e data — 29/10/2026
+
+| Código | Condição | Correção |
+| --- | --- | --- |
+| `ARGOS-S0620` | Sobrecarga adicional sem `overload`, ou tentativa de sobrecarregar `main`. | Marque assinaturas adicionais com `overload`; mantenha uma única entrada. |
+| `ARGOS-S0621` | Nenhuma assinatura compatível, chamada ambígua ou referência a nome sobrecarregado. | Confira tipos/rótulos ou use chamada explícita em uma lambda de assinatura única. |
+| `ARGOS-S0622` | `super` fora de classe derivada, construção fora da primeira instrução/repetida, observação prematura de `this` ou acesso a requisito abstrato. | Construa a base primeiro; acesse somente implementações existentes e visíveis. |
+| `ARGOS-S0623` | `data` com estado mutável, referência mutável, array, closure, ciclo ou superclasse concreta. | Declare campos imutáveis escalares ou outros `data`, sem ciclos. |
+
+Acesso privado/protegido continua usando `ARGOS-S0611`; alteração de campo
+imutável usa `ARGOS-S0330`. Os diagnósticos são emitidos antes do lowering,
+com localização, explicação e sugestão. Veja as regras no
+[capítulo de POO](10-classes-e-interfaces.md).
+
+
+## Acesso sealed e relações nominais
+
+| Código | Condição | Correção |
+| --- | --- | --- |
+| `ARGOS-S0624` | Subclasse/implementador direto ou leitor de campo sealed não autorizado; nome `permited` inexistente, duplicado ou lista em tipo incompatível. | Declare os nomes corretos na lista `permited`; `data` continua imutável. |
+| `ARGOS-S0625` | Interface implementada com `:`, classe herdada com `by` ou `by` em declaração de interface. | Use `class Filha: Base by Contrato`; interfaces estendem interfaces com `:`. |
+
+Acesso público omitido é o padrão de tipos e funções de topo; métodos de classe
+são privados por padrão. Requisitos de interface são públicos por padrão, mas
+aceitam outro acesso explícito. Escritas em dados imutáveis autorizados continuam
+produzindo `ARGOS-S0330`; leituras não autorizadas de `data` usam `ARGOS-S0624`.
+
+## Pacotes, composição e geração de data
+
+| Código | Causa | Correção |
+| --- | --- | --- |
+| `ARGOS-S0626` | Componente inválido, repetido, cíclico ou qualificador ambíguo. | Use classes concretas acessíveis e qualificadores únicos. |
+| `ARGOS-S0627` | Assinatura delegada ambígua entre componentes ou herança. | Declare o método na receptora e encaminhe explicitamente. |
+| `ARGOS-S0628` | Componente sem inicialização exclusiva válida. | Use construtor acessível sem argumentos ou atribuição de `new` em todos os caminhos do construtor. |
+| `ARGOS-S0629` | Classe privada/protegida no nível superior. | Aninhe o tipo ou use acesso público/de pacote. |
+| `ARGOS-S0630` | Tipo ou contenedor inacessível. | Respeite o pacote e o acesso nominal. |
+| `ARGOS-S0631` | Escape ou acesso inválido ao armazenamento de composição. | Use os métodos delegados ou qualificadores no contexto da classe. |
+| `ARGOS-S0632` | Membro reservado aos métodos gerados de data. | Não redeclare `hashCode` ou `toString`. |
+
+Valores fora de 0..255 em `uint_8`/`byte` são rejeitados estaticamente quando
+conhecidos; operações dinâmicas verificam a faixa em execução e terminam com
+erro antes de armazenar o resultado inválido.

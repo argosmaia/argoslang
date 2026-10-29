@@ -3,10 +3,11 @@
 #include "argos/ast/ast.hpp"
 #include "argos/diagnostics/diagnostic_engine.hpp"
 #include "argos/source/source_span.hpp"
-#include <string_view>
 #include <optional>
-#include <utility>
+#include <string_view>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace argos::semantics {
@@ -89,6 +90,9 @@ struct Symbol final {
   source::SourceSpan span{};
   ast::Modifiers modifiers{};
   std::string owner{};
+  const ast::FunctionDeclaration *declaration{nullptr};
+  std::string package_name{};
+  std::string component_target{};
 };
 
 class SemanticAnalyzer final {
@@ -102,9 +106,43 @@ public:
   symbol_id_of(const ast::Expression &expression) const;
   [[nodiscard]] const Symbol *symbol_by_id(SymbolId id) const noexcept;
   [[nodiscard]] const std::vector<Symbol>& captures_of(const ast::LambdaExpression& expression) const;
+  [[nodiscard]] const Symbol *
+  resolved_call(const ast::CallExpression &call) const;
+  [[nodiscard]] const Symbol *
+  declaration_symbol(const ast::FunctionDeclaration &declaration) const;
+  [[nodiscard]] std::vector<Symbol> methods_of(const std::string &name) const;
+  [[nodiscard]] static std::string dispatch_key(const Symbol &symbol);
+  [[nodiscard]] static std::string virtual_key(const Symbol &symbol);
+  [[nodiscard]] static std::string function_key(const Symbol &symbol);
   [[nodiscard]] bool is_initialized(std::string_view name) const noexcept;
 
+  [[nodiscard]] std::vector<const ast::ClassDeclaration *>
+  class_declarations() const;
+  [[nodiscard]] const std::vector<std::string> &
+  bases_of(const std::string &) const;
+  [[nodiscard]] const std::vector<std::unique_ptr<ast::VariableDeclaration>> &
+  generated_fields(const std::string &) const;
+  [[nodiscard]] const std::vector<std::unique_ptr<ast::FunctionDeclaration>> &
+  generated_methods(const std::string &) const;
+  [[nodiscard]] bool explicitly_initializes(const ast::FunctionDeclaration &,
+                                            const std::string &) const;
+  struct ComponentBinding {
+    std::string receiver;
+    std::string field;
+  };
+  [[nodiscard]] const ComponentBinding *
+  component_binding(const ast::Expression &) const;
+
 private:
+  std::string current_package_;
+  std::vector<const ast::ClassDeclaration *> class_order_;
+  std::string resolve_nominal(const std::string &, const std::string &,
+                              const std::string &) const;
+  bool accessible_type(const std::string &, const source::SourceSpan &);
+  void build_components(const std::string &);
+  void capture_receiver(const source::SourceSpan &);
+  std::unordered_map<const ast::Expression *, ComponentBinding>
+      component_bindings_;
   struct Scope final {
     std::unordered_map<std::string, Symbol> symbols;
   };
@@ -132,17 +170,36 @@ private:
   analyze_variable_declaration(const ast::VariableDeclaration &declaration);
   void
   analyze_function_declaration(const ast::FunctionDeclaration &declaration);
-  void analyze_protocol_declaration(const ast::ProtocolDeclaration &declaration);
   struct ClassInfo {
     const ast::ClassDeclaration* declaration{};
     std::unordered_map<std::string, Symbol> members;
     unsigned state{0};
+    std::vector<std::string> bases, interfaces, permissions, components;
+    std::vector<std::unique_ptr<ast::VariableDeclaration>> fields;
+    std::vector<std::unique_ptr<ast::FunctionDeclaration>> generated;
+    std::unordered_map<const ast::FunctionDeclaration *,
+                       std::unordered_set<std::string>>
+        explicit_components;
+    std::unordered_map<std::string, std::vector<Symbol>> methods;
   };
+  Type resolve_overload(const ast::CallExpression &,
+                        const std::vector<Symbol> &);
+  bool accessible(const Symbol &, const source::SourceSpan &);
+  bool immutable_data_type(const Type &, std::vector<std::string> &) const;
+  std::unordered_map<const ast::FunctionDeclaration *, Symbol>
+      declaration_symbols_;
+  std::unordered_map<const ast::CallExpression *, Symbol> resolved_calls_;
+  std::unordered_map<std::string, std::vector<Symbol>> global_overloads_;
+  bool super_initialized_{true};
+  bool calling_super_{};
+  bool resolving_callee_{};
+  std::string superclass(const std::string &) const;
   void build_class(const std::string& name);
   void analyze_class(const ast::ClassDeclaration& declaration);
   Symbol function_symbol(const ast::FunctionDeclaration& declaration);
   Type analyze_lambda(const ast::LambdaExpression& expression);
-  Type check_call(const ast::CallExpression& expression, const Symbol& function);
+  Type check_call(const ast::CallExpression &expression, const Symbol &function,
+                  bool analyzed = false);
   const Symbol* find_member(const Type& type, const std::string& name,
                             const source::SourceSpan& span);
   bool is_subtype(const std::string& derived, const std::string& base) const;
@@ -207,7 +264,6 @@ private:
   std::unordered_map<const ast::Expression *, Type> expression_coercions_;
   std::unordered_map<const ast::Expression *, SymbolId> expression_symbols_;
   std::vector<Symbol> symbol_records_;
-  std::unordered_map<std::string, std::unordered_map<std::string, Type>> nominal_fields_;
   bool analyzing_assignment_target_{false};
 };
 

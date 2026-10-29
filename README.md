@@ -10,13 +10,16 @@ source file → SourceManager → Lexer → Parser → AST → SemanticAnalyzer 
                                       AST Printer      diagnostics
 ```
 
-The current frontend supports variables, functions, non-generic data protocols,
-basic control flow, primitive and intrinsic `String` types, optionals, named
-arguments, Unicode identifiers and source-backed diagnostics. The parser is
-still handwritten; the canonical LR(1) generator and the broader grammar in
-[referência geral](docs/geral.md#gramatica) remain future work. Classes, interfaces, generics,
-modules, lambdas, ownership and foreign executors are not available yet.
-`examples/null_safety.argos` declares its nominal types and passes `check`.
+The compiler supports variables, functions, classes, single inheritance,
+interfaces (`by`), virtual dispatch, overload/override, `super`, immutable `data`,
+sealed hierarchies and `permited` access lists,
+computed properties, lambdas/closures, optionals and homogeneous arrays.
+These features execute in the VM and on native x86-64/Linux; see the
+[language guide](docs/guide/README.md) for syntax and current limits.
+`protocol` has been removed; use `interface` for contracts and `data` for
+immutable aggregates. The parser remains handwritten. The LR(1) generator,
+generics, modules, ownership, scope-based destruction and foreign executors
+remain future work in the [general reference](docs/geral.md#gramatica).
 
 ## Requirements on Ubuntu/Pop!_OS
 
@@ -109,3 +112,7 @@ A forma curta `argosc -S arquivo.argos` também funciona e gera `arquivo.s`
 no diretório atual. A opção `-S` usa o backend existente sobre a IR tipada e
 validada, sem chamar `cc`. Montar e ligar o resultado exige uma toolchain
 x86-64/Linux. O subconjunto suportado é o mesmo da compilação nativa.
+
+A POO inclui composição múltipla com `with`, acesso por pacote com `default`,
+tipos aninhados e records `data` com igualdade, hash e texto gerados. Veja as
+[regras e exemplos](docs/guide/10-classes-e-interfaces.md).

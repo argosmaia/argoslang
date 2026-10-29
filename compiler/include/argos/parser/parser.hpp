@@ -65,11 +65,13 @@ private:
     ast::Modifiers parse_modifiers();
     void parse_accessors(ast::VariableDeclaration& property);
     bool in_class_{false};
+    std::string package_name_;
+    std::string enclosing_type_;
+    std::string parse_qualified_name();
     ast::BlockItemPtr parse_class_declaration(const lexer::Token& keyword);
     ast::ExpressionPtr parse_lambda();
     bool starts_lambda() const;
     bool in_interface_{false};
-    ast::BlockItemPtr parse_protocol_declaration(const lexer::Token& keyword);
 
     ast::StatementPtr parse_statement();
     std::unique_ptr<ast::BlockStatement> parse_required_block(

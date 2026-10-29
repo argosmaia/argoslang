@@ -102,7 +102,9 @@ concretas e closures fazem parte da execução, dentro dos limites do
 encerram com status 70. `float` e `double` usam binary64. O backend emite
 assembly e usa `cc` para montar e ligar, sem transpilar ArgosLang para C.
 
-`examples/null_safety.argos` **ainda não compila para executável**: não define `main()` e usa protocolos e variáveis de topo, que não têm lowering nesse backend. `argosc check examples/null_safety.argos` pode validar o frontend, mas `argosc examples/null_safety.argos` termina com diagnóstico `ARGOS-C0001`/`ARGOS-C0002`, sem criar binário. O exemplo `minimal_optional.argos` já executa na VM e no nativo.
+`examples/null_safety.argos` usa `data` e possui `main()`: executa na VM e no
+nativo. `minimal_polymorphism.argos` demonstra herança, interfaces, sobrecarga,
+sobrescrita e `super`; `minimal_data.argos` demonstra igualdade estrutural.
 
 Se a compilação falhar, leia o código e a posição do erro antes de tentar executar a saída. Um erro `ARGOS-C0001` indica uma construção válida para o frontend, mas ainda ausente do backend; `ARGOS-C0002` indica falta de `main()` compilável. Um `check` bem-sucedido não elimina esses erros de compilação. Também não confunda um executável antigo que já exista no disco com uma saída produzida por uma tentativa que falhou.
 
@@ -219,7 +221,9 @@ Para observar o resultado de um programa do subconjunto pela rota nativa, compil
 echo $?
 ```
 
-O status esperado é `42`; isso é **execução nativa**, não interpretação. Protocolos e herança ainda podem passar em `check` sem ter execução. Opcionais já executam na VM e no nativo.
+O status esperado é `42`; isso é **execução nativa**. Opcionais, herança,
+interfaces e `data` também executam na VM e no nativo, dentro dos limites do
+[guia de POO](guide/10-classes-e-interfaces.md).
 
 <a id="interpretar-como-a-interpretação-funciona"></a>
 
@@ -304,3 +308,24 @@ O primeiro backend nativo já recebe a IR do subconjunto e emite assembly x86-64
 Para uma placa ou máquina diferente do host, será preciso implementar a toolchain de **cross-compilation**, incluindo geração de objeto, relocação, linkagem, entry point e suporte de runtime adequado. No caso de bare metal, também serão necessários mapa de memória, startup code e interfaces com periféricos. Não há procedimento de flash ou imagem de firmware ArgosLang disponível neste estágio.
 
 No alvo x86-64/Linux atual, `ctest` compila e executa os programas mínimos suportados, comparando os status observados. Para qualquer novo alvo, repita esse teste no hardware ou emulador correspondente. `argosc check` sozinho não substitui execução real.
+
+## Exercitar composição, records e pacotes
+
+Execute os mesmos exemplos pela VM e pelo backend nativo:
+
+```bash
+./build/bin/argosc run examples/minimal_composition.argos
+./build/bin/argosc run examples/minimal_records.argos
+./build/bin/argosc compile examples/minimal_composition.argos -o /tmp/composition
+/tmp/composition
+./build/bin/argosc run examples/packages/client/main.argos examples/packages/auth/types.argos
+```
+
+No exemplo de composição, acompanhe o estado de cada componente e a resolução
+explícita de métodos com a mesma assinatura. No exemplo de records, compare
+igualdade, hash e texto de valores iguais e observe que apenas o controller
+listado em `permited` lê os componentes privados. No exemplo de pacotes, troque
+um tipo público por `default` e tente acessá-lo do outro pacote: o diagnóstico
+deve apontar o arquivo e o trecho responsáveis.
+
+As regras completas estão no [guia de classes](guide/10-classes-e-interfaces.md).

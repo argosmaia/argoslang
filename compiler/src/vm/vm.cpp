@@ -1,16 +1,18 @@
 #include "argos/vm/vm.hpp"
 #include "argos/ir/validator.hpp"
+#include <algorithm>
 
-#include <charconv>
 #include <bit>
+#include <charconv>
 #include <cstdint>
 #include <iomanip>
+#include <iostream>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
-#include <iostream>
 
 namespace argos::vm {
 
@@ -27,18 +29,22 @@ std::int32_t VM::run() const {
   optionals_.clear();
   closures_.clear();
   objects_.clear();
+  strings_.clear();
   struct HeapReset {
     decltype(arrays_) &arrays;
     decltype(optionals_) &optionals;
     decltype(closures_)& closures;
     decltype(objects_)& objects;
+    decltype(strings_) &strings;
     ~HeapReset() {
       arrays.clear();
       optionals.clear();
       closures.clear();
-      objects.clear();
+      while (!objects.empty())
+        objects.pop_back();
+      strings.clear();
     }
-  } reset{arrays_, optionals_, closures_, objects_};
+  } reset{arrays_, optionals_, closures_, objects_, strings_};
   if (module_ == nullptr)
     throw std::runtime_error("nenhum módulo foi carregado na VM");
   if (const auto error = argos::ir::validate_module(*module_))
@@ -92,6 +98,23 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
     return static_cast<double>(integer_value(reg));
   };
 
+  const auto string_value = [&](std::uint64_t handle) -> std::string_view {
+    if (handle == 0)
+      invalid("string ausente");
+    if (handle <= module_->constants.size()) {
+      const auto &literal = module_->constants[handle - 1].value;
+      return std::string_view{literal};
+    }
+    const auto index = handle - module_->constants.size() - 1;
+    if (index >= strings_.size())
+      invalid("handle de string inválido");
+    return strings_[index];
+  };
+  const auto intern_string = [&](std::string value) {
+    strings_.push_back(std::move(value));
+    return static_cast<std::uint64_t>(module_->constants.size() +
+                                      strings_.size());
+  };
   std::size_t block_index = 0;
   std::size_t instruction_index = 0;
   while (true) {
@@ -117,6 +140,57 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
 
     using argos::ir::Opcode;
     switch (instruction.opcode) {
+    case Opcode::check_uint8:
+      if (integer_value(instruction.src1) < 0 ||
+          integer_value(instruction.src1) > 255)
+        throw std::runtime_error("uint_8 fora do intervalo 0..255 em " +
+                                 function.name + ":" +
+                                 std::to_string(instruction.source_line) + ":" +
+                                 std::to_string(instruction.source_column));
+      set_register(instruction.dst, register_value(instruction.src1));
+      break;
+    case Opcode::hash_scalar: {
+      const auto type = function.register_types[instruction.src1];
+      std::uint32_t value;
+      if (type == argos::ir::ValueType::string) {
+        value = 2166136261u;
+        for (const char byte :
+             string_value(register_value(instruction.src1)))
+          value = (value ^ static_cast<unsigned char>(byte)) * 16777619u;
+      } else if (type == argos::ir::ValueType::float64) {
+        const auto number = double_value(instruction.src1);
+        const auto bits = number == 0.0 ? std::uint64_t{0}
+                                        : std::bit_cast<std::uint64_t>(number);
+        value = static_cast<std::uint32_t>(bits ^ (bits >> 32));
+      } else
+        value = static_cast<std::uint32_t>(register_value(instruction.src1));
+      set_register(instruction.dst,
+                   static_cast<std::uint64_t>(static_cast<std::int64_t>(
+                       static_cast<std::int32_t>(value))));
+      break;
+    }
+    case Opcode::stringify_scalar: {
+      std::ostringstream text;
+      const auto type = function.register_types[instruction.src1];
+      if (type == argos::ir::ValueType::boolean)
+        text << (register_value(instruction.src1) ? "true" : "false");
+      else if (type == argos::ir::ValueType::float64)
+        text << std::setprecision(17) << std::defaultfloat
+             << double_value(instruction.src1);
+      else if (type == argos::ir::ValueType::string)
+        text << string_value(register_value(instruction.src1));
+      else
+        text << integer_value(instruction.src1);
+      set_register(instruction.dst, intern_string(text.str()));
+      break;
+    }
+    case Opcode::concat_strings: {
+      const auto text =
+          std::string{string_value(register_value(instruction.src1))} +
+          std::string{string_value(register_value(instruction.src2))};
+      set_register(instruction.dst, intern_string(text));
+      break;
+    }
     case Opcode::make_nil:
       set_register(instruction.dst, 0);
       break;
@@ -175,11 +249,30 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
     case Opcode::load_field:
     case Opcode::store_field: {
       const auto id = register_value(instruction.src1);
-      if (id == 0 || id > objects_.size() || objects_[id - 1].layout != instruction.constant)
+      if (id == 0 || id > objects_.size() ||
+          (objects_[id - 1].layout != instruction.constant &&
+           std::find(
+               module_->objects[objects_[id - 1].layout].ancestors.begin(),
+               module_->objects[objects_[id - 1].layout].ancestors.end(),
+               instruction.constant) ==
+               module_->objects[objects_[id - 1].layout].ancestors.end()))
         invalid("objeto incompatível com layout do campo");
       auto& object = objects_[id - 1];
       if (instruction.opcode == Opcode::load_field) set_register(instruction.dst, object.fields[instruction.count]);
-      else object.fields[instruction.count] = register_value(instruction.src2);
+      else {
+        const auto value = register_value(instruction.src2);
+        const auto &owned = module_->objects[instruction.constant].owned_fields;
+        if (std::find(owned.begin(), owned.end(), instruction.count) !=
+            owned.end()) {
+          if (!value || value > objects_.size() || value <= id ||
+              object.fields[instruction.count] != 0 ||
+              objects_[value - 1].owner != 0)
+            invalid("componente exclusivo já inicializado, compartilhado ou "
+                    "cíclico");
+          objects_[value - 1].owner = id;
+        }
+        object.fields[instruction.count] = value;
+      }
       break;
     }
     case Opcode::make_closure: {
@@ -332,12 +425,8 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
           argos::ir::ValueType::string) {
         const auto left = register_value(instruction.src1);
         const auto right = register_value(instruction.src2);
-        if (left == 0 || right == 0 || left > module_->constants.size() ||
-            right > module_->constants.size())
-          invalid("valor string inválido");
         set_register(instruction.dst,
-                     module_->constants[left - 1].value ==
-                         module_->constants[right - 1].value);
+                     string_value(left) == string_value(right));
         break;
       }
       set_register(instruction.dst,
@@ -353,12 +442,8 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
           argos::ir::ValueType::string) {
         const auto left = register_value(instruction.src1);
         const auto right = register_value(instruction.src2);
-        if (left == 0 || right == 0 || left > module_->constants.size() ||
-            right > module_->constants.size())
-          invalid("valor string inválido");
         set_register(instruction.dst,
-                     module_->constants[left - 1].value !=
-                         module_->constants[right - 1].value);
+                     string_value(left) != string_value(right));
         break;
       }
       set_register(instruction.dst,
@@ -404,11 +489,22 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
       if (register_value(instruction.src1) == 0)
         jump_to(instruction.label);
       break;
+    case Opcode::call_virtual:
     case Opcode::call: {
+      auto target = instruction.function;
+      if (instruction.opcode == Opcode::call_virtual) {
+        const auto receiver = register_value(instruction.arguments.front());
+        if (receiver == 0 || receiver > objects_.size())
+          invalid("receptor virtual inválido");
+        target = module_->objects[objects_[receiver - 1].layout]
+                     .methods[instruction.constant];
+        if (target == UINT32_MAX)
+          invalid("método abstrato sem implementação");
+      }
       std::vector<std::uint64_t> call_arguments;
       for (const auto reg : instruction.arguments) call_arguments.push_back(register_value(reg));
       try {
-        set_register(instruction.dst, execute(instruction.function, call_arguments));
+        set_register(instruction.dst, execute(target, call_arguments));
       } catch (const std::exception &error) {
         throw std::runtime_error(std::string{error.what()} + "\n  chamado por " +
                                  function.name);
@@ -430,10 +526,7 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
     }
     case Opcode::print_string_value: {
       const auto value = register_value(instruction.src1);
-      if (value == 0 || value > module_->constants.size())
-        invalid("valor string fora dos limites");
-      const auto &text = module_->constants[value - 1].value;
-      output.write(text.data(), static_cast<std::streamsize>(text.size()));
+      output << string_value(value);
       break;
     }
     case Opcode::print_newline: output << '\n'; break;

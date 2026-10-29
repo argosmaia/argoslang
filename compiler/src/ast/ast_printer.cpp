@@ -1,5 +1,6 @@
 #include "argos/ast/ast_printer.hpp"
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 
@@ -181,9 +182,20 @@ void AstPrinter::write_node(const Node &node) {
 
         case NodeKind::class_declaration: {
             const auto& value = static_cast<const ClassDeclaration&>(node);
-            write_line(std::string(value.is_interface ? "InterfaceDeclaration " : "ClassDeclaration ") + value.name);
+            write_line(std::string(value.is_interface ? "InterfaceDeclaration "
+                                   : value.is_data    ? "DataDeclaration "
+                                                      : "ClassDeclaration ") +
+                       value.name);
             IndentGuard indent{*this};
-            for (const auto& base : value.bases) write_line("Base " + base);
+            for (const auto &base : value.bases)
+              write_line(
+                  (std::find(value.interfaces.begin(), value.interfaces.end(),
+                             base) == value.interfaces.end()
+                       ? "Base "
+                       : "By ") +
+                  base);
+            for (const auto &entity : value.permited)
+              write_line("Permited " + entity);
             for (const auto& member : value.members) write_node(*member);
             return;
         }
@@ -203,14 +215,6 @@ void AstPrinter::write_node(const Node &node) {
             IndentGuard indent{*this};
             write_type(*value.type);
             write_node(*value.call);
-            return;
-        }
-
-        case NodeKind::protocol_declaration: {
-            const auto &value = static_cast<const ProtocolDeclaration &>(node);
-            write_line("ProtocolDeclaration " + value.name);
-            IndentGuard indent{*this};
-            for (const auto &component : value.components) write_node(*component);
             return;
         }
 

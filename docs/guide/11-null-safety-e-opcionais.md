@@ -210,8 +210,9 @@ não garante que ela esteja inicializada depois da expressão.
 | Persistência de opcionais numéricos/bool | Sim | Sim | Sim | Sim, inclusive camadas aninhadas |
 | Persistência de string/objeto/closure/array | — | Duração da execução | Duração da execução | Não |
 
-O suporte sempre depende do tipo-base executável. Protocolos, interfaces e
-herança continuam com os limites descritos no [MVP](../geral.md#mvp).
+O suporte depende do tipo-base executável. Herança e interfaces também
+executam, inclusive chamadas opcionais com despacho virtual. `protocol` foi
+substituído por `data`; veja o [capítulo de POO](10-classes-e-interfaces.md).
 `print` aceita opcionais dos tipos primitivos imprimíveis, escrevendo `nil`
 para ausência; não imprime objetos, funções ou arrays.
 

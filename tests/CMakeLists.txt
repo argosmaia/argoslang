@@ -55,6 +55,11 @@ foreach(example IN ITEMS
     minimal_properties
     minimal_object_closure
     minimal_frontend_inheritance
+    minimal_polymorphism
+    minimal_data
+    minimal_sealed_access
+    minimal_composition
+    minimal_records
     minimal_frontend_bound_method
 )
     add_test(
@@ -83,6 +88,13 @@ foreach(example_expected IN ITEMS
     "minimal_optional:9"
     "minimal_null_safety:0"
     "minimal_optional_arrays:0"
+    "minimal_frontend_inheritance:42"
+    "minimal_polymorphism:0"
+    "minimal_data:0"
+    "minimal_sealed_access:0"
+    "minimal_composition:0"
+    "minimal_records:0"
+    "null_safety:0"
     "minimal_arithmetic:14"
     "minimal_branch:7"
     "minimal_loop:6"
@@ -108,7 +120,17 @@ foreach(example_expected IN ITEMS
     list(GET example_parts 0 example)
     list(GET example_parts 1 expected)
     set(expected_stdout "")
-    if(example STREQUAL "minimal_optional_arrays")
+    if(example STREQUAL "minimal_polymorphism")
+        set(expected_stdout "base\nderived\n191919\n202036\n34\n0\neffect\n37\ndefault\n2\n2.5\n79\n12\n3420")
+    elseif(example STREQUAL "minimal_composition")
+        set(expected_stdout "571\nRio de Janeiromusica\nGPS ativo\nRadio ativo\n8\n9\n11")
+    elseif(example STREQUAL "minimal_records")
+        set(expected_stdout "Person(name=Ada, age=255, active=true, rating=1.5)\nPerson(name=Ada, age=255, active=true, rating=1.5)\ntruetrue\nAda\nEnvelope(value=Person(name=Ada, age=255, active=true, rating=1.5))truetrue\nEnvelope(value=nil)")
+    elseif(example STREQUAL "minimal_sealed_access")
+        set(expected_stdout "Ada1001\nAlan2")
+    elseif(example STREQUAL "minimal_data")
+        set(expected_stdout "truefalsefalse\ntruefalse\ntrue\n8")
+    elseif(example STREQUAL "minimal_optional_arrays")
         set(expected_stdout "0\neffect\n9\neffect\n2\n4\n8\n53\n7\ntruehello\n1\ntruetrue\ntruetruetrue\nreceiver\noffset\neffect\n2\n8")
     elseif(example STREQUAL "minimal_null_safety")
         set(expected_stdout "fallback\n9\n0truefalse\n3\n7\n0\nfalsetrue\nfalse\n4\nempty\ntrue\nfalse\n1.5\n832\n10\n8\n22\n99\nindex\n22\n33\n4\n6")
@@ -154,6 +176,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
         "minimal_optional:9"
         "minimal_null_safety:0"
         "minimal_optional_arrays:0"
+        "minimal_frontend_inheritance:42"
+        "minimal_polymorphism:0"
+        "minimal_data:0"
+        "minimal_sealed_access:0"
+        "minimal_composition:0"
+        "minimal_records:0"
+        "null_safety:0"
         "minimal_arithmetic:14"
         "minimal_branch:7"
         "minimal_loop:6"
@@ -179,7 +208,17 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
         list(GET example_parts 0 example)
         list(GET example_parts 1 expected)
         set(expected_stdout "")
-        if(example STREQUAL "minimal_optional_arrays")
+        if(example STREQUAL "minimal_polymorphism")
+            set(expected_stdout "base\nderived\n191919\n202036\n34\n0\neffect\n37\ndefault\n2\n2.5\n79\n12\n3420")
+        elseif(example STREQUAL "minimal_composition")
+            set(expected_stdout "571\nRio de Janeiromusica\nGPS ativo\nRadio ativo\n8\n9\n11")
+        elseif(example STREQUAL "minimal_records")
+            set(expected_stdout "Person(name=Ada, age=255, active=true, rating=1.5)\nPerson(name=Ada, age=255, active=true, rating=1.5)\ntruetrue\nAda\nEnvelope(value=Person(name=Ada, age=255, active=true, rating=1.5))truetrue\nEnvelope(value=nil)")
+        elseif(example STREQUAL "minimal_sealed_access")
+            set(expected_stdout "Ada1001\nAlan2")
+        elseif(example STREQUAL "minimal_data")
+            set(expected_stdout "truefalsefalse\ntruefalse\ntrue\n8")
+        elseif(example STREQUAL "minimal_optional_arrays")
             set(expected_stdout "0\neffect\n9\neffect\n2\n4\n8\n53\n7\ntruehello\n1\ntruetrue\ntruetruetrue\nreceiver\noffset\neffect\n2\n8")
         elseif(example STREQUAL "minimal_null_safety")
             set(expected_stdout "fallback\n9\n0truefalse\n3\n7\n0\nfalsetrue\nfalse\n4\nempty\ntrue\nfalse\n1.5\n832\n10\n8\n22\n99\nindex\n22\n33\n4\n6")
@@ -239,7 +278,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
             "-DSHORT_FORM=ON"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/compile_example.cmake"
     )
-    foreach(example IN ITEMS null_safety minimal_frontend_inheritance minimal_frontend_bound_method)
+    foreach(example IN ITEMS minimal_frontend_bound_method)
         add_test(
             NAME "example_${example}_native_rejected"
             COMMAND "${CMAKE_COMMAND}"
@@ -286,3 +325,10 @@ foreach(example_error IN ITEMS "minimal_nil_unwrap:tentativa de desembrulhar nil
             "-DEXPECTED_ERROR=${error}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/optional_runtime_error.cmake")
 endforeach()
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
+    add_test(NAME multi_source_package_isolation
+        COMMAND "${CMAKE_COMMAND}" "-DARGOSC=$<TARGET_FILE:argosc>" "-DPROJECT_ROOT=${PROJECT_SOURCE_DIR}" "-DBINARY=${CMAKE_BINARY_DIR}/bin/multi-package-test" -P "${CMAKE_CURRENT_SOURCE_DIR}/multi_source.cmake")
+    add_test(NAME exclusive_components_destroyed_once
+        COMMAND "${CMAKE_COMMAND}" "-DARGOSC=$<TARGET_FILE:argosc>" "-DCC=${ARGOS_ASSEMBLY_CC}" "-DSOURCE=${PROJECT_SOURCE_DIR}/examples/minimal_composition.argos" "-DBINARY=${CMAKE_BINARY_DIR}/bin/exclusive-components-test" "-DWRAPPER=${CMAKE_CURRENT_SOURCE_DIR}/owned_components.c" -P "${CMAKE_CURRENT_SOURCE_DIR}/owned_components.cmake")
+endif()

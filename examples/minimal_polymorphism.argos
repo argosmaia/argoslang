@@ -1,0 +1,62 @@
+interface Metric {
+    function read() -> int;
+    var mut amount: int { getter(); setter(); }
+}
+class Storage {
+    private var mut stored: int;
+    public construct(_ n: int) { stored = n; print("base"); }
+    public overload construct() { stored = 2; print("default"); }
+    public virtual function read() -> int { return stored; }
+    public function total() -> int { return read(); }
+    public function reader() -> () -> int { return () => read(); }
+    public virtual var mut amount: int {
+        getter() { return stored; }
+        setter() { stored = value; }
+    }
+}
+class Counter : Storage by Metric {
+    private var tag: string = "derived";
+    public construct(_ n: int) { super(n); print(tag); }
+    public override function read() -> int { return super.read() + 5; }
+    public overload function read(_ n: int) -> int { return read() + n; }
+    public override var mut amount: int {
+        getter() { return super.amount + 1; }
+        setter() { super.amount = value - 1; }
+    }
+}
+class FinalCounter : Counter {
+    public construct(_ n: int) { super(n); }
+    public final override function read() -> int { return super.read() + 10; }
+}
+class Automatic : Storage {}
+interface Scale { function apply(_ value: double) -> double; }
+class Twice by Scale {
+    public function apply(_ value: double) -> double { return value * 2; }
+}
+function select(_ n: int) -> int { return n; }
+overload function select(_ text: string) -> int { return 9; }
+function combine(first: int, second: int) -> int { return first * 10 + second; }
+function effect() -> int { print("effect"); return 3; }
+function main() -> int {
+    var concrete = new FinalCounter(4);
+    var base: Storage = concrete;
+    var metric: Metric = concrete;
+    print(base.read(), metric.read(), base.total());
+    metric.amount = 20;
+    print(base.amount, metric.amount, concrete.read(2));
+    var closure = base.reader();
+    print(closure());
+    var absent: Counter? = nil;
+    print(absent?.read(effect()) ?? 0);
+    var present: Counter? = concrete;
+    print(present?.read(effect()) ?? 0);
+    var automatic = new Automatic();
+    print(automatic.read());
+    var scale: Scale = new Twice();
+    print(scale.apply(1.25));
+    print(select(7), select("text"));
+    print(combine(second: 2, first: 1));
+    var optionalMetric: Metric? = metric;
+    print(optionalMetric?.read() ?? 0, optionalMetric?.amount ?? 0);
+    return 0;
+}

@@ -61,6 +61,30 @@ std::optional<std::string> validate_function(const Module &module,
   for (const auto &block : function.blocks) {
     for (const auto &instruction : block.instructions) {
       switch (instruction.opcode) {
+      case Opcode::check_uint8:
+        if (!has_register_type(instruction.src1, ValueType::int32) ||
+            !has_register_type(instruction.dst, ValueType::int32))
+          return "uint_8 exige representação inteira";
+        break;
+      case Opcode::hash_scalar:
+      case Opcode::stringify_scalar:
+        if (!valid_register(instruction.src1) ||
+            !has_register_type(instruction.dst,
+                               instruction.opcode == Opcode::hash_scalar
+                                   ? ValueType::int32
+                                   : ValueType::string) ||
+            (register_type(instruction.src1) != ValueType::int32 &&
+             register_type(instruction.src1) != ValueType::boolean &&
+             register_type(instruction.src1) != ValueType::float64 &&
+             register_type(instruction.src1) != ValueType::string))
+          return "operando escalar inválido para data";
+        break;
+      case Opcode::concat_strings:
+        if (!has_register_type(instruction.src1, ValueType::string) ||
+            !has_register_type(instruction.src2, ValueType::string) ||
+            !has_register_type(instruction.dst, ValueType::string))
+          return "concatenação exige strings";
+        break;
       case Opcode::make_nil:
         if (!valid_register(instruction.dst) ||
             !is_optional(register_type(instruction.dst)))
@@ -273,6 +297,15 @@ std::optional<std::string> validate_function(const Module &module,
           if (!has_register_type(instruction.arguments[i], instruction.parameter_types[i]) ||
               instruction.parameter_types[i] == ValueType::void_type) return "argumento de closure inválido";
         break;
+      case Opcode::call_virtual:
+        if (instruction.constant >= module.virtual_functions.size() ||
+            instruction.function !=
+                module.virtual_functions[instruction.constant] ||
+            instruction.arguments.empty() ||
+            !has_register_type(instruction.arguments.front(),
+                               ValueType::object))
+          return "slot ou receptor virtual inválido";
+        [[fallthrough]];
       case Opcode::call:
         if (!valid_register(instruction.dst) ||
             instruction.function >= module.functions.size())
@@ -347,6 +380,44 @@ std::optional<std::string> validate_module(const Module &module) {
   if (module.functions.empty())
     return "módulo sem funções";
 
+  for (const auto representative : module.virtual_functions)
+    if (representative >= module.functions.size())
+      return "assinatura virtual inexistente";
+  for (std::size_t id = 0; id < module.objects.size(); ++id) {
+    const auto &layout = module.objects[id];
+    if (layout.methods.size() != module.virtual_functions.size())
+      return "tabela virtual incompleta";
+    std::unordered_set<std::uint32_t> owned;
+    for (const auto field : layout.owned_fields)
+      if (!owned.insert(field).second || field >= layout.fields.size() ||
+          layout.fields[field] != ValueType::object)
+        return "campo de composição exclusiva inválido";
+    for (const auto ancestor : layout.ancestors) {
+      if (ancestor >= module.objects.size() || ancestor == id)
+        return "ancestral inválido";
+      const auto &base = module.objects[ancestor];
+      for (const auto field : base.owned_fields)
+        if (!owned.contains(field))
+          return "ownership herdado incompleto";
+      if (base.fields.size() > layout.fields.size())
+        return "layout herdado incompleto";
+      for (std::size_t field = 0; field < base.fields.size(); ++field)
+        if (base.fields[field] != layout.fields[field])
+          return "prefixo de campos herdados incompatível";
+    }
+    for (std::size_t slot = 0; slot < layout.methods.size(); ++slot) {
+      const auto target = layout.methods[slot];
+      if (target == UINT32_MAX)
+        continue;
+      if (target >= module.functions.size())
+        return "método virtual inexistente";
+      const auto &actual = module.functions[target];
+      const auto &expected = module.functions[module.virtual_functions[slot]];
+      if (actual.parameter_types != expected.parameter_types ||
+          actual.return_type != expected.return_type)
+        return "assinatura de método virtual incompatível";
+    }
+  }
   const auto storage_type = [](ValueType type) { return valid_type(type); };
   for (const auto& layout : module.objects)
     for (const auto type : layout.fields)

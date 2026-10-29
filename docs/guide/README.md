@@ -53,8 +53,9 @@ métodos de classes concretas. Consulte os exemplos e os limites de execução e
 > `func` não é uma palavra-chave. `null` ainda é aceito como apelido temporário
 > de `nil`.
 
-- [Classes, interfaces e closures](10-classes-e-interfaces.md): subconjunto
-  executável de POO e limites atuais de herança.
+- [Classes, interfaces e closures](10-classes-e-interfaces.md): herança
+  simples, implementação com `by`, polimorfismo, `overload`, `override`, `super`,
+  padrões de acesso, `sealed`, `permited` e `data` imutável.
 
 
 ## Opcionais e arrays — 28/10/2026
@@ -63,3 +64,6 @@ O [capítulo 11](11-null-safety-e-opcionais.md) documenta a implementação
 executável: `T?`, `nil`, `??`, `?.`, `?[`, `?=`, `?==`, `??=`, `!!` e `!!=`,
 com tipos rigorosos, curto-circuito, arrays opcionais no estilo Dart,
 falhas localizadas e persistência de opcionais numéricos no REPL.
+
+O capítulo de classes também cobre pacotes, `default`, tipos aninhados, composição
+múltipla `with` e os métodos automáticos de `data`.

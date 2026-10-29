@@ -171,15 +171,22 @@ TEST_CASE("reports unsupported match statements") {
     REQUIRE(program.items.size() == 1);
 }
 
-TEST_CASE("parses a non-generic data protocol") {
-    argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto program = parse("protocol User(id: uint, name: string?);", diagnostics);
-    REQUIRE_FALSE(diagnostics.has_errors());
-    const auto *protocol = dynamic_cast<const argos::ast::ProtocolDeclaration *>(program.items[0].get());
-    REQUIRE(protocol != nullptr);
-    REQUIRE(protocol->name == "User");
-    REQUIRE(protocol->components.size() == 2);
-    REQUIRE(protocol->components[1]->type->nullable_depth == 1);
+TEST_CASE("parses immutable data and rejects removed protocol") {
+  argos::diagnostics::DiagnosticEngine diagnostics;
+  const auto program = parse("data User(id: int, name: string?);", diagnostics);
+  REQUIRE_FALSE(diagnostics.has_errors());
+  const auto *data = dynamic_cast<const argos::ast::ClassDeclaration *>(
+      program.items[0].get());
+  REQUIRE(data != nullptr);
+  REQUIRE(data->is_data);
+  REQUIRE(data->modifiers.final_);
+  REQUIRE(data->members.size() == 3);
+  const auto *field = dynamic_cast<const argos::ast::VariableDeclaration *>(
+      data->members[1].get());
+  REQUIRE(field->type->nullable_depth == 1);
+  argos::diagnostics::DiagnosticEngine removed;
+  (void)parse("protocol User(name: string);", removed);
+  REQUIRE(removed.has_errors());
 }
 
 TEST_CASE("accepts escaped identifiers in declarations") {
@@ -260,4 +267,86 @@ TEST_CASE("rejects old constructors and malformed accessor syntax") {
         (void)parse(source, diagnostics);
         REQUIRE(diagnostics.has_errors());
     }
+}
+
+TEST_CASE(
+    "applies declaration visibility defaults and nominal relation clauses") {
+  argos::diagnostics::DiagnosticEngine diagnostics;
+  const auto program = parse(R"(
+      class A { function hidden() {} public function visible() {} }
+      function top() {}
+      interface I { function visible(); private function hidden(); }
+      sealed class Base permited Child {}
+      class Child: Base by I { public function visible() {} function hidden() {} }
+      data Person(name: string) permited Child;
+    )",
+                             diagnostics);
+  REQUIRE_FALSE(diagnostics.has_errors());
+  const auto *a = dynamic_cast<const argos::ast::ClassDeclaration *>(
+      program.items[0].get());
+  REQUIRE(a->modifiers.visibility == argos::ast::Visibility::public_);
+  REQUIRE(a->members[0]->modifiers.visibility ==
+          argos::ast::Visibility::private_);
+  REQUIRE(a->members[1]->modifiers.visibility ==
+          argos::ast::Visibility::public_);
+  const auto *top = dynamic_cast<const argos::ast::FunctionDeclaration *>(
+      program.items[1].get());
+  REQUIRE(top->modifiers.visibility == argos::ast::Visibility::public_);
+  const auto *interface = dynamic_cast<const argos::ast::ClassDeclaration *>(
+      program.items[2].get());
+  REQUIRE(interface->modifiers.visibility == argos::ast::Visibility::public_);
+  REQUIRE(interface->members[0]->modifiers.visibility ==
+          argos::ast::Visibility::public_);
+  REQUIRE(interface->members[1]->modifiers.visibility ==
+          argos::ast::Visibility::private_);
+  const auto *base = dynamic_cast<const argos::ast::ClassDeclaration *>(
+      program.items[3].get());
+  REQUIRE(base->modifiers.sealed_);
+  REQUIRE(base->permited == std::vector<std::string>{"Child"});
+  const auto *child = dynamic_cast<const argos::ast::ClassDeclaration *>(
+      program.items[4].get());
+  REQUIRE(child->interfaces == std::vector<std::string>{"I"});
+  REQUIRE(child->bases == std::vector<std::string>{"Base", "I"});
+  const auto *data = dynamic_cast<const argos::ast::ClassDeclaration *>(
+      program.items[5].get());
+  REQUIRE(data->modifiers.visibility == argos::ast::Visibility::public_);
+  REQUIRE(data->members[0]->modifiers.sealed_);
+  argos::diagnostics::DiagnosticEngine old_spelling;
+  (void)parse("sealed class A permitted B {}", old_spelling);
+  REQUIRE(old_spelling.has_errors());
+}
+
+TEST_CASE("parses packages nested visibility components and body record "
+          "declarations") {
+  argos::diagnostics::DiagnosticEngine diagnostics;
+  const auto program = parse(R"(
+      package br.argos;
+      default class Outer { private class Inner {} protected class Protected {} }
+      class Car with br.engine.Motor, GPS {}
+      data Person permited Controller { name: string; age: uint_8; }
+      class Controller {}
+    )",
+                             diagnostics);
+  REQUIRE_FALSE(diagnostics.has_errors());
+  REQUIRE(program.package_name == "br.argos");
+  const auto *outer = dynamic_cast<const argos::ast::ClassDeclaration *>(
+      program.items[0].get());
+  REQUIRE(outer->name == "br.argos.Outer");
+  REQUIRE(outer->modifiers.visibility == argos::ast::Visibility::package_);
+  const auto *inner = dynamic_cast<const argos::ast::ClassDeclaration *>(
+      outer->members[0].get());
+  REQUIRE(inner->name == "br.argos.Outer.Inner");
+  REQUIRE(inner->enclosing_type == outer->name);
+  const auto *car = dynamic_cast<const argos::ast::ClassDeclaration *>(
+      program.items[1].get());
+  REQUIRE(car->components.size() == 2);
+  REQUIRE(car->bases.empty());
+  const auto *data = dynamic_cast<const argos::ast::ClassDeclaration *>(
+      program.items[2].get());
+  REQUIRE(data->members.size() == 3);
+  const auto *constructor =
+      dynamic_cast<const argos::ast::FunctionDeclaration *>(
+          data->members.back().get());
+  REQUIRE(constructor->parameters.size() == 2);
+  REQUIRE(constructor->modifiers.visibility == argos::ast::Visibility::public_);
 }

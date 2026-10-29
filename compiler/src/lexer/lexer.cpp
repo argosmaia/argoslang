@@ -176,6 +176,10 @@ std::vector<Token> Lexer::tokenize() {
     }
   }
 
+  for (auto &token : tokens) {
+    token.span.begin.source_file = source_file_.path.string();
+    token.span.end.source_file = source_file_.path.string();
+  }
   return tokens;
 }
 
@@ -832,6 +836,8 @@ TokenKind Lexer::keyword_kind(std::string_view lexeme) noexcept {
       std::pair{"operator", TokenKind::KwOperator},
       std::pair{"const", TokenKind::KwConst},
       std::pair{"class", TokenKind::KwClass},
+      std::pair{"data", TokenKind::KwData},
+      std::pair{"overload", TokenKind::KwOverload},
       std::pair{"protocol", TokenKind::KwProtocol},
       std::pair{"interface", TokenKind::KwInterface},
       std::pair{"enum", TokenKind::KwEnum},
@@ -841,6 +847,10 @@ TokenKind Lexer::keyword_kind(std::string_view lexeme) noexcept {
       std::pair{"internal", TokenKind::KwInternal},
       std::pair{"final", TokenKind::KwFinal},
       std::pair{"sealed", TokenKind::KwSealed},
+      std::pair{"permited", TokenKind::KwPermited},
+      std::pair{"by", TokenKind::KwBy},
+      std::pair{"with", TokenKind::KwWith},
+      std::pair{"package", TokenKind::KwPackage},
       std::pair{"abstract", TokenKind::KwAbstract},
       std::pair{"override", TokenKind::KwOverride},
       std::pair{"virtual", TokenKind::KwVirtual},

@@ -1,0 +1,39 @@
+class Motor {
+    private var mut starts: int;
+    public construct() { starts = 0; }
+    public overload construct(_ initial: int) { starts = initial; }
+    public function ligar() -> int { starts += 1; return starts; }
+    public overload function ligar(_ amount: int) -> int { starts += amount; return starts; }
+    protected function internalOnly() -> int { return starts; }
+}
+class GPS {
+    public function localizar() -> string { return "Rio de Janeiro"; }
+    public function iniciar() { print("GPS ativo"); }
+}
+class Radio {
+    public function tocar() -> string { return "musica"; }
+    public function iniciar() { print("Radio ativo"); }
+}
+abstract class Veiculo { public abstract function dirigir() -> int; }
+class Carro: Veiculo with Motor, GPS, Radio {
+    public construct(_ initial: int) { Motor = new Motor(initial); }
+    public overload construct() {}
+    public override function dirigir() -> int { return ligar(); }
+    public function iniciar() { GPS.iniciar(); Radio.iniciar(); }
+    public function qualified() -> int { return Motor.ligar(2); }
+    public function callback() -> () -> int { return () => Motor.ligar(); }
+}
+function main() -> int {
+    var a = new Carro(4);
+    var b = new Carro();
+    print(a.ligar(), a.qualified(), b.ligar());
+    print(a.localizar(), a.tocar());
+    a.iniciar();
+    var vehicle: Veiculo = a;
+    print(vehicle.dirigir());
+    var callback = a.callback();
+    print(callback());
+    var optional: Carro? = a;
+    print(optional?.ligar(2) ?? 0);
+    return 0;
+}

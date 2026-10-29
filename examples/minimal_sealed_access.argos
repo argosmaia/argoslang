@@ -1,0 +1,26 @@
+data Person(name: string) permited Funcionario, Aluno;
+interface FormaPagamento { function pagar() -> int; }
+sealed class Pessoa permited Funcionario, Aluno {
+    public virtual function categoria() -> int { return 0; }
+}
+class Funcionario: Pessoa by FormaPagamento {
+    private var person: Person;
+    public construct(_ name: string) { person = new Person(name: name); }
+    function privateName() -> string { return person.name; }
+    public function nome() -> string { return privateName(); }
+    public function pagar() -> int { return 100; }
+    public override function categoria() -> int { return 1; }
+}
+class Aluno: Pessoa {
+    public function nome(_ person: Person) -> string { return person.name; }
+    public override function categoria() -> int { return 2; }
+}
+function main() -> int {
+    var funcionario = new Funcionario("Ada");
+    var pagamento: FormaPagamento = funcionario;
+    var pessoa: Pessoa = funcionario;
+    print(funcionario.nome(), pagamento.pagar(), pessoa.categoria());
+    var aluno = new Aluno();
+    print(aluno.nome(new Person(name: "Alan")), aluno.categoria());
+    return 0;
+}

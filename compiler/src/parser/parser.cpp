@@ -90,9 +90,23 @@ Parser::Parser(
     }
 }
 
+std::string Parser::parse_qualified_name() {
+  auto name =
+      consume(lexer::TokenKind::Identifier, "esperado nome de tipo ou pacote")
+          .lexeme;
+  while (match(lexer::TokenKind::Dot))
+    name +=
+        "." +
+        consume(lexer::TokenKind::Identifier, "esperado nome após '.'").lexeme;
+  return name;
+}
+
 ast::Program Parser::parse_program() {
     std::vector<ast::BlockItemPtr> items;
-
+    if (match(lexer::TokenKind::KwPackage)) {
+      package_name_ = parse_qualified_name();
+      consume_statement_terminator("package");
+    }
     while (!is_at_end()) {
         if (match(lexer::TokenKind::Semicolon)) {
             continue;
@@ -116,10 +130,9 @@ ast::Program Parser::parse_program() {
         : items.front()->span.begin;
     const auto end = current().span.end;
 
-    return ast::Program{
-        std::move(items),
-        span_from(begin, end),
-    };
+    ast::Program result{std::move(items), span_from(begin, end)};
+    result.package_name = package_name_;
+    return result;
 }
 
 bool Parser::is_at_end() const noexcept {
@@ -283,12 +296,29 @@ ast::BlockItemPtr Parser::parse_block_item() {
         declaration = parse_variable_declaration(previous());
     else if (match(lexer::TokenKind::KwFunction))
         declaration = parse_function_declaration(previous());
-    else if (match(lexer::TokenKind::KwProtocol))
-        declaration = parse_protocol_declaration(previous());
-    else if (match({lexer::TokenKind::KwClass, lexer::TokenKind::KwInterface}))
-        declaration = parse_class_declaration(previous());
+    else if (match(lexer::TokenKind::KwProtocol)) {
+      report(previous(), "protocol foi removido; use interface para contratos "
+                         "ou data para dados imutáveis");
+      skip_unsupported_construct();
+      return nullptr;
+    } else if (match({lexer::TokenKind::KwClass, lexer::TokenKind::KwInterface,
+                      lexer::TokenKind::KwData}))
+      declaration = parse_class_declaration(previous());
     if (declaration) {
         static_cast<ast::Declaration&>(*declaration).modifiers = modifiers;
+        static_cast<ast::Declaration &>(*declaration).package_name =
+            package_name_;
+        if (auto *type =
+                dynamic_cast<ast::ClassDeclaration *>(declaration.get())) {
+          if (!modifiers.explicit_visibility)
+            type->modifiers.visibility = ast::Visibility::public_;
+          if (type->is_data)
+            type->modifiers.final_ = true;
+        }
+        if (auto *function =
+                dynamic_cast<ast::FunctionDeclaration *>(declaration.get());
+            function && !modifiers.explicit_visibility)
+          function->modifiers.visibility = ast::Visibility::public_;
         return declaration;
     }
 
@@ -318,7 +348,10 @@ ast::BlockItemPtr Parser::parse_block_item() {
     default: break;
     }
 
-    return parse_statement();
+    auto statement = parse_statement();
+    if (statement)
+      statement->package_name = package_name_;
+    return statement;
 }
 
 ast::Modifiers Parser::parse_modifiers() {
@@ -329,18 +362,34 @@ ast::Modifiers Parser::parse_modifiers() {
         bool* flag = nullptr;
         using K = lexer::TokenKind;
         switch (kind) {
-        case K::KwPublic: case K::KwPrivate: case K::KwProtected: case K::KwInternal:
-            if (visibility) report(current(), "visibilidade repetida ou conflitante");
-            visibility = true;
-            result.visibility = kind == K::KwPublic ? ast::Visibility::public_ :
-                kind == K::KwPrivate ? ast::Visibility::private_ :
-                kind == K::KwProtected ? ast::Visibility::protected_ : ast::Visibility::internal_;
-            advance(); continue;
+        case K::KwPublic:
+        case K::KwPrivate:
+        case K::KwProtected:
+        case K::KwInternal:
+        case K::KwDefault:
+          if (visibility)
+            report(current(), "visibilidade repetida ou conflitante");
+          visibility = true;
+          result.explicit_visibility = true;
+          result.visibility =
+              kind == K::KwPublic      ? ast::Visibility::public_
+              : kind == K::KwPrivate   ? ast::Visibility::private_
+              : kind == K::KwProtected ? ast::Visibility::protected_
+              : kind == K::KwDefault   ? ast::Visibility::package_
+                                       : ast::Visibility::internal_;
+          advance();
+          continue;
         case K::KwFinal: flag = &result.final_; break;
+        case K::KwSealed:
+          flag = &result.sealed_;
+          break;
         case K::KwAbstract: flag = &result.abstract_; break;
         case K::KwOverride: flag = &result.override_; break;
         case K::KwStatic: flag = &result.static_; break;
         case K::KwVirtual: flag = &result.virtual_; break;
+        case K::KwOverload:
+          flag = &result.overload_;
+          break;
         default: return result;
         }
         if (*flag) report(current(), "modificador repetido");
@@ -349,64 +398,228 @@ ast::Modifiers Parser::parse_modifiers() {
     }
 }
 
-ast::BlockItemPtr Parser::parse_class_declaration(const lexer::Token& keyword) {
-    const auto name = consume(lexer::TokenKind::Identifier, "esperado nome do tipo");
-    auto result = std::make_unique<ast::ClassDeclaration>(
-        name.lexeme, keyword.kind == lexer::TokenKind::KwInterface, keyword.span);
+ast::BlockItemPtr Parser::parse_class_declaration(const lexer::Token &keyword) {
+  if (keyword.kind == lexer::TokenKind::KwData)
+    match(lexer::TokenKind::KwClass);
+  const auto name =
+      consume(lexer::TokenKind::Identifier, "esperado nome do tipo");
+  auto result = std::make_unique<ast::ClassDeclaration>(
+      name.lexeme, keyword.kind == lexer::TokenKind::KwInterface, keyword.span);
+  result->is_data = keyword.kind == lexer::TokenKind::KwData;
+  std::vector<ast::VariableDeclaration *> bare_components;
+  result->simple_name = name.lexeme;
+  result->enclosing_type = enclosing_type_;
+  result->package_name = package_name_;
+  result->name = (enclosing_type_.empty()
+                      ? (package_name_.empty() ? "" : package_name_ + ".")
+                      : enclosing_type_ + ".") +
+                 name.lexeme;
+  if (result->is_data && match(lexer::TokenKind::LeftParen)) {
+    std::vector<ast::ParameterPtr> parameters;
+    std::vector<ast::BlockItemPtr> assignments;
+    while (!check(lexer::TokenKind::RightParen) && !is_at_end()) {
+      const auto field =
+          consume(lexer::TokenKind::Identifier, "esperado nome do campo data");
+      consume(lexer::TokenKind::Colon, "esperado ':' no campo data");
+      auto type = parse_type();
+      parameters.push_back(std::make_unique<ast::Parameter>(
+          field.lexeme, clone_type(type.get()), field.span));
+      auto stored = std::make_unique<ast::VariableDeclaration>(
+          ast::Mutability::immutable, field.lexeme, std::move(type), nullptr,
+          field.span);
+      stored->modifiers.visibility = ast::Visibility::private_;
+      stored->modifiers.sealed_ = true;
+      result->members.push_back(std::move(stored));
+      auto target = std::make_unique<ast::MemberAccessExpression>(
+          std::make_unique<ast::IdentifierExpression>("this", field.span),
+          field.lexeme, false, field.span);
+      assignments.push_back(std::make_unique<ast::ExpressionStatement>(
+          std::make_unique<ast::AssignmentExpression>(
+              std::move(target), ast::AssignmentOperator::assign,
+              std::make_unique<ast::IdentifierExpression>(field.lexeme,
+                                                          field.span),
+              field.span),
+          field.span));
+      if (!match(lexer::TokenKind::Comma))
+        break;
+    }
+    consume(lexer::TokenKind::RightParen, "esperado ')' nos campos data");
+    auto constructor = std::make_unique<ast::FunctionDeclaration>(
+        "construct", std::move(parameters), nullptr,
+        std::make_unique<ast::BlockStatement>(std::move(assignments),
+                                              keyword.span),
+        keyword.span);
+    constructor->modifiers.visibility = ast::Visibility::public_;
+    constructor->package_name = package_name_;
+    result->members.push_back(std::move(constructor));
+  }
+  bool seen_base = false, seen_by = false, seen_permited = false,
+       seen_with = false;
+  for (;;) {
+    std::vector<std::string> *names = nullptr;
     if (match(lexer::TokenKind::Colon)) {
-        do {
-            result->bases.push_back(consume(lexer::TokenKind::Identifier,
-                                           "esperado tipo base").lexeme);
-        } while (match(lexer::TokenKind::Comma));
-    }
-    consume(lexer::TokenKind::LeftBrace, "esperado '{' após o tipo");
-    const bool previous_interface = in_interface_;
-    const bool previous_class = in_class_;
-    in_class_ = true;
-    in_interface_ = result->is_interface;
-    while (!check(lexer::TokenKind::RightBrace) && !is_at_end()) {
-        if (match(lexer::TokenKind::Semicolon)) continue;
-        const auto before = index_;
-        auto modifiers = parse_modifiers();
-        ast::BlockItemPtr member;
-        if (match(lexer::TokenKind::KwVar)) member = parse_variable_declaration(previous());
-        else if (match(lexer::TokenKind::KwFunction)) member = parse_function_declaration(previous());
-        else if (match(lexer::TokenKind::KwConstruct)) {
-            const auto token = previous();
-            member = parse_function_declaration(token);
-        } else if (check(lexer::TokenKind::Identifier) && current().lexeme == "init" &&
-                   peek(1).kind == lexer::TokenKind::LeftParen) {
-            report(current(), "init foi removido; declare o construtor com construct(...)");
-            skip_unsupported_construct();
-        } else {
-            report(current(), "esperado campo, propriedade, método ou construct no tipo");
-            skip_unsupported_construct();
-        }
-        if (member) {
-            auto* declaration = static_cast<ast::Declaration*>(member.release());
-            declaration->modifiers = modifiers;
-            result->members.emplace_back(declaration);
-        }
-        if (index_ == before && !is_at_end()) advance();
-    }
-    in_interface_ = previous_interface;
-    in_class_ = previous_class;
-    result->span.end = consume(lexer::TokenKind::RightBrace, "esperado '}' após membros").span.end;
+      if (seen_base)
+        report(previous(), "cláusula de herança repetida");
+      seen_base = true;
+      names = &result->bases;
+    } else if (match(lexer::TokenKind::KwBy)) {
+      if (seen_by)
+        report(previous(), "cláusula by repetida");
+      seen_by = true;
+      names = &result->interfaces;
+    } else if (match(lexer::TokenKind::KwWith)) {
+      if (seen_with)
+        report(previous(), "cláusula with repetida");
+      seen_with = true;
+      names = &result->components;
+    } else if (match(lexer::TokenKind::KwPermited)) {
+      if (seen_permited)
+        report(previous(), "cláusula permited repetida");
+      seen_permited = true;
+      names = &result->permited;
+    } else if (check(lexer::TokenKind::Identifier) &&
+               current().lexeme == "permitted") {
+      report(advance(), "use permited, não permitted");
+      names = &result->permited;
+    } else
+      break;
+    do {
+      names->push_back(parse_qualified_name());
+    } while (match(lexer::TokenKind::Comma));
+  }
+  for (const auto &interface : result->interfaces)
+    result->bases.push_back(interface);
+  if (result->is_data && !check(lexer::TokenKind::Colon) &&
+      !check(lexer::TokenKind::LeftBrace)) {
+    consume_statement_terminator("data");
+    result->span.end = previous().span.end;
     return result;
+  }
+  consume(lexer::TokenKind::LeftBrace, "esperado '{' após o tipo");
+  const bool previous_interface = in_interface_;
+  const bool previous_class = in_class_;
+  in_class_ = true;
+  const auto previous_enclosing = enclosing_type_;
+  enclosing_type_ = result->name;
+  in_interface_ = result->is_interface;
+  while (!check(lexer::TokenKind::RightBrace) && !is_at_end()) {
+    if (match(lexer::TokenKind::Semicolon))
+      continue;
+    const auto before = index_;
+    auto modifiers = parse_modifiers();
+    ast::BlockItemPtr member;
+    if (result->is_data && check(lexer::TokenKind::Identifier) &&
+        peek(1).kind == lexer::TokenKind::Colon) {
+      const auto component = advance();
+      advance();
+      auto type = parse_type();
+      auto field = std::make_unique<ast::VariableDeclaration>(
+          ast::Mutability::immutable, component.lexeme, std::move(type),
+          nullptr, component.span);
+      if (!modifiers.explicit_visibility)
+        modifiers.visibility = ast::Visibility::private_;
+      modifiers.sealed_ = true;
+      bare_components.push_back(field.get());
+      member = std::move(field);
+      consume_statement_terminator("componente de data");
+    } else if (match(lexer::TokenKind::KwVar))
+      member = parse_variable_declaration(previous());
+    else if (match(lexer::TokenKind::KwFunction))
+      member = parse_function_declaration(previous());
+    else if (match({lexer::TokenKind::KwClass, lexer::TokenKind::KwInterface,
+                    lexer::TokenKind::KwData}))
+      member = parse_class_declaration(previous());
+    else if (match(lexer::TokenKind::KwConstruct)) {
+      const auto token = previous();
+      member = parse_function_declaration(token);
+    } else if (check(lexer::TokenKind::Identifier) &&
+               current().lexeme == "init" &&
+               peek(1).kind == lexer::TokenKind::LeftParen) {
+      report(current(),
+             "init foi removido; declare o construtor com construct(...)");
+      skip_unsupported_construct();
+    } else {
+      report(current(),
+             "esperado campo, propriedade, método ou construct no tipo");
+      skip_unsupported_construct();
+    }
+    if (member) {
+      auto *declaration = static_cast<ast::Declaration *>(member.release());
+      declaration->modifiers = modifiers;
+      declaration->package_name = package_name_;
+      if (result->is_data &&
+          dynamic_cast<ast::VariableDeclaration *>(declaration))
+        declaration->modifiers.sealed_ = true;
+      if (!modifiers.explicit_visibility) {
+        if (result->is_data &&
+            dynamic_cast<ast::VariableDeclaration *>(declaration))
+          declaration->modifiers.visibility = ast::Visibility::private_;
+        else if (result->is_interface ||
+                 dynamic_cast<ast::ClassDeclaration *>(declaration))
+          declaration->modifiers.visibility = ast::Visibility::public_;
+        else if (const auto *method =
+                     dynamic_cast<ast::FunctionDeclaration *>(declaration);
+                 method && method->name != "construct")
+          declaration->modifiers.visibility = ast::Visibility::private_;
+      }
+      if (auto *nested = dynamic_cast<ast::ClassDeclaration *>(declaration);
+          nested && nested->is_data)
+        nested->modifiers.final_ = true;
+      result->members.emplace_back(declaration);
+    }
+    if (index_ == before && !is_at_end())
+      advance();
+  }
+  if (!bare_components.empty()) {
+    std::vector<ast::ParameterPtr> parameters;
+    std::vector<ast::BlockItemPtr> assignments;
+    for (const auto *field : bare_components) {
+      parameters.push_back(std::make_unique<ast::Parameter>(
+          field->name, clone_type(field->type.get()), field->span));
+      auto target = std::make_unique<ast::MemberAccessExpression>(
+          std::make_unique<ast::IdentifierExpression>("this", field->span),
+          field->name, false, field->span);
+      assignments.push_back(std::make_unique<ast::ExpressionStatement>(
+          std::make_unique<ast::AssignmentExpression>(
+              std::move(target), ast::AssignmentOperator::assign,
+              std::make_unique<ast::IdentifierExpression>(field->name,
+                                                          field->span),
+              field->span),
+          field->span));
+    }
+    auto constructor = std::make_unique<ast::FunctionDeclaration>(
+        "construct", std::move(parameters), nullptr,
+        std::make_unique<ast::BlockStatement>(std::move(assignments),
+                                              result->span),
+        result->span);
+    constructor->modifiers.visibility = ast::Visibility::public_;
+    constructor->package_name = package_name_;
+    result->members.push_back(std::move(constructor));
+  }
+  in_interface_ = previous_interface;
+  in_class_ = previous_class;
+  enclosing_type_ = previous_enclosing;
+  result->span.end =
+      consume(lexer::TokenKind::RightBrace, "esperado '}' após membros")
+          .span.end;
+  return result;
 }
 
 bool Parser::starts_lambda() const {
-    if (!check(lexer::TokenKind::LeftParen)) return false;
-    std::size_t depth = 0;
-    for (std::size_t i = 0; index_ + i < tokens_.size(); ++i) {
-        const auto kind = peek(i).kind;
-        if (kind == lexer::TokenKind::LeftParen) ++depth;
-        if (kind == lexer::TokenKind::RightParen && depth > 0 && --depth == 0)
-            return peek(i + 1).kind == lexer::TokenKind::FatArrow ||
-                   peek(i + 1).kind == lexer::TokenKind::Arrow;
-        if (kind == lexer::TokenKind::EndOfFile) break;
-    }
+  if (!check(lexer::TokenKind::LeftParen))
     return false;
+  std::size_t depth = 0;
+  for (std::size_t i = 0; index_ + i < tokens_.size(); ++i) {
+    const auto kind = peek(i).kind;
+    if (kind == lexer::TokenKind::LeftParen)
+      ++depth;
+    if (kind == lexer::TokenKind::RightParen && depth > 0 && --depth == 0)
+      return peek(i + 1).kind == lexer::TokenKind::FatArrow ||
+             peek(i + 1).kind == lexer::TokenKind::Arrow;
+    if (kind == lexer::TokenKind::EndOfFile)
+      break;
+  }
+  return false;
 }
 
 ast::ExpressionPtr Parser::parse_lambda() {
@@ -614,52 +827,6 @@ ast::BlockItemPtr Parser::parse_function_declaration(
         std::move(body),
         span_from(keyword.span.begin, end)
     );
-}
-
-ast::BlockItemPtr Parser::parse_protocol_declaration(const lexer::Token& keyword) {
-    const auto name = consume(lexer::TokenKind::Identifier,
-                              "esperado nome após 'protocol'");
-    if (check(lexer::TokenKind::Less)) {
-        report(current(), "protocol genérico ainda não é suportado");
-        skip_unsupported_construct();
-        return nullptr;
-    }
-    consume(lexer::TokenKind::LeftParen, "esperado '(' após o nome do protocol");
-    std::vector<std::unique_ptr<ast::VariableDeclaration>> components;
-    while (!check(lexer::TokenKind::RightParen) && !is_at_end()) {
-        const auto component_name = consume(lexer::TokenKind::Identifier,
-                                             "esperado nome do componente");
-        consume(lexer::TokenKind::Colon, "esperado ':' após o componente");
-        auto type = parse_type();
-        ast::ExpressionPtr initializer;
-        if (match(lexer::TokenKind::Equal)) initializer = parse_expression();
-        const auto end = initializer ? initializer->span.end : type->span.end;
-        components.push_back(std::make_unique<ast::VariableDeclaration>(
-            ast::Mutability::immutable, component_name.lexeme, std::move(type),
-            std::move(initializer), span_from(component_name.span.begin, end)));
-        if (!match(lexer::TokenKind::Comma)) break;
-    }
-    const auto closing = consume(lexer::TokenKind::RightParen,
-                                  "esperado ')' após componentes do protocol");
-    if (check(lexer::TokenKind::Colon) || check(lexer::TokenKind::KwType)) {
-        report(current(), "conformidade e constraints de protocol ainda não são suportadas");
-        skip_unsupported_construct();
-        return nullptr;
-    }
-    source::SourceLocation end = closing.span.end;
-    if (match(lexer::TokenKind::LeftBrace)) {
-        if (!check(lexer::TokenKind::RightBrace)) {
-            report(current(), "membros no corpo de protocol ainda não são suportados");
-            while (!check(lexer::TokenKind::RightBrace) && !is_at_end()) advance();
-        }
-        end = consume(lexer::TokenKind::RightBrace,
-                      "esperado '}' após o corpo do protocol").span.end;
-    } else {
-        consume_statement_terminator("declaração de protocol");
-        end = previous().span.end;
-    }
-    return std::make_unique<ast::ProtocolDeclaration>(
-        name.lexeme, std::move(components), span_from(keyword.span.begin, end));
 }
 
 ast::StatementPtr Parser::parse_statement() {
@@ -939,6 +1106,12 @@ ast::TypeSyntaxPtr Parser::parse_type() {
     }
     else report(current(), "esperado nome de tipo");
 
+    while (match(lexer::TokenKind::Dot)) {
+      name.lexeme += "." + consume(lexer::TokenKind::Identifier,
+                                   "esperado nome após '.' no tipo")
+                               .lexeme;
+      name.span.end = previous().span.end;
+    }
     std::size_t nullable_depth = 0;
     source::SourceLocation end = name.span.end;
 
@@ -1095,9 +1268,11 @@ ast::ExpressionPtr Parser::parse_primary_expression() {
         node->call.reset(static_cast<ast::CallExpression*>(call.release()));
         return node;
     }
-    if (match(lexer::TokenKind::KwThis)) {
-        const lexer::Token token = previous();
-        return std::make_unique<ast::IdentifierExpression>("this", token.span);
+    if (match({lexer::TokenKind::KwThis, lexer::TokenKind::KwSuper})) {
+      const lexer::Token token = previous();
+      return std::make_unique<ast::IdentifierExpression>(
+          token.kind == lexer::TokenKind::KwSuper ? "super" : "this",
+          token.span);
     }
 
     if (match({lexer::TokenKind::Identifier, lexer::TokenKind::EscapedIdentifier})) {

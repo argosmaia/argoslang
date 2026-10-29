@@ -338,3 +338,189 @@ events:
       
       
 ...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "/usr/share/cmake-3.28/Modules/CheckCXXSourceCompiles.cmake:52 (cmake_check_source_compiles)"
+      - "CMakeLists.txt:14 (check_cxx_source_compiles)"
+    checks:
+      - "Performing Test ARGOS_CXX_RUNTIME_LINKS"
+    directories:
+      source: "/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-jMbkr0"
+      binary: "/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-jMbkr0"
+    cmakeVariables:
+      CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS: "/usr/bin/clang-scan-deps-18"
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "ARGOS_CXX_RUNTIME_LINKS"
+      cached: true
+      stdout: |
+        Change Dir: '/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-jMbkr0'
+        
+        Run Build Command(s): /usr/bin/ninja -v cmTC_ee2d0
+        [1/2] /usr/bin/clang++ -DARGOS_CXX_RUNTIME_LINKS   -MD -MT CMakeFiles/cmTC_ee2d0.dir/src.cxx.o -MF CMakeFiles/cmTC_ee2d0.dir/src.cxx.o.d -o CMakeFiles/cmTC_ee2d0.dir/src.cxx.o -c /home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-jMbkr0/src.cxx
+        [2/2] : && /usr/bin/clang++   CMakeFiles/cmTC_ee2d0.dir/src.cxx.o -o cmTC_ee2d0   && :
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "/usr/share/cmake-3.28/Modules/CheckCXXSourceCompiles.cmake:52 (cmake_check_source_compiles)"
+      - "CMakeLists.txt:14 (check_cxx_source_compiles)"
+    checks:
+      - "Performing Test ARGOS_CXX_RUNTIME_LINKS"
+    directories:
+      source: "/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-jhBYPw"
+      binary: "/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-jhBYPw"
+    cmakeVariables:
+      CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS: "/usr/bin/clang-scan-deps-18"
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "ARGOS_CXX_RUNTIME_LINKS"
+      cached: true
+      stdout: |
+        Change Dir: '/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-jhBYPw'
+        
+        Run Build Command(s): /usr/bin/ninja -v cmTC_68ce9
+        [1/2] /usr/bin/clang++ -DARGOS_CXX_RUNTIME_LINKS   -MD -MT CMakeFiles/cmTC_68ce9.dir/src.cxx.o -MF CMakeFiles/cmTC_68ce9.dir/src.cxx.o.d -o CMakeFiles/cmTC_68ce9.dir/src.cxx.o -c /home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-jhBYPw/src.cxx
+        [2/2] : && /usr/bin/clang++   CMakeFiles/cmTC_68ce9.dir/src.cxx.o -o cmTC_68ce9   && :
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "/usr/share/cmake-3.28/Modules/CheckCXXSourceCompiles.cmake:52 (cmake_check_source_compiles)"
+      - "CMakeLists.txt:14 (check_cxx_source_compiles)"
+    checks:
+      - "Performing Test ARGOS_CXX_RUNTIME_LINKS"
+    directories:
+      source: "/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-K22i6m"
+      binary: "/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-K22i6m"
+    cmakeVariables:
+      CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS: "/usr/bin/clang-scan-deps-18"
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "ARGOS_CXX_RUNTIME_LINKS"
+      cached: true
+      stdout: |
+        Change Dir: '/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-K22i6m'
+        
+        Run Build Command(s): /usr/bin/ninja -v cmTC_616a0
+        [1/2] /usr/bin/clang++ -DARGOS_CXX_RUNTIME_LINKS   -MD -MT CMakeFiles/cmTC_616a0.dir/src.cxx.o -MF CMakeFiles/cmTC_616a0.dir/src.cxx.o.d -o CMakeFiles/cmTC_616a0.dir/src.cxx.o -c /home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-K22i6m/src.cxx
+        [2/2] : && /usr/bin/clang++   CMakeFiles/cmTC_616a0.dir/src.cxx.o -o cmTC_616a0   && :
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "/usr/share/cmake-3.28/Modules/CheckCXXSourceCompiles.cmake:52 (cmake_check_source_compiles)"
+      - "CMakeLists.txt:14 (check_cxx_source_compiles)"
+    checks:
+      - "Performing Test ARGOS_CXX_RUNTIME_LINKS"
+    directories:
+      source: "/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-LOQh2N"
+      binary: "/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-LOQh2N"
+    cmakeVariables:
+      CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS: "/usr/bin/clang-scan-deps-18"
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "ARGOS_CXX_RUNTIME_LINKS"
+      cached: true
+      stdout: |
+        Change Dir: '/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-LOQh2N'
+        
+        Run Build Command(s): /usr/bin/ninja -v cmTC_6ae49
+        [1/2] /usr/bin/clang++ -DARGOS_CXX_RUNTIME_LINKS   -MD -MT CMakeFiles/cmTC_6ae49.dir/src.cxx.o -MF CMakeFiles/cmTC_6ae49.dir/src.cxx.o.d -o CMakeFiles/cmTC_6ae49.dir/src.cxx.o -c /home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-LOQh2N/src.cxx
+        [2/2] : && /usr/bin/clang++   CMakeFiles/cmTC_6ae49.dir/src.cxx.o -o cmTC_6ae49   && :
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "/usr/share/cmake-3.28/Modules/CheckCXXSourceCompiles.cmake:52 (cmake_check_source_compiles)"
+      - "CMakeLists.txt:14 (check_cxx_source_compiles)"
+    checks:
+      - "Performing Test ARGOS_CXX_RUNTIME_LINKS"
+    directories:
+      source: "/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-xSxdd2"
+      binary: "/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-xSxdd2"
+    cmakeVariables:
+      CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS: "/usr/bin/clang-scan-deps-18"
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "ARGOS_CXX_RUNTIME_LINKS"
+      cached: true
+      stdout: |
+        Change Dir: '/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-xSxdd2'
+        
+        Run Build Command(s): /usr/bin/ninja -v cmTC_bda7f
+        [1/2] /usr/bin/clang++ -DARGOS_CXX_RUNTIME_LINKS   -MD -MT CMakeFiles/cmTC_bda7f.dir/src.cxx.o -MF CMakeFiles/cmTC_bda7f.dir/src.cxx.o.d -o CMakeFiles/cmTC_bda7f.dir/src.cxx.o -c /home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-xSxdd2/src.cxx
+        [2/2] : && /usr/bin/clang++   CMakeFiles/cmTC_bda7f.dir/src.cxx.o -o cmTC_bda7f   && :
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "/usr/share/cmake-3.28/Modules/CheckCXXSourceCompiles.cmake:52 (cmake_check_source_compiles)"
+      - "CMakeLists.txt:14 (check_cxx_source_compiles)"
+    checks:
+      - "Performing Test ARGOS_CXX_RUNTIME_LINKS"
+    directories:
+      source: "/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-7WUD64"
+      binary: "/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-7WUD64"
+    cmakeVariables:
+      CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS: "/usr/bin/clang-scan-deps-18"
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+    buildResult:
+      variable: "ARGOS_CXX_RUNTIME_LINKS"
+      cached: true
+      stdout: |
+        Change Dir: '/home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-7WUD64'
+        
+        Run Build Command(s): /usr/bin/ninja -v cmTC_27d83
+        [1/2] /usr/bin/clang++ -DARGOS_CXX_RUNTIME_LINKS   -MD -MT CMakeFiles/cmTC_27d83.dir/src.cxx.o -MF CMakeFiles/cmTC_27d83.dir/src.cxx.o.d -o CMakeFiles/cmTC_27d83.dir/src.cxx.o -c /home/dgti/Projetos/argoslang/build-clang/CMakeFiles/CMakeScratch/TryCompile-7WUD64/src.cxx
+        [2/2] : && /usr/bin/clang++   CMakeFiles/cmTC_27d83.dir/src.cxx.o -o cmTC_27d83   && :
+        
+      exitCode: 0
+...

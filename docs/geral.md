@@ -151,8 +151,8 @@ Arquivos também podem executar, pela VM e pelo backend x86-64/Linux:
 
 Funções comuns aceitam até seis argumentos. Métodos e construtores reservam
 uma posição para `this`; chamadas indiretas e lambdas reservam uma para o
-ambiente, deixando até cinco argumentos explícitos. Não há sobrecarga nem
-argumentos padrão de parâmetros. Parâmetros de lambdas exigem tipo explícito;
+ambiente, deixando até cinco argumentos explícitos. Há sobrecarga explícita com `overload`; argumentos padrão de parâmetros
+ainda não estão disponíveis. Parâmetros de lambdas exigem tipo explícito;
 o retorno é inferido em corpos de expressão e assume `void` em corpos de bloco
 sem anotação. Não há captura mutável explícita nesta etapa.
 
@@ -161,14 +161,25 @@ a arena é liberada no encerramento do processo. Ainda não há destruição por
 escopo, `deinit` ou verificação de ownership; este modelo não é uma implementação
 da memória determinística planejada na gramática.
 
-`check` também valida interfaces de métodos e propriedades, classes abstratas, herança simples,
-conformidade múltipla, ciclos, bases `final`, métodos `virtual`, requisitos
-`abstract`, `override` e `final override`. A execução de classes com bases ou
-classes abstratas é recusada com `ARGOS-C0001`: despacho polimórfico ainda não
-tem lowering. Referências ligadas a métodos (`var f = objeto.metodo`) também
-não são executáveis; a chamada `objeto.metodo(...)` funciona. Interfaces aceitam
-contratos `getter();`/`setter();`, mas não implementações padrão. `static`,
-`sealed`, genéricos e `super` continuam pendentes.
+Herança simples, interfaces, classes abstratas, métodos virtuais, `override`,
+`final override`, sobrecarga com `overload` e `super(...)`/`super.membro`
+executam na VM e no nativo. Uma classe estende no máximo uma superclasse e pode
+implementar várias interfaces. Interfaces são públicas por padrão e contêm
+contratos de métodos e propriedades, sem implementações padrão.
+`data` cria dados transitivamente imutáveis, finais, com construtor canônico
+e igualdade estrutural; `protocol` foi removido. As regras e limites atuais
+estão no [capítulo de POO](guide/10-classes-e-interfaces.md).
+Tipos (`class`, `interface`, `data`) e funções de topo são públicos por padrão;
+métodos de classe/data são privados, e requisitos de interface são públicos
+com alteração explícita de acesso permitida. `sealed class ... permited ...`
+restringe subclasses diretas; campos de `data` são sealed e a lista autoriza
+acesso imutável. `:` herda classes; `by` implementa interfaces.
+`default class` restringe acesso ao pacote declarado. Tipos privados/protegidos
+só podem ser aninhados. `class A with B, C` contém instâncias exclusivas e delega
+métodos públicos, sem criar subtipagem; colisões exigem resolução explícita.
+`data` também gera `hashCode()` e `toString()`. O guia descreve construção,
+permissões e limitações do modelo de memória.
+Referências ligadas a métodos, `static` e genéricos continuam pendentes.
 
 O REPL pode chamar funções de ordem superior em uma entrada, mas não preserva
 objetos nem closures em variáveis entre entradas e rejeita essas declarações
@@ -201,7 +212,8 @@ antes da chamada; métodos podem ser chamados por `obj?.metodo(...)`.
 O REPL preserva opcionais numéricos/bool e o estado anterior após entradas
 com erro. Continua rejeitando persistência de strings, objetos, arrays e
 closures. Arrays multidimensionais, redimensionamento, slices/views, `[T; N]`
-e `for` permanecem pendentes. Herança e protocolos continuam fora do lowering.
+e `for` permanecem pendentes. Herança e interfaces agora integram o lowering;
+`protocol` foi substituído por `data`.
 
 Exemplos de conformidade: `minimal_null_safety.argos`,
 `minimal_optional_arrays.argos`, `minimal_nil_unwrap.argos` e
@@ -373,10 +385,10 @@ como parte do MVP, a linguagem precisa dizer exatamente o que cada um significa:
   só é útil quando a linguagem tiver genéricos ou padrões que precisem dessas
   restrições;
 - `whenever`: o significado e a sintaxe ainda precisam ser decididos;
-- `with`: pode significar várias coisas em linguagens diferentes; não deve ser
-  implementado antes de escolher um único significado.
+- `with`: agora implementa composição exclusiva e delegação múltipla em classes;
+  veja o [guia de POO](guide/10-classes-e-interfaces.md).
 
-Não é necessário incluir essas quatro palavras no MVP. É melhor ter `if` e
+As três primeiras palavras continuam planejadas; `with` já executa no MVP. É melhor ter `if` e
 `for` bem definidos do que palavras extras com comportamento confuso.
 
 <a id="roadmap-6-completar-funções-de-forma-consistente"></a>
@@ -541,10 +553,11 @@ antes da consolidação dos demais itens deste roteiro:
 - [x] Visibilidade, inicialização de campos e rejeição de mutação imutável.
 - [x] Análise estática de herança, interfaces e sobrescrita.
 - [x] IR verificada e execução VM/x86-64 dos subconjuntos descritos no MVP.
-- [ ] Lowering de herança, despacho virtual e chamadas por interfaces.
+- [x] Lowering de herança, despacho virtual e chamadas por interfaces — 29/10/2026.
+- [x] `overload`, `override`, `super` e `data` transitivamente imutável — 29/10/2026.
 - [x] Propriedades computadas com `getter()` e `setter()`/`setter(nome)`.
 - [x] Construtor `construct(...)`, com rejeição da sintaxe antiga `init(...)`.
-- [ ] Acessores automáticos, membros estáticos, sobrecarga e genéricos.
+- [ ] Acessores automáticos, membros estáticos e genéricos.
 - [ ] Referências ligadas a métodos e captura mutável explícita.
 - [ ] Ownership, destruição por escopo e persistência de objetos/closures no REPL.
 
@@ -574,8 +587,7 @@ executáveis estão em [ArgosLang MVP](#mvp-poo-e-funções-como-valores-26-de-o
 - [x] Conformidade de saída e efeitos entre VM, binário nativo e assembly.
 - [ ] Persistência de opcionais de strings, objetos, arrays e closures no REPL.
 - [ ] Arrays multidimensionais, crescimento, slices/views, `[T; N]` e `for`.
-- [ ] Integração executável com herança, interfaces e tipos-base ainda sem
-      backend, conforme os limites gerais do MVP.
+- [x] Integração executável com herança, interfaces e tipos-base — 29/10/2026.
 
 O [capítulo de opcionais](guide/11-null-safety-e-opcionais.md) define tipos,
 curto-circuito, ordem dos efeitos, aninhamento, propriedades e limitações.
@@ -588,7 +600,7 @@ já são opcionais; `T??` explicitamente declarado continua tendo duas camadas.
 
 Opcionais não concluem o roteiro inteiro. Continuam pendentes texto persistente
 no REPL, operações de strings, `char`/Unicode, fechamento das regras numéricas,
-coleções além dos arrays mínimos, `for`, entrada básica, polimorfismo executável,
+coleções além dos arrays mínimos, `for`, entrada básica,
 ownership/destruição, persistência de objetos/closures e consolidação de
 instalação, diagnósticos e CI. As seções anteriores sobre ausência de coleções
 devem ser lidas agora como ausência de uma biblioteca ampla: arrays mínimos
@@ -1083,7 +1095,8 @@ mensagens seguintes podem ser consequência da estrutura incompleta.
 | `minimal_break.argos` | saída antecipada de laço |
 | `minimal_null_safety.argos` | operadores opcionais, propriedades e closures — VM e nativo |
 | `minimal_optional_arrays.argos` | arrays opcionais e chamadas seguras — VM e nativo |
-| `protocol_frontend.argos` | protocolos — apenas `check` |
+| `minimal_data.argos` | dados imutáveis e igualdade estrutural — VM e nativo |
+| `minimal_polymorphism.argos` | herança, interfaces, overload/override e super — VM e nativo |
 | `error_uninitialized.argos` | erro intencional |
 | `error_immutable.argos` | erro intencional |
 
@@ -1091,9 +1104,10 @@ mensagens seguintes podem ser consequência da estrutura incompleta.
 
 ### Limites desta versão
 
-Classes com herança, `data`, enums, interfaces completas, `for`, `switch`,
-`when`, genéricos, módulos, exceções, async/await e concorrência ainda estão em
-evolução.
+Herança simples, polimorfismo por interfaces, sobrecarga, sobrescrita e `data`
+executam na VM e no nativo. Enums, interfaces com implementação padrão, `for`,
+`switch`, `when`, genéricos, módulos, exceções, async/await e concorrência
+continuam pendentes.
 
 **Opcionais e null-safety** executam na VM e no nativo, incluindo `?[` de
 arrays opcionais inspirado no Dart. O REPL preserva opcionais numéricos/bool;
@@ -1197,7 +1211,7 @@ Ela possui:
 1. sintaxe moderna inspirada em Swift;
 2. classes como tipos com identidade e herança;
 3. interfaces como contratos comportamentais;
-4. protocols como agregados imutáveis equivalentes conceitualmente aos records do Java moderno;
+4. `data` como agregados imutáveis inspirados nos records do Java e data classes do Kotlin;
 5. generics e constraints;
 6. perfis hosted, embedded, freestanding e bare metal;
 7. compilação nativa direta, sem C, C++ ou LLVM intermediários;
@@ -1271,7 +1285,7 @@ ImportItemList ::= ImportItem ("," ImportItem)* ","? ;
 ImportItem ::= Identifier ("as" Identifier)? ;
 QualifiedName ::= Identifier ("." Identifier)* ;
 
-TopLevelDecl ::= ClassDecl | ProtocolDecl | InterfaceDecl | EnumDecl
+TopLevelDecl ::= ClassDecl | DataDecl | InterfaceDecl | EnumDecl
                | TypeAliasDecl | FunctionDecl | VariableDecl | ForeignDecl ;
 TypeAliasDecl ::= AttributeList? Visibility? "type" Identifier
                   GenericParameterClause? "=" Type SEMI ;
@@ -1286,21 +1300,25 @@ Instruções no topo são exclusivas de scripts. Módulos compilados contêm dec
 ```ebnf
 AttributeList ::= Attribute+ ;
 Attribute ::= "@" QualifiedName ("(" ArgumentList? ")")? ;
-Visibility ::= "public" | "internal" | "protected" | "private" ;
+Visibility ::= "public" | "internal" | "protected" | "private" | "default" ;
 ClassModifier ::= "abstract" | "sealed" | "final" | "unsafe" ;
-MemberModifier ::= "abstract" | "final" | "override" | "static"
+MemberModifier ::= "abstract" | "virtual" | "final" | "override" | "overload" | "static"
                  | "mut" | "unsafe" | "async" | "native" ;
 ```
 
 - `public`: acessível por módulos importadores;
-- `internal`: acessível no módulo e padrão para declarações de topo;
-- `protected`: classe e subclasses; somente membros;
+- `internal`: acessível no módulo; tipos e funções de topo são `public` por padrão;
+- métodos de classe/data são `private` por padrão;
+- `default`: mesmo pacote declarado;
+- `protected`: classe e subclasses; classes protegidas somente aninhadas;
 - `private`: escopo nominal que declarou o membro;
-- `sealed class`: subclasses somente no mesmo módulo;
+- `sealed class`: subclasses diretas somente quando listadas em `permited`;
 - `final class`: não pode ser estendida;
 - `final` em membro: não pode ser sobrescrito;
 - `abstract`: exige implementação concreta;
-- `override`: obrigatório em toda sobrescrita;
+- `override`: obrigatório ao sobrescrever uma implementação herdada de classe;
+- `overload`: obrigatório em cada assinatura adicional; retorno e rótulos não diferenciam sobrecargas;
+- interfaces e seus membros são públicos por padrão; modificadores usam palavras-chave, sem `@`;
 - `sealed final` é redundante e inválido.
 
 <a id="gramatica-8-classes"></a>
@@ -1312,8 +1330,11 @@ MemberModifier ::= "abstract" | "final" | "override" | "static"
 ```ebnf
 ClassDecl ::= AttributeList? Visibility? ClassModifier*
               "class" Identifier GenericParameterClause?
-              ClassInheritanceClause? WhereClause? ClassBody ;
-ClassInheritanceClause ::= ":" NamedType ("," NamedType)* ;
+              ClassInheritanceClause? InterfaceImplementationClause? CompositionClause? PermitedClause? WhereClause? ClassBody ;
+ClassInheritanceClause ::= ":" NamedType ;
+CompositionClause ::= "with" NamedType ("," NamedType)* ;
+InterfaceImplementationClause ::= "by" NamedType ("," NamedType)* ;
+PermitedClause ::= "permited" Identifier ("," Identifier)* ;
 ClassBody ::= "{" ClassMember* "}" ;
 
 ClassMember ::= FieldDecl | PropertyDecl | ConstructorDecl
@@ -1341,7 +1362,7 @@ MethodDecl ::= AttributeList? Visibility? MemberModifier*
 
 ComputedPropertyDecl ::= AttributeList? Visibility? MemberModifier*
                          "var" ("mut")? Identifier ":" Type PropertyBody ;
-NestedTypeDecl ::= ClassDecl | ProtocolDecl | InterfaceDecl | EnumDecl
+NestedTypeDecl ::= ClassDecl | DataDecl | InterfaceDecl | EnumDecl
                  | TypeAliasDecl ;
 OperatorDecl ::= AttributeList? Visibility? MemberModifier*
                  "operator" OperatorToken "(" ParameterList? ")"
@@ -1351,50 +1372,42 @@ OperatorToken ::= "+" | "-" | "*" | "/" | "%" | "==" | "!="
 EmptyDecl ::= SEMI ;
 ```
 
-Uma classe estende no máximo uma classe e implementa múltiplas interfaces. A classe-base, se houver, é o primeiro item. Todos os campos obrigatórios devem estar inicializados ao final de `construct`. `deinit` é único e determinístico.
+Uma classe estende no máximo uma classe e implementa múltiplas interfaces. Herança usa `:` e implementação usa `by`; por exemplo, `class Funcionario: Pessoa by FormaPagamento`. Todos os campos obrigatórios devem estar inicializados ao final de `construct`. `super(argumentos)` constrói a base antes dos campos da subclasse; `deinit` e destruição por escopo continuam planejados.
 
 Corpos ausentes só são válidos em membro abstrato, requisito de interface ou declaração estrangeira.
 
 <a id="gramatica-9-protocols-de-dados"></a>
 
-### 9. Protocols de dados
+### 9. Data imutável
 
-Na ArgosLang, `protocol` significa agregado nominal imutável, equivalente conceitual ao `record` do Java 17–25. Não significa interface no sentido do Swift; esse papel pertence a `interface`.
+`protocol` foi removido. `interface` representa contratos; `data` representa
+agregados transitivamente imutáveis inspirados em data classes do Kotlin e
+records do Java.
 
 ```ebnf
-ProtocolDecl ::= AttributeList? Visibility? "protocol" Identifier
-                 GenericParameterClause?
-                 "(" ProtocolComponentList? ")"
-                 ProtocolConformanceClause? WhereClause?
-                 (ProtocolBody | SEMI) ;
-ProtocolComponentList ::= ProtocolComponent ("," ProtocolComponent)* ","? ;
-ProtocolComponent ::= AttributeList? Visibility? Identifier ":" Type
-                      ("=" Expression)? ;
-ProtocolConformanceClause ::= ":" NamedType ("," NamedType)* ;
-ProtocolBody ::= "{" ProtocolMember* "}" ;
-ProtocolMember ::= ComputedPropertyDecl | MethodDecl
-                 | NestedTypeDecl | EmptyDecl ;
+DataDecl ::= Visibility? "data" "class"? Identifier
+             ("(" DataComponentList? ")")?
+             ("by" Identifier ("," Identifier)*)? PermitedClause?
+             (ClassBody | SEMI) ;
+DataComponentList ::= DataComponent ("," DataComponent)* ","? ;
+DataComponent ::= Identifier ":" Type ;
 ```
 
-Um `protocol` possui implicitamente:
+A forma com componentes gera campos privados e imutáveis com autorização `permited` e `construct`
+público com os mesmos nomes como rótulos de parâmetros. Apenas o próprio tipo e
+as entidades nominais listadas em `permited` acessam diretamente os campos. Componentes `nome: tipo;` no corpo também geram construtor canônico; campos
+explícitos com `var` seguem as regras de inicialização. O corpo permite métodos e conformidade
+de interfaces. `data` é sempre final, concreto e não estende classes.
 
-- componentes finais e imutáveis;
-- inicializador canônico;
-- igualdade e hashing estruturais;
-- representação textual estrutural;
-- decomposição por pattern matching;
-- proibição de herança de implementação;
-- possibilidade de implementar interfaces;
-- impossibilidade de adicionar campos ocultos no corpo.
-
-`protocol` é implicitamente final e não aceita `abstract`, `sealed` ou `final`.
+Campos podem conter escalares, strings, opcionais desses tipos e outros `data`.
+São rejeitados `var mut`, propriedades computadas, arrays, closures, referências
+a classes comuns e grafos recursivos. `==`, `!=` e `?==` com tipo estático `data`
+comparam os campos recursivamente. O armazenamento atual ainda usa objetos;
+conversão para interface conserva identidade de referência. `hashCode()`, `toString()` e impressão estrutural são gerados automaticamente.
+`copy`, `componentN`, decomposição e serialização automática não estão implementados.
 
 ```argos
-public protocol User<TId>(
-    id: TId,
-    name: string,
-    email: string?
-) : Serializable where TId: Hashable;
+data User(id: int, name: string, email: string?);
 ```
 
 <a id="gramatica-10-interfaces"></a>
@@ -1428,7 +1441,9 @@ DefaultMethodDecl ::= AttributeList? Visibility?
                       FunctionSignature FunctionBody ;
 ```
 
-Interfaces podem herdar múltiplas interfaces. Implementações padrão não armazenam estado. Conformidade é nominal.
+Interfaces são públicas por padrão e podem estender múltiplas interfaces, sem
+estender classes. Conformidade é nominal. A gramática ampliada acima inclui
+recursos planejados: implementações padrão e tipos associados ainda não são aceitos.
 
 <a id="gramatica-11-enums"></a>
 
@@ -1547,12 +1562,12 @@ VariableType ::= ":" Type ;
 VariableInitializer ::= "=" Expression ;
 
 Pattern ::= IdentifierPattern | WildcardPattern | TuplePattern
-          | ProtocolPattern | EnumPattern | LiteralPattern ;
+          | DataPattern | EnumPattern | LiteralPattern ;
 IdentifierPattern ::= Identifier ;
 WildcardPattern ::= "_" ;
 TuplePattern ::= "(" PatternList? ")" ;
 PatternList ::= Pattern ("," Pattern)* ","? ;
-ProtocolPattern ::= QualifiedName "(" NamedPatternList? ")" ;
+DataPattern ::= QualifiedName "(" NamedPatternList? ")" ;
 NamedPatternList ::= NamedPattern ("," NamedPattern)* ","? ;
 NamedPattern ::= Identifier ":" Pattern ;
 EnumPattern ::= QualifiedName ("(" PatternList? ")")? ;
@@ -1774,7 +1789,9 @@ Classes possuem herança simples de implementação e múltipla conformidade de 
 - `abstract` introduz requisito;
 - `override` confirma membro herdado compatível;
 - `final override` impede nova sobrescrita;
-- sobrecarga não se distingue apenas pelo retorno;
+- assinaturas adicionais exigem `overload`; retorno e rótulos não diferenciam sobrecargas;
+- `super()` é a primeira instrução de `construct`, ou a base acessível sem argumentos é construída implicitamente;
+- `super.membro` seleciona a implementação da base, conservando visibilidade;
 - campos não são sobrescritos;
 - casts descendentes exigem teste ou conversão explícita.
 
@@ -1789,7 +1806,7 @@ Classes possuem herança simples de implementação e múltipla conformidade de 
 - `&mut T` é referência mutável exclusiva;
 - `*const T` e `*mut T` são raw e exigem `unsafe`;
 - referências não sobrevivem ao valor referenciado;
-- protocols são valores e podem ser inline;
+- `data` possui igualdade por conteúdo; armazenamento inline ainda é planejado;
 - alocações ocultas podem ser proibidas por perfil.
 
 <a id="gramatica-22-unsafe-e-bare-metal"></a>
@@ -1860,11 +1877,11 @@ Devem ser diagnosticados:
 
 - nomes e tipos inexistentes;
 - duplicatas e ciclos de herança/constraints;
-- classe final estendida ou sealed fora do módulo;
+- classe final estendida ou entidade fora da lista `permited` de uma base sealed;
 - sobrescrita sem `override`;
 - requisito abstrato ausente;
 - estado armazenado em interface;
-- mutação de componente de protocol;
+- mutação de campo de data;
 - violações de optional e force unwrap;
 - caminhos sem retorno;
 - patterns não exaustivos;
@@ -1889,7 +1906,7 @@ public interface Identifiable<TId> {
     public var id: TId { getter(); }
 }
 
-public sealed class Account<TId> : Identifiable<TId>
+sealed class Account<TId> by Identifiable<TId>
 where TId: Hashable {
     public var id: TId;
     private var mut balance: long;
@@ -1909,14 +1926,10 @@ where TId: Hashable {
 
 <a id="gramatica-262-protocol"></a>
 
-#### 26.2. Protocol
+#### 26.2. Data
 
 ```argos
-public protocol SensorReading<T>(
-    sensor: string,
-    value: T,
-    timestamp: ulong
-) : Serializable where T: Numeric;
+data SensorReading(sensor: string, value: double, timestamp: int);
 ```
 
 <a id="gramatica-263-null-safety"></a>
@@ -1957,7 +1970,7 @@ Não existe etapa C, C++ ou LLVM. Cada backend Argos conhece diretamente ISA, AB
 
 ### 28. Perfil mínimo
 
-O primeiro perfil completo deve conter módulos simples, funções, variáveis, primitivos, `string` mínima, opcionais, classes finais, protocols, interfaces, generics monomorfizados, controle de fluxo, lambdas restritas, IR verificada, VM, um backend direto e FFI C com símbolos compilados.
+O primeiro perfil completo deve conter módulos simples, funções, variáveis, primitivos, `string` mínima, opcionais, classes finais, data, interfaces, generics monomorfizados, controle de fluxo, lambdas restritas, IR verificada, VM, um backend direto e FFI C com símbolos compilados.
 
 Recursos posteriores falham explicitamente até possuírem semântica e lowering.
 
@@ -2016,7 +2029,7 @@ retorno assumem `void`. Métodos são não virtuais por padrão.
 Classes concretas sem bases e closures com captura imutável têm lowering para
 IR, VM e x86-64. Propriedades computadas foram acrescentadas em 27/10/2026.
 Herança executável, genéricos e membros estáticos,
-`sealed`, captura mutável, ownership e destruição por escopo permanecem planos.
+captura mutável, ownership e destruição por escopo permanecem planos.
 A memória desta etapa é uma arena com duração da execução. Consulte a matriz
 atual em [ArgosLang MVP](#mvp-poo-e-funções-como-valores-26-de-outubro-de-2026).
 
@@ -2088,9 +2101,9 @@ incluindo VM, compilador nativo, REPL, diagnósticos e conformidade — consulte
    O `while` recebe uma expressão booleana; condições múltiplas são
    combinadas explicitamente, sem uma sintaxe ambígua. `break` e `continue`
    já estão disponíveis em `while`.
-2. Tipos nominais: `data` (record imutável com `with`), `enum`, `class` e
-   `interface`, com visibilidade pública padrão de tipos e privada padrão de
-   membros.
+2. Tipos nominais: `data` (record imutável com permissões `permited`), `enum`, `class` e
+   `interface`, com visibilidade pública padrão de tipos e funções de topo, privada padrão de
+   métodos de classe e pública padrão de requisitos de interface.
 3. Padrões: `when` como expressão e instrução, incluindo `nil`, variantes de
    `enum`/`data` e refinamento de `unknown`.
 4. Genéricos reificados: `T`, `T extends Base`, `where` e wildcards `?`,
@@ -2103,8 +2116,7 @@ incluindo VM, compilador nativo, REPL, diagnósticos e conformidade — consulte
 
 `static`, `extern`, `inline`, `lazy`, `eager`, `raw` e `unsafe` são
 modificadores contextuais, não tipos. `eager` é o padrão; `lazy` cria uma
-inicialização sob demanda. `sealed` e `permitted` pertencem apenas à
-hierarquia nominal.
+inicialização sob demanda. `sealed` e `permited` restringem a hierarquia nominal e o acesso aos campos de `data`.
 
 
 ---
@@ -2789,8 +2801,9 @@ subconjunto descrito em [ArgosLang MVP](#mvp).
 - O REPL usa o mesmo frontend, lowering e VM, e preserva variáveis locais
   `int`/`bool` entre entradas.
 - Strings armazenadas, opcionais, arrays homogêneos, classes concretas e
-  closures já executam na VM e no nativo. Protocolos, herança executável,
-  backends ARM64/RISC-V/AVR e cross-compilation continuam pendentes.
+  closures já executam na VM e no nativo. Herança, interfaces, `super`,
+  overload/override e `data` também executam. Backends ARM64/RISC-V/AVR e
+  cross-compilation continuam pendentes.
   A matriz completa está no [MVP](#mvp).
 
 Uma construção aceita por `check` ainda pode não ser executável. Nesses casos,
@@ -3328,3 +3341,53 @@ LLVM will later implement a backend port that consumes the lower IR.
 - Frontend tests do not need LLVM.
 - Language semantics remain owned by ArgosLang.
 - Lowering contracts must be carefully specified.
+
+## Atualização implementada: pacotes, composição e records
+
+O [guia de classes](guide/10-classes-e-interfaces.md) é a referência operacional
+para `package`, `default`, tipos aninhados, composição múltipla `with`, construção
+exclusiva e geração de hash/texto de `data`. A sintaxe permanece `function`, `:`
+para superclasse, `by` para interfaces e `permited`; `extends`/`permits` não foram
+introduzidos. `argosc check/run/compile` aceita vários arquivos explícitos,
+preservando os pacotes e a origem dos diagnósticos. `uint_8` representa 0..255
+e possui checagem de faixa. A arena continua tendo duração de execução; o vínculo
+exclusivo dos componentes não equivale a um sistema geral de owner/borrow.
+
+### Entregas desta etapa
+
+- Visibilidade pública implícita para tipos e funções de topo, métodos de classe
+  privados por padrão e requisitos de interface públicos por padrão.
+- `default class` por pacote declarado, tipos aninhados e rejeição de classes
+  privadas/protegidas no nível superior, incluindo acesso aos contenedores.
+- Herança simples com `:`, contratos com `by`, despacho polimórfico,
+  `overload`, `override`, `super` e validação de classes abstratas.
+- Hierarquias `sealed` com lista explícita e não vazia de herdeiros diretos
+  existentes e acessíveis em `permited`.
+- Composição múltipla `with`: instâncias independentes, encaminhamento de métodos
+  públicos com o receptor correto, resolução explícita de conflitos e construção
+  exclusiva por construtor padrão acessível ou atribuição de uma instância nova.
+- `data` final e transitivamente imutável, componentes privados e permissão exata
+  de leitura por tipo nominal, sem transferência para subclasses ou serializadores.
+  Componentes no corpo geram construtor canônico. Igualdade estrutural, hash e
+  texto são automáticos; os métodos gerados cumprem interfaces compatíveis.
+- Diagnósticos `ARGOS-S0626` a `ARGOS-S0632` para composição, inicialização, acesso
+  e nomes reservados, preservando arquivo e trecho em programas com vários arquivos.
+
+A validação final passou em **239 de 239 testes com GCC e com Clang**, com
+execução pela VM e pelo nativo x86-64/Linux. O `build/` local foi reconstruído.
+Testes adicionais confirmaram métodos gerados de `data` via interface e erro de
+faixa de `uint_8` nos dois backends. Os links e a navegação da documentação foram
+verificados. Exemplos completos: `examples/minimal_composition.argos`,
+`examples/minimal_records.argos` e `examples/packages/`.
+
+### Trabalho ainda pendente
+
+O vínculo exclusivo de `with` usa a arena existente, liberada ao fim da execução
+(VM) ou do processo (`atexit` no nativo). Ainda faltam ownership/borrowing gerais,
+lifetimes, destruição por escopo e `deinit`. Também faltam modos de alocação manual
+com ponteiros e sua exclusão estática em relação ao modo de ownership; esta etapa
+não introduziu esses modos. `with &T` e `with shared T` não estão disponíveis.
+
+Outros limites atuais: métodos ligados como valores, `static`, genéricos, captura
+mutável, `copy`/`componentN` e serialização automática de `data`. Não há busca
+automática de imports: os arquivos do programa são informados ao driver.

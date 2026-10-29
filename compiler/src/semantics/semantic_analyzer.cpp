@@ -11,6 +11,8 @@
 
 namespace argos::semantics {
 namespace {
+std::string component_alias(const std::string &);
+std::string component_field(const std::string &, const std::string &);
 
 Type error_type() { return Type{TypeKind::error, 0}; }
 Type unknown_type() { return Type{TypeKind::unknown, 0}; }
@@ -141,12 +143,17 @@ bool SemanticAnalyzer::analyze(const ast::Program &program) {
   expression_coercions_.clear();
   expression_symbols_.clear();
   symbol_records_.clear();
-  nominal_fields_.clear();
   classes_.clear();
   current_class_.clear();
   lambda_scope_boundaries_.clear();
   active_lambdas_.clear();
   lambda_captures_.clear();
+  declaration_symbols_.clear();
+  resolved_calls_.clear();
+  global_overloads_.clear();
+  super_initialized_ = true;
+  calling_super_ = false;
+  resolving_callee_ = false;
   in_constructor_ = false;
   initializing_field_ = false;
   constructor_lambda_context_ = false;
@@ -154,46 +161,98 @@ bool SemanticAnalyzer::analyze(const ast::Program &program) {
   loop_depth_ = 0;
 
   enter_scope();
-  for (const auto& item : program.items) {
-    if (const auto* type = dynamic_cast<const ast::ClassDeclaration*>(item.get())) {
-      declare(Symbol{.name = type->name, .kind = Symbol::Kind::type,
-                     .type = Type{TypeKind::nominal_type, 0, type->name},
-                     .initialized = true, .span = type->span});
-      classes_.try_emplace(type->name, ClassInfo{type, {}, 0});
+  class_order_.clear();
+  component_bindings_.clear();
+  current_package_ = program.package_name;
+  const auto collect = [&](auto &&self,
+                           const ast::ClassDeclaration &type) -> void {
+    declare(Symbol{.name = type.name,
+                   .kind = Symbol::Kind::type,
+                   .type = Type{TypeKind::nominal_type, 0, type.name},
+                   .initialized = true,
+                   .span = type.span});
+    ClassInfo info;
+    info.declaration = &type;
+    classes_.try_emplace(type.name, std::move(info));
+    class_order_.push_back(&type);
+    for (const auto &member : type.members)
+      if (const auto *nested =
+              dynamic_cast<const ast::ClassDeclaration *>(member.get()))
+        self(self, *nested);
+  };
+  for (const auto &item : program.items)
+    if (const auto *type =
+            dynamic_cast<const ast::ClassDeclaration *>(item.get()))
+      collect(collect, *type);
+  for (const auto *type : class_order_) {
+    auto &info = classes_.at(type->name);
+    for (const auto &name : type->bases)
+      info.bases.push_back(
+          resolve_nominal(name, type->name, type->package_name));
+    for (const auto &name : type->interfaces)
+      info.interfaces.push_back(
+          resolve_nominal(name, type->name, type->package_name));
+    for (const auto &name : type->permited)
+      info.permissions.push_back(
+          resolve_nominal(name, type->name, type->package_name));
+    for (const auto &name : type->components)
+      info.components.push_back(
+          resolve_nominal(name, type->name, type->package_name));
+  }
+  for (const auto *type : class_order_)
+    build_class(type->name);
+  for (const auto *type : class_order_) {
+    if (type->enclosing_type.empty() &&
+        (type->modifiers.visibility == ast::Visibility::private_ ||
+         type->modifiers.visibility == ast::Visibility::protected_))
+      report("ARGOS-S0629", type->span,
+             "private/protected class só é válida como classe aninhada");
+    if (type->modifiers.sealed_ && !type->is_data) {
+      const auto &info = classes_.at(type->name);
+      if (info.permissions.empty())
+        report("ARGOS-S0624", type->span,
+               "sealed exige uma lista permited explícita e não vazia");
+      const auto saved_class = current_class_;
+      const auto saved_package = current_package_;
+      current_class_ = type->name;
+      current_package_ = type->package_name;
+      for (const auto &name : info.permissions)
+        if (classes_.contains(name))
+          accessible_type(name, type->span);
+      current_class_ = saved_class;
+      current_package_ = saved_package;
+      for (const auto &name : info.permissions)
+        if (classes_.contains(name) &&
+            std::find(classes_.at(name).bases.begin(),
+                      classes_.at(name).bases.end(),
+                      type->name) == classes_.at(name).bases.end())
+          report("ARGOS-S0624", type->span,
+                 "entidade permited deve herdar/implementar diretamente o tipo "
+                 "sealed: " +
+                     name);
     }
   }
-
-  for (const auto &item : program.items) {
-    if (item->kind == ast::NodeKind::protocol_declaration)
-      analyze_declaration(*static_cast<const ast::Declaration *>(item.get()));
-  }
-
-  for (auto& [name, info] : classes_) build_class(name);
 
   // Install function signatures before analyzing calls and executable code.
   for (const auto &item : program.items) {
     if (item->kind == ast::NodeKind::function_declaration) {
+      current_package_ =
+          static_cast<const ast::Declaration *>(item.get())->package_name;
       analyze_declaration(*static_cast<const ast::Declaration *>(item.get()));
     }
   }
 
-  for (const auto &item : program.items) {
-    if (item->kind == ast::NodeKind::protocol_declaration)
-      analyze_protocol_declaration(
-          static_cast<const ast::ProtocolDeclaration &>(*item));
-  }
-
+  for (const auto *type : class_order_)
+    analyze_class(*type);
   // Variables and statements retain source order for definite initialization.
   for (const auto &item : program.items) {
+    current_package_ = item->package_name;
     switch (item->kind) {
     case ast::NodeKind::function_declaration:
       analyze_function_declaration(
           static_cast<const ast::FunctionDeclaration &>(*item));
       break;
-    case ast::NodeKind::protocol_declaration:
-      break;
     case ast::NodeKind::class_declaration:
-      analyze_class(static_cast<const ast::ClassDeclaration&>(*item));
       break;
     case ast::NodeKind::variable_declaration:
       analyze_variable_declaration(
@@ -241,6 +300,12 @@ void SemanticAnalyzer::leave_scope() {
 
 Symbol *SemanticAnalyzer::lookup(std::string_view name) {
   for (auto it = scopes_.rbegin(); it != scopes_.rend(); ++it) {
+    if (&*it == &scopes_.front() && !current_package_.empty()) {
+      const auto scoped =
+          it->symbols.find(current_package_ + "." + std::string{name});
+      if (scoped != it->symbols.end())
+        return &scoped->second;
+    }
     const auto found = it->symbols.find(std::string(name));
     if (found != it->symbols.end()) {
       return &found->second;
@@ -251,6 +316,12 @@ Symbol *SemanticAnalyzer::lookup(std::string_view name) {
 
 const Symbol *SemanticAnalyzer::lookup(std::string_view name) const {
   for (auto it = scopes_.rbegin(); it != scopes_.rend(); ++it) {
+    if (&*it == &scopes_.front() && !current_package_.empty()) {
+      const auto scoped =
+          it->symbols.find(current_package_ + "." + std::string{name});
+      if (scoped != it->symbols.end())
+        return &scoped->second;
+    }
     const auto found = it->symbols.find(std::string(name));
     if (found != it->symbols.end()) {
       return &found->second;
@@ -330,24 +401,27 @@ void SemanticAnalyzer::analyze_declaration(
     {
       const auto& function = static_cast<const ast::FunctionDeclaration&>(declaration);
       if (function.modifiers.abstract_ || function.modifiers.override_ ||
-          function.modifiers.virtual_ || function.modifiers.final_ || function.modifiers.static_)
+          function.modifiers.virtual_ || function.modifiers.final_ ||
+          function.modifiers.static_ || function.modifiers.sealed_)
         report("ARGOS-S0600", function.span, "modificador de membro fora de um tipo");
-      declare(function_symbol(function));
+      auto symbol = function_symbol(function);
+      auto &overloads = global_overloads_[symbol.name];
+      for (const auto &prior : overloads)
+        if (dispatch_key(prior) == dispatch_key(symbol))
+          report("ARGOS-S0001", function.span,
+                 "assinatura duplicada: " + function.name);
+      if (!overloads.empty() && symbol.name == "main")
+        report("ARGOS-S0620", function.span,
+               "main deve possuir uma única assinatura de entrada");
+      if (!overloads.empty() && !symbol.modifiers.overload_)
+        report("ARGOS-S0620", function.span,
+               "sobrecarga adicional exige overload");
+      declaration_symbols_[&function] = symbol;
+      if (overloads.empty())
+        declare(symbol);
+      overloads.push_back(symbol);
     }
     break;
-  case ast::NodeKind::protocol_declaration: {
-    const auto &protocol = static_cast<const ast::ProtocolDeclaration &>(declaration);
-    declare(Symbol{
-        .name = protocol.name,
-        .kind = Symbol::Kind::type,
-        .type = Type{TypeKind::nominal_type, 0, protocol.name},
-        .initialized = true,
-        .parameter_types = {},
-        .parameter_labels = {},
-        .span = protocol.span,
-    });
-    break;
-  }
   default:
     report("ARGOS-S0003", declaration.span,
            "declaração semântica desconhecida");
@@ -355,42 +429,22 @@ void SemanticAnalyzer::analyze_declaration(
   }
 }
 
-void SemanticAnalyzer::analyze_protocol_declaration(
-    const ast::ProtocolDeclaration &declaration) {
-  auto &fields = nominal_fields_[declaration.name];
-  for (const auto &component : declaration.components) {
-    if (fields.contains(component->name)) {
-      report("ARGOS-S0500", component->span,
-             "componente " + quoted(component->name) + " duplicado no protocol");
-      continue;
-    }
-    Type type = resolve_type(*component->type);
-    if (type.kind == TypeKind::void_type || type.kind == TypeKind::never_type) {
-      report("ARGOS-S0501", component->type->span,
-             "componente de protocol exige tipo habitável");
-      type = error_type();
-    }
-    if (component->initializer) {
-      const Type value = analyze_expression(*component->initializer);
-      const bool assignable = is_assignable_expression(value, type, *component->initializer);
-      if (!assignable &&
-          !value.is_error() && !type.is_error())
-        report("ARGOS-S0502", component->initializer->span,
-               "valor padrão do componente tem tipo incompatível");
-      if (assignable) record_coercion(*component->initializer, value, type);
-    }
-    fields.emplace(component->name, type);
-  }
-}
-
 void SemanticAnalyzer::analyze_variable_declaration(
     const ast::VariableDeclaration &declaration) {
   if (declaration.is_property)
     report("ARGOS-S0607", declaration.span, "propriedade só pode ser declarada como membro de um tipo");
+  if (!current_class_.empty())
+    for (const auto &component : classes_.at(current_class_).components)
+      if (declaration.name == component_alias(component))
+        report("ARGOS-S0626", declaration.span,
+               "variável não pode ocultar qualificador with: " +
+                   declaration.name);
   if (!current_class_.empty() && declaration.name == "this")
     report("ARGOS-S0600", declaration.span, "variável não pode ocultar this");
-  if (declaration.modifiers.final_ || declaration.modifiers.abstract_ || declaration.modifiers.override_ ||
-      declaration.modifiers.virtual_ || declaration.modifiers.static_)
+  if (declaration.modifiers.final_ || declaration.modifiers.abstract_ ||
+      declaration.modifiers.override_ || declaration.modifiers.overload_ ||
+      declaration.modifiers.virtual_ || declaration.modifiers.static_ ||
+      declaration.modifiers.sealed_)
     report("ARGOS-S0600", declaration.span, "modificador incompatível com variável local ou global");
   Type declared_type = declaration.type ? resolve_type(*declaration.type) : unknown_type();
 
@@ -458,7 +512,12 @@ void SemanticAnalyzer::analyze_variable_declaration(
 
 void SemanticAnalyzer::analyze_function_declaration(
     const ast::FunctionDeclaration &declaration) {
-  const Symbol *function = lookup(declaration.name);
+  if (declaration.builtin != ast::FunctionDeclaration::Builtin::none)
+    return;
+  const auto declared = declaration_symbols_.find(&declaration);
+  const Symbol *function = declared != declaration_symbols_.end()
+                               ? &declared->second
+                               : lookup(declaration.name);
   if (function == nullptr || function->kind != Symbol::Kind::function) {
     return;
   }
@@ -648,8 +707,7 @@ Type SemanticAnalyzer::analyze_expression(const ast::Expression &expression,
     Symbol implicit;
     implicit.return_type = result;
     if (constructor != found->second.members.end()) {
-      if (const auto* member = find_member(result, "construct", expression.span))
-        check_call(*creation.call, *member);
+      resolve_overload(*creation.call, found->second.methods.at("construct"));
     } else check_call(*creation.call, implicit);
     break;
   }
@@ -786,12 +844,75 @@ Type SemanticAnalyzer::analyze_expression(const ast::Expression &expression,
 
 Type SemanticAnalyzer::analyze_identifier(
     const ast::IdentifierExpression &expression) {
+  if (expression.name == "super") {
+    if (!active_lambdas_.empty())
+      report("ARGOS-S0622", expression.span,
+             "super só pode ser acessado diretamente no corpo do método");
+    const auto base = superclass(current_class_);
+    if (base.empty()) {
+      report("ARGOS-S0622", expression.span, "super exige superclasse");
+      return error_type();
+    }
+    if (!accessing_member_base_)
+      report("ARGOS-S0622", expression.span,
+             "super só pode ser usado como chamada ou acesso a membro");
+    return Type{TypeKind::nominal_type, 0, base};
+  }
+  if (expression.name.starts_with("$with.")) {
+    report("ARGOS-S0631", expression.span,
+           "armazenamento interno de componente não pertence à API");
+    return error_type();
+  }
+  if (!current_class_.empty())
+    for (const auto &component : classes_.at(current_class_).components) {
+      if (expression.name != component_alias(component) &&
+          expression.name != component)
+        continue;
+      if (expression.name != component &&
+          std::count_if(classes_.at(current_class_).components.begin(),
+                        classes_.at(current_class_).components.end(),
+                        [&](const std::string &candidate) {
+                          return component_alias(candidate) == expression.name;
+                        }) > 1)
+        report("ARGOS-S0626", expression.span,
+               "qualificador de componente ambíguo; use o nome completo");
+      if (calling_super_)
+        report("ARGOS-S0622", expression.span,
+               "argumentos de super não podem acessar componentes de this");
+      if (in_constructor_ && !analyzing_assignment_target_)
+        for (const auto &pending : classes_.at(current_class_).fields)
+          if (const auto *field = lookup_field(pending->name);
+              field && !field->initialized)
+            report(
+                "ARGOS-S0628", expression.span,
+                "inicialize todos os componentes antes de chamadas delegadas");
+      const auto field = component_field(current_class_, component);
+      component_bindings_[&expression] = {current_class_, field};
+      if (!accessing_member_base_ && !analyzing_assignment_target_)
+        report("ARGOS-S0631", expression.span,
+               "componente with só pode ser usado como receptor qualificado ou "
+               "alvo de inicialização");
+      if (!analyzing_assignment_target_)
+        if (const auto *stored = lookup_field(field);
+            stored && !stored->initialized)
+          report("ARGOS-S0628", expression.span,
+                 "componente usado antes da inicialização: " + component);
+      capture_receiver(expression.span);
+      return Type{TypeKind::nominal_type, 0, component};
+    }
   const Symbol *symbol = lookup(expression.name);
   if (symbol == nullptr) {
     report("ARGOS-S0300", expression.span,
            "identificador " + quoted(expression.name) + " não foi declarado");
     return error_type();
   }
+  if ((!symbol->owner.empty() || symbol->kind == Symbol::Kind::function) &&
+      !(resolving_callee_ && symbol->kind == Symbol::Kind::function) &&
+      !accessible(*symbol, expression.span))
+    return error_type();
+  if (calling_super_ && (symbol->name == "this" || !symbol->owner.empty()))
+    report("ARGOS-S0622", expression.span,
+           "argumentos de super não podem observar this ou seus membros");
   if (!analyzing_assignment_target_ &&
       symbol->kind != Symbol::Kind::function && !symbol->initialized) {
     report("ARGOS-S0301", expression.span,
@@ -819,6 +940,31 @@ Type SemanticAnalyzer::analyze_identifier(
       if (std::none_of(captures.begin(), captures.end(), [&](const Symbol& value) { return value.id == symbol->id; }))
         captures.push_back(*symbol);
     }
+  }
+  if (symbol->kind == Symbol::Kind::function && !symbol->owner.empty() &&
+      !active_lambdas_.empty()) {
+    if (constructor_lambda_context_)
+      report("ARGOS-S0613", expression.span,
+             "closure não pode capturar instância em construção");
+    if (const auto *receiver = lookup("this"))
+      for (const auto *lambda : active_lambdas_) {
+        auto &captures = lambda_captures_[lambda];
+        if (std::none_of(captures.begin(), captures.end(),
+                         [&](const Symbol &capture) {
+                           return capture.id == receiver->id;
+                         }))
+          captures.push_back(*receiver);
+      }
+  }
+  if (!resolving_callee_ && symbol->kind == Symbol::Kind::function) {
+    const auto count =
+        symbol->owner.empty()
+            ? global_overloads_[symbol->name].size()
+            : classes_.at(current_class_).methods[symbol->name].size();
+    if (count > 1)
+      report("ARGOS-S0621", expression.span,
+             "referência a função sobrecarregada exige chamada explícita ou "
+             "wrapper com assinatura única");
   }
   if (symbol->kind == Symbol::Kind::type) {
     report("ARGOS-S0302", expression.span,
@@ -995,6 +1141,16 @@ Type SemanticAnalyzer::analyze_assignment(
   const Type value = analyze_expression(*expression.value, target);
   if (expression.op == ast::AssignmentOperator::null_coalescing_assign)
     restore_initialization(before_value);
+  const ast::Expression *fresh = expression.value.get();
+  while (const auto *group =
+             dynamic_cast<const ast::GroupingExpression *>(fresh))
+    fresh = group->expression.get();
+  if (component_binding(*expression.target) &&
+      (expression.op != ast::AssignmentOperator::assign ||
+       !dynamic_cast<const ast::NewExpression *>(fresh)))
+    report("ARGOS-S0628", expression.span,
+           "componente exclusivo deve ser inicializado uma vez com new dentro "
+           "de construct");
   if (target.is_error() || value.is_error())
     return error_type();
 
@@ -1031,7 +1187,8 @@ Type SemanticAnalyzer::analyze_assignment(
       if (target_symbol->id < symbol_records_.size())
         symbol_records_[target_symbol->id].initialized = true;
     }
-    return target;
+    return component_binding(*expression.target) ? Type{TypeKind::void_type}
+                                                 : target;
   };
 
   switch (expression.op) {
@@ -1108,11 +1265,177 @@ Type SemanticAnalyzer::analyze_assignment(
   return error_type();
 }
 
+Type SemanticAnalyzer::resolve_overload(const ast::CallExpression &call,
+                                        const std::vector<Symbol> &candidates) {
+  if (candidates.empty())
+    return error_type();
+  const auto selected = [&](const Symbol &method, bool analyzed) {
+    accessible(method, call.span);
+    resolved_calls_[&call] = method;
+    auto callee_type = method.type;
+    if (const auto *member = dynamic_cast<const ast::MemberAccessExpression *>(
+            call.callee.get());
+        member && member->safe)
+      ++callee_type.nullable_depth;
+    expression_types_[call.callee.get()] = callee_type;
+    return check_call(call, method, analyzed);
+  };
+  if (candidates.size() == 1)
+    return selected(candidates.front(), false);
+
+  struct Candidate {
+    const Symbol *method;
+    std::vector<std::size_t> parameters;
+  };
+  std::vector<Candidate> shaped;
+  for (const auto &candidate : candidates) {
+    if (candidate.parameter_types.size() != call.arguments.size())
+      continue;
+    Candidate binding{&candidate, {}};
+    std::vector<bool> used(call.arguments.size());
+    std::size_t next = 0;
+    for (std::size_t i = 0; i < call.arguments.size(); ++i) {
+      const auto label =
+          i < call.argument_labels.size() ? call.argument_labels[i] : "";
+      std::size_t at = used.size();
+      if (label.empty()) {
+        while (next < used.size() && used[next])
+          ++next;
+        if (next < used.size() && candidate.parameter_labels[next].empty())
+          at = next++;
+      } else
+        for (std::size_t j = 0; j < used.size(); ++j)
+          if (candidate.parameter_labels[j] == label) {
+            at = j;
+            break;
+          }
+      if (at == used.size() || used[at])
+        break;
+      used[at] = true;
+      binding.parameters.push_back(at);
+    }
+    if (binding.parameters.size() == call.arguments.size())
+      shaped.push_back(std::move(binding));
+  }
+  // Unique arity/labels supply context for nil, empty arrays and numeric
+  // literals.
+  if (shaped.size() == 1)
+    return selected(*shaped.front().method, false);
+  for (const auto &arg : call.arguments)
+    analyze_expression(*arg);
+  std::vector<Candidate> viable;
+  for (const auto &candidate : shaped) {
+    bool valid = true;
+    for (std::size_t i = 0; i < call.arguments.size(); ++i)
+      if (!is_assignable_expression(
+              type_of(*call.arguments[i]),
+              candidate.method->parameter_types[candidate.parameters[i]],
+              *call.arguments[i])) {
+        valid = false;
+        break;
+      }
+    if (valid)
+      viable.push_back(candidate);
+  }
+  const auto better = [&](const Candidate &a, const Candidate &b) {
+    bool strict = false;
+    for (std::size_t i = 0; i < call.arguments.size(); ++i) {
+      const auto &left = a.method->parameter_types[a.parameters[i]];
+      const auto &right = b.method->parameter_types[b.parameters[i]];
+      if (left == right)
+        continue;
+      const auto actual = type_of(*call.arguments[i]);
+      if (actual == left) {
+        strict = true;
+        continue;
+      }
+      if (actual == right)
+        return false;
+      if (is_assignable(left, right) && !is_assignable(right, left))
+        strict = true;
+      else
+        return false;
+    }
+    return strict;
+  };
+  const Candidate *best = nullptr;
+  bool ambiguous = false;
+  for (const auto &candidate : viable) {
+    const bool dominated =
+        std::any_of(viable.begin(), viable.end(), [&](const Candidate &other) {
+          return better(other, candidate);
+        });
+    if (dominated)
+      continue;
+    if (best)
+      ambiguous = true;
+    else
+      best = &candidate;
+  }
+  if (!best || ambiguous) {
+    report("ARGOS-S0621", call.span,
+           best ? "chamada ambígua entre sobrecargas"
+                : "nenhuma sobrecarga aceita os tipos e rótulos fornecidos");
+    return error_type();
+  }
+  return selected(*best->method, true);
+}
+
 Type SemanticAnalyzer::analyze_call(const ast::CallExpression &expression) {
+  struct CalleeContext {
+    bool &flag;
+    bool previous;
+    ~CalleeContext() { flag = previous; }
+  } context{resolving_callee_, resolving_callee_};
+  resolving_callee_ = false;
   const auto* identifier = dynamic_cast<const ast::IdentifierExpression*>(expression.callee.get());
   if (identifier && identifier->name == "print") {
     for (const auto& arg : expression.arguments) analyze_expression(*arg);
     return Type{TypeKind::void_type};
+  }
+  if (identifier && identifier->name == "super") {
+    const auto base = superclass(current_class_);
+    if (!in_constructor_ || base.empty() || super_initialized_ ||
+        calling_super_) {
+      report("ARGOS-S0622", expression.span,
+             "super() exige primeira instrução do construtor e uma única "
+             "chamada à superclasse");
+      for (const auto &arg : expression.arguments)
+        analyze_expression(*arg);
+      return error_type();
+    }
+    auto candidates = classes_.at(base).methods["construct"];
+    if (candidates.empty()) {
+      Symbol implicit;
+      implicit.name = "construct";
+      implicit.owner = base;
+      implicit.kind = Symbol::Kind::function;
+      implicit.return_type = Type{TypeKind::void_type};
+      candidates.push_back(implicit);
+    }
+    calling_super_ = true;
+    const auto returned = resolve_overload(expression, candidates);
+    calling_super_ = false;
+    super_initialized_ = true;
+    return returned;
+  }
+  const auto qualified = [&](auto &&self,
+                             const ast::Expression &node) -> std::string {
+    if (const auto *id = dynamic_cast<const ast::IdentifierExpression *>(&node))
+      return id->name;
+    if (const auto *member =
+            dynamic_cast<const ast::MemberAccessExpression *>(&node);
+        member && !member->safe) {
+      const auto base = self(self, *member->base);
+      return base.empty() ? "" : base + "." + member->member;
+    }
+    return "";
+  };
+  if (!identifier) {
+    const auto name = qualified(qualified, *expression.callee);
+    const auto found = global_overloads_.find(name);
+    if (found != global_overloads_.end())
+      return resolve_overload(expression, found->second);
   }
   // Copy signatures before analyzing arguments: nested lambdas may grow scopes.
   Symbol callable;
@@ -1124,14 +1447,15 @@ Type SemanticAnalyzer::analyze_call(const ast::CallExpression &expression) {
       for (const auto& arg : expression.arguments) analyze_expression(*arg);
       return error_type();
     }
-    if (in_constructor_ && symbol->kind == Symbol::Kind::function &&
-        !symbol->owner.empty() && !instance_ready())
-      report("ARGOS-S0614", expression.span, "método exige instância completamente inicializada");
     callable = *symbol;
     expression_symbols_[&expression] = symbol->id;
     expression_symbols_[expression.callee.get()] = symbol->id;
   }
+  resolving_callee_ =
+      identifier || dynamic_cast<const ast::MemberAccessExpression *>(
+                        expression.callee.get());
   Type type = analyze_expression(*expression.callee);
+  resolving_callee_ = false;
   const auto *safe_member = dynamic_cast<const ast::MemberAccessExpression *>(
       expression.callee.get());
   const bool safe_call = safe_member && safe_member->safe;
@@ -1145,7 +1469,11 @@ Type SemanticAnalyzer::analyze_call(const ast::CallExpression &expression) {
   }
   if (const auto* access = dynamic_cast<const ast::MemberAccessExpression*>(expression.callee.get())) {
     const auto base_type = type_of(*access->base);
-    if (const auto* member = find_member(base_type, access->member, access->span)) callable = *member;
+    if (classes_.contains(base_type.nominal_name)) {
+      const auto &members = classes_.at(base_type.nominal_name).members;
+      if (members.contains(access->member))
+        callable = members.at(access->member);
+    }
   }
   if (callable.kind != Symbol::Kind::function) {
     callable.parameter_types.assign(type.signature.begin(), type.signature.end() - 1);
@@ -1153,7 +1481,55 @@ Type SemanticAnalyzer::analyze_call(const ast::CallExpression &expression) {
     callable.return_type = type.signature.back();
   }
   const auto before_arguments = scopes_;
-  auto returned = check_call(expression, callable);
+  std::vector<Symbol> candidates;
+  if (callable.kind == Symbol::Kind::function) {
+    if (safe_member) {
+      const auto nominal = type_of(*safe_member->base).nominal_name;
+      if (classes_.contains(nominal) &&
+          classes_.at(nominal).methods.contains(safe_member->member))
+        candidates = classes_.at(nominal).methods.at(safe_member->member);
+    } else if (identifier && !callable.owner.empty()) {
+      if (classes_.at(current_class_).methods.contains(identifier->name))
+        candidates = classes_.at(current_class_).methods.at(identifier->name);
+    } else if (identifier && global_overloads_.contains(callable.name))
+      candidates = global_overloads_.at(callable.name);
+  }
+  auto returned = candidates.empty() ? check_call(expression, callable)
+                                     : resolve_overload(expression, candidates);
+  if (in_constructor_)
+    if (const auto selected = resolved_calls_.find(&expression);
+        selected != resolved_calls_.end() && !selected->second.owner.empty()) {
+      const auto *receiver =
+          safe_member ? dynamic_cast<const ast::IdentifierExpression *>(
+                            safe_member->base.get())
+                      : nullptr;
+      const bool on_this =
+          identifier ||
+          (receiver && (receiver->name == "this" || receiver->name == "super"));
+      if (on_this && selected->second.component_target.empty())
+        report("ARGOS-S0614", expression.span,
+               "método exige instância completamente inicializada");
+      if (on_this && !selected->second.component_target.empty()) {
+        if (calling_super_)
+          report("ARGOS-S0622", expression.span,
+                 "super não pode observar componentes de this");
+        for (const auto &field : classes_.at(current_class_).fields)
+          if (const auto *stored = lookup_field(field->name);
+              stored && !stored->initialized)
+            report("ARGOS-S0628", expression.span,
+                   "componente deve ser inicializado antes da delegação");
+      }
+    }
+  if (safe_member) {
+    const auto *receiver = dynamic_cast<const ast::IdentifierExpression *>(
+        safe_member->base.get());
+    const auto selected = resolved_calls_.find(&expression);
+    if (receiver && receiver->name == "super" &&
+        selected != resolved_calls_.end() &&
+        selected->second.modifiers.abstract_)
+      report("ARGOS-S0622", expression.span,
+             "super não pode invocar método abstrato");
+  }
   if (safe_call)
     restore_initialization(before_arguments);
   if (safe_call && returned.kind != TypeKind::void_type &&
@@ -1162,7 +1538,8 @@ Type SemanticAnalyzer::analyze_call(const ast::CallExpression &expression) {
   return returned;
 }
 
-Type SemanticAnalyzer::check_call(const ast::CallExpression& expression, const Symbol& callable) {
+Type SemanticAnalyzer::check_call(const ast::CallExpression &expression,
+                                  const Symbol &callable, bool analyzed) {
   const Symbol* function = &callable;
   std::vector<bool> bound(function->parameter_types.size(), false);
   std::size_t next_positional = 0;
@@ -1184,11 +1561,15 @@ Type SemanticAnalyzer::check_call(const ast::CallExpression& expression, const S
         report(diagnostics::catalog::semantic::calls::unknown_argument_label.code, expression.arguments[i]->span,
                "rótulo de argumento " + quoted(label) + " inexistente");
     }
-    const Type actual = analyze_expression(
-        *expression.arguments[i],
-        parameter < bound.size()
-            ? std::optional<Type>{function->parameter_types[parameter]}
-            : std::nullopt);
+    const Type actual =
+        analyzed
+            ? type_of(*expression.arguments[i])
+            : analyze_expression(
+                  *expression.arguments[i],
+                  parameter < bound.size()
+                      ? std::optional<Type>{function
+                                                ->parameter_types[parameter]}
+                      : std::nullopt);
     if (parameter < bound.size()) {
       if (bound[parameter])
         report(diagnostics::catalog::semantic::calls::duplicate_argument.code, expression.arguments[i]->span,
@@ -1214,12 +1595,56 @@ Type SemanticAnalyzer::check_call(const ast::CallExpression& expression, const S
 
 Type SemanticAnalyzer::analyze_member_access(
     const ast::MemberAccessExpression &expression) {
+  const auto qualified_name = [&](auto &&self,
+                                  const ast::Expression &node) -> std::string {
+    if (const auto *id = dynamic_cast<const ast::IdentifierExpression *>(&node))
+      return id->name;
+    if (const auto *member =
+            dynamic_cast<const ast::MemberAccessExpression *>(&node);
+        member && !member->safe) {
+      const auto base = self(self, *member->base);
+      return base.empty() ? "" : base + "." + member->member;
+    }
+    return "";
+  };
+  if (!current_class_.empty()) {
+    const auto name = qualified_name(qualified_name, expression);
+    const auto &components = classes_.at(current_class_).components;
+    if (std::find(components.begin(), components.end(), name) !=
+        components.end()) {
+      component_bindings_[&expression] = {
+          current_class_, component_field(current_class_, name)};
+      if (!accessing_member_base_)
+        report("ARGOS-S0631", expression.span,
+               "componente só pode ser receptor qualificado");
+      if (calling_super_)
+        report("ARGOS-S0622", expression.span,
+               "super não pode observar componentes de this");
+      if (in_constructor_)
+        for (const auto &pending : classes_.at(current_class_).fields)
+          if (const auto *stored = lookup_field(pending->name);
+              stored && !stored->initialized)
+            report("ARGOS-S0628", expression.span,
+                   "componente ainda não inicializado");
+      capture_receiver(expression.span);
+      return Type{TypeKind::nominal_type, 0, name};
+    }
+  }
   const bool previous_member_base = accessing_member_base_;
   const auto* direct_base = dynamic_cast<const ast::IdentifierExpression*>(expression.base.get());
-  accessing_member_base_ = direct_base && direct_base->name == "this";
+  const auto base_name = qualified_name(qualified_name, *expression.base);
+  accessing_member_base_ =
+      direct_base != nullptr ||
+      (!current_class_.empty() &&
+       std::find(classes_.at(current_class_).components.begin(),
+                 classes_.at(current_class_).components.end(),
+                 base_name) != classes_.at(current_class_).components.end());
   const bool previous_target = analyzing_assignment_target_;
   analyzing_assignment_target_ = false;
+  const auto previous_resolving = resolving_callee_;
+  resolving_callee_ = false;
   const Type base = analyze_expression(*expression.base);
+  resolving_callee_ = previous_resolving;
   analyzing_assignment_target_ = previous_target;
   accessing_member_base_ = previous_member_base;
   if (base.is_error())
@@ -1243,6 +1668,13 @@ Type SemanticAnalyzer::analyze_member_access(
     return error_type();
   }
   if (classes_.contains(base.nominal_name)) {
+    if (!accessible_type(base.nominal_name, expression.span))
+      return error_type();
+    if (expression.member.starts_with("$with.")) {
+      report("ARGOS-S0631", expression.span,
+             "armazenamento interno de with não é acessível");
+      return error_type();
+    }
     if (expression.member == "construct") {
       report("ARGOS-S0600", expression.span, "construct só pode ser invocado pela construção new");
       return error_type();
@@ -1255,28 +1687,30 @@ Type SemanticAnalyzer::analyze_member_access(
     }
     const auto* member = find_member(base, expression.member, expression.span);
     if (!member) return error_type();
-    if (in_constructor_ && (member->kind == Symbol::Kind::function || member->kind == Symbol::Kind::property)) {
+    if (in_constructor_ &&
+        (member->kind == Symbol::Kind::property ||
+         (member->kind == Symbol::Kind::function && !resolving_callee_))) {
       const auto* identifier = dynamic_cast<const ast::IdentifierExpression*>(expression.base.get());
-      if (identifier && identifier->name == "this" && !instance_ready())
+      if (identifier &&
+          (identifier->name == "this" || identifier->name == "super") &&
+          !instance_ready())
         report("ARGOS-S0614", expression.span, "método exige instância completamente inicializada");
     }
+    if (!resolving_callee_ && member->kind == Symbol::Kind::function &&
+        classes_.at(base.nominal_name).methods.at(expression.member).size() > 1)
+      report("ARGOS-S0621", expression.span,
+             "referência a método sobrecarregado exige chamada explícita");
+    if (direct_base && direct_base->name == "super" &&
+        member->kind != Symbol::Kind::function && member->modifiers.abstract_)
+      report("ARGOS-S0622", expression.span,
+             "super não pode invocar membro abstrato sem implementação");
     Type result = member->type;
     if (expression.safe && !result.is_optional())
       ++result.nullable_depth;
     return result;
   }
-  const auto nominal = nominal_fields_.find(base.nominal_name);
-  if (nominal == nominal_fields_.end() ||
-      !nominal->second.contains(expression.member)) {
-    report("ARGOS-S0353", expression.span,
-           "membro " + quoted(expression.member) + " não existe em " +
-           type_name(base));
-    return error_type();
-  }
-  Type result = nominal->second.at(expression.member);
-  if (expression.safe && !result.is_optional())
-    ++result.nullable_depth;
-  return result;
+  report("ARGOS-S0353", expression.span, "tipo nominal sem membros declarados");
+  return error_type();
 }
 
 Type SemanticAnalyzer::analyze_postfix(
@@ -1358,7 +1792,7 @@ Type SemanticAnalyzer::resolve_type(const ast::TypeSyntax &syntax) {
 
   if (name == "bool")
     kind = TypeKind::bool_type;
-  else if (name == "byte")
+  else if (name == "byte" || name == "uint_8")
     kind = TypeKind::byte;
   else if (name == "sbyte") kind = TypeKind::sbyte;
   else if (name == "short")
@@ -1385,11 +1819,12 @@ Type SemanticAnalyzer::resolve_type(const ast::TypeSyntax &syntax) {
     kind = TypeKind::void_type;
   else if (name == "never") kind = TypeKind::never_type;
   else {
-    if (const Symbol *symbol = lookup(name);
-        symbol && symbol->kind == Symbol::Kind::type) {
-      Type resolved = symbol->type;
-      resolved.nullable_depth = syntax.nullable_depth;
-      return resolved;
+    const auto canonical =
+        resolve_nominal(std::string{name}, current_class_, current_package_);
+    if (classes_.contains(canonical)) {
+      syntax.resolved_name = canonical;
+      accessible_type(canonical, syntax.span);
+      return Type{TypeKind::nominal_type, syntax.nullable_depth, canonical};
     }
     report("ARGOS-S0400", syntax.span, "tipo " + quoted(name) + " não foi declarado");
     return error_type();
@@ -1566,6 +2001,10 @@ bool SemanticAnalyzer::is_mutable_lvalue(
     return !index->safe && is_mutable_lvalue(*index->base);
   if (const auto *identifier =
           dynamic_cast<const ast::IdentifierExpression *>(&expression)) {
+    if (const auto *component = component_binding(expression)) {
+      const auto *field = lookup_field(component->field);
+      return in_constructor_ && field && !field->initialized;
+    }
     const Symbol *symbol = lookup(identifier->name);
     return symbol != nullptr &&
            (symbol->mutability == ast::Mutability::mutable_ || !symbol->initialized);
@@ -1663,11 +2102,10 @@ const std::vector<Symbol>& SemanticAnalyzer::captures_of(const ast::LambdaExpres
 }
 
 bool SemanticAnalyzer::instance_ready() const {
-  if (current_class_.empty()) return true;
-  for (const auto& [name, member] : classes_.at(current_class_).members)
-    if (member.kind == Symbol::Kind::variable)
-      if (const auto* field = lookup_field(name); field && !field->initialized) return false;
-  return true;
+  // A base constructor cannot know whether the actual object has uninitialized
+  // derived fields. Until construction returns, this must not escape or
+  // dispatch.
+  return !in_constructor_;
 }
 
 Symbol* SemanticAnalyzer::lookup_field(const std::string& name) {
@@ -1683,8 +2121,12 @@ const Symbol* SemanticAnalyzer::lookup_field(const std::string& name) const {
 }
 
 Symbol* SemanticAnalyzer::assignment_symbol(const ast::Expression& expression) {
-  if (const auto* identifier = dynamic_cast<const ast::IdentifierExpression*>(&expression))
+  if (const auto *identifier =
+          dynamic_cast<const ast::IdentifierExpression *>(&expression)) {
+    if (const auto *component = component_binding(expression))
+      return lookup_field(component->field);
     return lookup(identifier->name);
+  }
   if (const auto* access = dynamic_cast<const ast::MemberAccessExpression*>(&expression)) {
     const auto* base = dynamic_cast<const ast::IdentifierExpression*>(access->base.get());
     if (base && base->name == "this") return lookup_field(access->member);
@@ -1694,7 +2136,12 @@ Symbol* SemanticAnalyzer::assignment_symbol(const ast::Expression& expression) {
 
 Symbol SemanticAnalyzer::function_symbol(const ast::FunctionDeclaration& declaration) {
   Symbol result;
-  result.name = declaration.name;
+  result.declaration = &declaration;
+  result.name = current_class_.empty() && !declaration.package_name.empty() &&
+                        declaration.name != "main"
+                    ? declaration.package_name + "." + declaration.name
+                    : declaration.name;
+  result.package_name = declaration.package_name;
   result.kind = Symbol::Kind::function;
   result.initialized = true;
   result.span = declaration.span;
@@ -1705,6 +2152,12 @@ Symbol SemanticAnalyzer::function_symbol(const ast::FunctionDeclaration& declara
   for (const auto& parameter : declaration.parameters) {
     if (!current_class_.empty() && parameter->name == "this")
       report("ARGOS-S0600", parameter->span, "parâmetro não pode ocultar this");
+    if (!current_class_.empty())
+      for (const auto &component : classes_.at(current_class_).components)
+        if (parameter->name == component_alias(component))
+          report("ARGOS-S0626", parameter->span,
+                 "parâmetro não pode ocultar qualificador with: " +
+                     parameter->name);
     auto type = parameter->type ? resolve_type(*parameter->type) : error_type();
     if (type.kind == TypeKind::void_type || type.kind == TypeKind::never_type)
       report("ARGOS-S0610", parameter->span, "parâmetro exige tipo habitável");
@@ -1729,9 +2182,480 @@ bool SemanticAnalyzer::is_subtype(const std::string& derived, const std::string&
     if (name == base) return true;
     if (!visited.insert(name).second) continue;
     if (const auto found = classes_.find(name); found != classes_.end())
-      for (const auto& parent : found->second.declaration->bases) pending.push_back(parent);
+      for (const auto &parent : found->second.bases)
+        pending.push_back(parent);
   }
   return false;
+}
+
+namespace {
+// Diagnostic spelling is not a signature encoding: an optional function and a
+// function returning an optional may otherwise have the same printed name.
+std::string type_key(const Type &type) {
+  std::string key = std::to_string(static_cast<unsigned>(type.kind)) + "?" +
+                    std::to_string(type.nullable_depth) + "N" +
+                    std::to_string(type.nominal_name.size()) + ":" +
+                    type.nominal_name;
+  key += "S" + std::to_string(type.signature.size()) + "[";
+  for (const auto &part : type.signature)
+    key += type_key(part) + ";";
+  return key + "]";
+}
+} // namespace
+
+std::string SemanticAnalyzer::dispatch_key(const Symbol &symbol) {
+  std::string key =
+      std::to_string(symbol.name.size()) + ":" + symbol.name + "(";
+  for (const auto &type : symbol.parameter_types)
+    key += type_key(type) + ";";
+  return key + ")";
+}
+std::string SemanticAnalyzer::virtual_key(const Symbol &symbol) {
+  return dispatch_key(symbol) + ":" + type_key(symbol.return_type);
+}
+std::string SemanticAnalyzer::function_key(const Symbol &symbol) {
+  if (symbol.name == "main" && symbol.owner.empty())
+    return "main";
+  return (symbol.owner.empty() ? ""
+                               : std::to_string(symbol.owner.size()) + ":" +
+                                     symbol.owner + ".") +
+         dispatch_key(symbol);
+}
+const Symbol *
+SemanticAnalyzer::resolved_call(const ast::CallExpression &call) const {
+  const auto it = resolved_calls_.find(&call);
+  return it == resolved_calls_.end() ? nullptr : &it->second;
+}
+const Symbol *SemanticAnalyzer::declaration_symbol(
+    const ast::FunctionDeclaration &decl) const {
+  const auto it = declaration_symbols_.find(&decl);
+  return it == declaration_symbols_.end() ? nullptr : &it->second;
+}
+std::vector<Symbol>
+SemanticAnalyzer::methods_of(const std::string &name) const {
+  std::vector<Symbol> result;
+  if (const auto it = classes_.find(name); it != classes_.end())
+    for (const auto &[key, methods] : it->second.methods)
+      for (const auto &method : methods)
+        result.push_back(method);
+  return result;
+}
+std::string SemanticAnalyzer::superclass(const std::string &name) const {
+  const auto found = classes_.find(name);
+  if (found != classes_.end())
+    for (const auto &base : found->second.bases)
+      if (classes_.contains(base) &&
+          !classes_.at(base).declaration->is_interface)
+        return base;
+  return {};
+}
+std::vector<const ast::ClassDeclaration *>
+SemanticAnalyzer::class_declarations() const {
+  return class_order_;
+}
+const std::vector<std::string> &
+SemanticAnalyzer::bases_of(const std::string &name) const {
+  return classes_.at(name).bases;
+}
+const std::vector<std::unique_ptr<ast::VariableDeclaration>> &
+SemanticAnalyzer::generated_fields(const std::string &name) const {
+  return classes_.at(name).fields;
+}
+const std::vector<std::unique_ptr<ast::FunctionDeclaration>> &
+SemanticAnalyzer::generated_methods(const std::string &name) const {
+  return classes_.at(name).generated;
+}
+const SemanticAnalyzer::ComponentBinding *
+SemanticAnalyzer::component_binding(const ast::Expression &expression) const {
+  const auto it = component_bindings_.find(&expression);
+  return it == component_bindings_.end() ? nullptr : &it->second;
+}
+std::string
+SemanticAnalyzer::resolve_nominal(const std::string &name,
+                                  const std::string &owner,
+                                  const std::string &package) const {
+  if (name.find('.') != std::string::npos && classes_.contains(name))
+    return name;
+  auto prefix = owner.empty() ? package : owner;
+  while (!prefix.empty()) {
+    const auto candidate = prefix + "." + name;
+    if (classes_.contains(candidate))
+      return candidate;
+    const auto dot = prefix.rfind('.');
+    prefix = dot == std::string::npos ? "" : prefix.substr(0, dot);
+  }
+  std::vector<std::string> pending;
+  std::unordered_set<std::string> visited;
+  if (classes_.contains(owner))
+    pending = classes_.at(owner).bases;
+  while (!pending.empty()) {
+    const auto base = pending.back();
+    pending.pop_back();
+    if (!visited.insert(base).second || !classes_.contains(base))
+      continue;
+    if (classes_.contains(base + "." + name))
+      return base + "." + name;
+    for (const auto &ancestor : classes_.at(base).bases)
+      pending.push_back(ancestor);
+  }
+  if (!package.empty() && classes_.contains(package + "." + name))
+    return package + "." + name;
+  return name;
+}
+bool SemanticAnalyzer::accessible_type(const std::string &name,
+                                       const source::SourceSpan &span) {
+  const auto it = classes_.find(name);
+  if (it == classes_.end())
+    return false;
+  const auto &type = *it->second.declaration;
+  if (!type.enclosing_type.empty() &&
+      !accessible_type(type.enclosing_type, span))
+    return false;
+  bool valid = true;
+  if (type.modifiers.visibility == ast::Visibility::package_)
+    valid = current_package_ == type.package_name;
+  if (type.modifiers.visibility == ast::Visibility::private_)
+    valid = current_class_ == type.enclosing_type ||
+            current_class_.starts_with(type.enclosing_type + ".");
+  if (type.modifiers.visibility == ast::Visibility::protected_)
+    valid = current_class_ == type.enclosing_type ||
+            current_class_.starts_with(type.enclosing_type + ".") ||
+            is_subtype(current_class_, type.enclosing_type);
+  if (!valid)
+    report("ARGOS-S0630", span,
+           "tipo inacessível neste pacote ou escopo: " + name);
+  return valid;
+}
+bool SemanticAnalyzer::accessible(const Symbol &symbol,
+                                  const source::SourceSpan &span) {
+  if (symbol.modifiers.sealed_) {
+    const auto owner = classes_.find(symbol.owner);
+    const bool authorized =
+        current_class_ == symbol.owner ||
+        (owner != classes_.end() &&
+         std::find(owner->second.permissions.begin(),
+                   owner->second.permissions.end(),
+                   current_class_) != owner->second.permissions.end());
+    if (!authorized)
+      report("ARGOS-S0624", span,
+             "acesso a dado sealed exige entidade listada em permited de " +
+                 symbol.owner);
+    return authorized;
+  }
+  if (symbol.owner.empty() && symbol.kind == Symbol::Kind::function) {
+    const bool valid =
+        (symbol.modifiers.visibility != ast::Visibility::private_ &&
+         symbol.modifiers.visibility != ast::Visibility::package_) ||
+        symbol.package_name == current_package_;
+    if (!valid)
+      report("ARGOS-S0611", span,
+             "função inacessível neste pacote: " + symbol.name);
+    return valid;
+  }
+  if (symbol.modifiers.visibility == ast::Visibility::package_ &&
+      classes_.contains(symbol.owner) &&
+      classes_.at(symbol.owner).declaration->package_name != current_package_) {
+    report("ARGOS-S0611", span,
+           "membro default inacessível neste pacote: " + symbol.name);
+    return false;
+  }
+  const auto nest = [&](std::string type) {
+    while (classes_.contains(type) &&
+           !classes_.at(type).declaration->enclosing_type.empty())
+      type = classes_.at(type).declaration->enclosing_type;
+    return type;
+  };
+  const bool nestmate =
+      !current_class_.empty() && nest(current_class_) == nest(symbol.owner);
+  if ((symbol.modifiers.visibility == ast::Visibility::private_ &&
+       current_class_ != symbol.owner && !nestmate) ||
+      (symbol.modifiers.visibility == ast::Visibility::protected_ &&
+       (current_class_.empty() || !is_subtype(current_class_, symbol.owner)))) {
+    report("ARGOS-S0611", span, "membro inacessível: " + symbol.name);
+    return false;
+  }
+  return true;
+}
+bool SemanticAnalyzer::immutable_data_type(
+    const Type &type, std::vector<std::string> &visiting) const {
+  if (type.kind == TypeKind::nominal_type) {
+    const auto it = classes_.find(type.nominal_name);
+    if (it == classes_.end() || !it->second.declaration->is_data ||
+        std::find(visiting.begin(), visiting.end(), type.nominal_name) !=
+            visiting.end())
+      return false;
+    visiting.push_back(type.nominal_name);
+    for (const auto &member : it->second.declaration->members)
+      if (const auto *field =
+              dynamic_cast<const ast::VariableDeclaration *>(member.get())) {
+        if (field->mutability == ast::Mutability::mutable_ ||
+            field->is_property)
+          return false;
+        // Resolve nominal links from syntax without mutating the analyzer.
+        if (!field->type || field->type->element_type ||
+            field->type->result_type)
+          return false;
+        if (classes_.contains(
+                resolve_nominal(field->type->name, type.nominal_name,
+                                it->second.declaration->package_name)) &&
+            !immutable_data_type(
+                Type{TypeKind::nominal_type, 0,
+                     resolve_nominal(field->type->name, type.nominal_name,
+                                     it->second.declaration->package_name)},
+                visiting))
+          return false;
+      }
+    visiting.pop_back();
+    return true;
+  }
+  return type.kind != TypeKind::array_type &&
+         type.kind != TypeKind::function_type &&
+         type.kind != TypeKind::void_type && type.kind != TypeKind::never_type;
+}
+namespace {
+ast::TypeSyntaxPtr clone_syntax(const ast::TypeSyntax *source) {
+  if (!source)
+    return nullptr;
+  auto result = std::make_unique<ast::TypeSyntax>(
+      source->name, source->nullable_depth, source->span);
+  result->resolved_name = source->resolved_name;
+  result->element_type = clone_syntax(source->element_type.get());
+  result->result_type = clone_syntax(source->result_type.get());
+  for (const auto &parameter : source->parameter_types)
+    result->parameter_types.push_back(clone_syntax(parameter.get()));
+  return result;
+}
+std::string component_alias(const std::string &type) {
+  const auto dot = type.rfind('.');
+  return dot == std::string::npos ? type : type.substr(dot + 1);
+}
+std::string component_field(const std::string &owner,
+                            const std::string &component) {
+  return "$with." + owner + "." + component;
+}
+} // namespace
+bool SemanticAnalyzer::explicitly_initializes(
+    const ast::FunctionDeclaration &constructor,
+    const std::string &field) const {
+  const auto symbol = declaration_symbols_.find(&constructor);
+  if (symbol == declaration_symbols_.end() ||
+      !classes_.contains(symbol->second.owner))
+    return false;
+  const auto &map = classes_.at(symbol->second.owner).explicit_components;
+  const auto entry = map.find(&constructor);
+  return entry != map.end() && entry->second.contains(field);
+}
+void SemanticAnalyzer::capture_receiver(const source::SourceSpan &span) {
+  if (active_lambdas_.empty())
+    return;
+  if (constructor_lambda_context_)
+    report("ARGOS-S0613", span,
+           "closure não pode capturar instância em construção");
+  if (const auto *receiver = lookup("this"))
+    for (const auto *lambda : active_lambdas_) {
+      auto &captures = lambda_captures_[lambda];
+      if (std::none_of(captures.begin(), captures.end(),
+                       [&](const Symbol &capture) {
+                         return capture.id == receiver->id;
+                       }))
+        captures.push_back(*receiver);
+    }
+}
+void SemanticAnalyzer::build_components(const std::string &name) {
+  auto &info = classes_.at(name);
+  const auto &owner = *info.declaration;
+  if ((owner.is_interface || owner.is_data) && !info.components.empty()) {
+    report("ARGOS-S0626", owner.span,
+           "with é composição de class, não de interface ou data");
+    return;
+  }
+  std::unordered_set<std::string> seen;
+  std::unordered_map<std::string, std::vector<std::pair<std::string, Symbol>>>
+      providers;
+  for (const auto &component : info.components) {
+    const auto target = classes_.find(component);
+    if (target == classes_.end() || !seen.insert(component).second) {
+      report("ARGOS-S0626", owner.span,
+             "componente inexistente, repetido ou qualificador ambíguo: " +
+                 component);
+      continue;
+    }
+    if (target->second.state == 1) {
+      report("ARGOS-S0626", owner.span, "ciclo de composição: " + component);
+      continue;
+    }
+    build_class(component);
+    accessible_type(component, owner.span);
+    if (target->second.declaration->is_interface ||
+        target->second.declaration->modifiers.abstract_) {
+      report("ARGOS-S0626", owner.span,
+             "componente with deve ser concreto: " + component);
+      continue;
+    }
+    if (info.members.contains(component_alias(component)))
+      report("ARGOS-S0626", owner.span,
+             "nome do componente conflita com membro: " +
+                 component_alias(component));
+    const auto span = owner.span;
+    auto type = std::make_unique<ast::TypeSyntax>(component, 0, span);
+    type->resolved_name = component;
+    ast::ExpressionPtr initializer;
+    const auto constructors = target->second.methods.find("construct");
+    bool automatic = constructors == target->second.methods.end();
+    const auto constructor_accessible = [&](const Symbol &method) {
+      const auto nest = [&](std::string candidate) {
+        while (classes_.contains(candidate) &&
+               !classes_.at(candidate).declaration->enclosing_type.empty())
+          candidate = classes_.at(candidate).declaration->enclosing_type;
+        return candidate;
+      };
+      if (method.modifiers.visibility == ast::Visibility::private_)
+        return !current_class_.empty() &&
+               nest(current_class_) == nest(method.owner);
+      if (method.modifiers.visibility == ast::Visibility::protected_)
+        return !current_class_.empty() &&
+               is_subtype(current_class_, method.owner);
+      if (method.modifiers.visibility == ast::Visibility::package_)
+        return classes_.at(method.owner).declaration->package_name ==
+               current_package_;
+      return true;
+    };
+    if (constructors != target->second.methods.end())
+      for (const auto &method : constructors->second)
+        if (method.parameter_types.empty() && constructor_accessible(method)) {
+          automatic = true;
+          break;
+        }
+    if (automatic) {
+      auto creation = std::make_unique<ast::NewExpression>(span);
+      creation->type = clone_syntax(type.get());
+      creation->call = std::make_unique<ast::CallExpression>(
+          std::make_unique<ast::IdentifierExpression>(component, span),
+          std::vector<ast::ExpressionPtr>{}, span);
+      initializer = std::move(creation);
+    }
+    auto field = std::make_unique<ast::VariableDeclaration>(
+        ast::Mutability::immutable, component_field(name, component),
+        std::move(type), std::move(initializer), span);
+    field->modifiers.visibility = ast::Visibility::private_;
+    field->package_name = owner.package_name;
+    Symbol storage;
+    storage.name = field->name;
+    storage.owner = name;
+    storage.kind = Symbol::Kind::variable;
+    storage.type = Type{TypeKind::nominal_type, 0, component};
+    storage.modifiers = field->modifiers;
+    storage.initialized = automatic;
+    storage.span = span;
+    info.members[storage.name] = storage;
+    info.fields.push_back(std::move(field));
+    if (!automatic && !info.methods.contains("construct"))
+      report("ARGOS-S0628", span,
+             "componente sem construtor padrão acessível exige construct e "
+             "inicialização explícita: " +
+                 component_alias(component) + " = new " + component + "(...)");
+    for (const auto &method : methods_of(component)) {
+      if (method.name == "construct" || method.name.starts_with('$') ||
+          method.modifiers.visibility != ast::Visibility::public_ ||
+          method.modifiers.static_ || method.modifiers.abstract_)
+        continue;
+      providers[dispatch_key(method)].push_back({component, method});
+    }
+  }
+  for (const auto &member : owner.members)
+    if (const auto *constructor =
+            dynamic_cast<const ast::FunctionDeclaration *>(member.get());
+        constructor && constructor->name == "construct" && constructor->body) {
+      const auto visit = [&](auto &&self, const ast::Node &node) -> void {
+        if (const auto *assignment =
+                dynamic_cast<const ast::AssignmentExpression *>(&node)) {
+          if (const auto *id = dynamic_cast<const ast::IdentifierExpression *>(
+                  assignment->target.get()))
+            for (const auto &component : info.components)
+              if (id->name == component ||
+                  id->name == component_alias(component))
+                info.explicit_components[constructor].insert(
+                    component_field(name, component));
+        } else if (const auto *expression =
+                       dynamic_cast<const ast::ExpressionStatement *>(&node))
+          self(self, *expression->expression);
+        else if (const auto *block =
+                     dynamic_cast<const ast::BlockStatement *>(&node))
+          for (const auto &item : block->items)
+            self(self, *item);
+        else if (const auto *branch =
+                     dynamic_cast<const ast::IfStatement *>(&node)) {
+          self(self, *branch->then_branch);
+          if (branch->else_branch)
+            self(self, *branch->else_branch);
+        } else if (const auto *loop =
+                       dynamic_cast<const ast::WhileStatement *>(&node))
+          self(self, *loop->body);
+      };
+      visit(visit, *constructor->body);
+    }
+  for (const auto &[key, candidates] : providers) {
+    const auto &method = candidates.front().second;
+    auto &overloads = info.methods[method.name];
+    const auto same = std::find_if(
+        overloads.begin(), overloads.end(),
+        [&](const Symbol &existing) { return dispatch_key(existing) == key; });
+    if (same != overloads.end() && same->owner == name)
+      continue;
+    if (same != overloads.end() || candidates.size() != 1) {
+      report("ARGOS-S0627", owner.span,
+             "assinatura herdada/delegada ambígua; declare uma implementação "
+             "explícita: " +
+                 method.name);
+      continue;
+    }
+    const auto &source = *method.declaration;
+    std::vector<ast::ParameterPtr> parameters;
+    std::vector<ast::ExpressionPtr> arguments;
+    std::vector<std::string> labels;
+    for (const auto &parameter : source.parameters) {
+      auto copy = std::make_unique<ast::Parameter>(
+          parameter->name, clone_syntax(parameter->type.get()), owner.span);
+      copy->external_label = parameter->external_label;
+      labels.push_back(copy->external_label);
+      arguments.push_back(
+          std::make_unique<ast::IdentifierExpression>(copy->name, owner.span));
+      parameters.push_back(std::move(copy));
+    }
+    auto access = std::make_unique<ast::MemberAccessExpression>(
+        std::make_unique<ast::IdentifierExpression>(candidates.front().first,
+                                                    owner.span),
+        method.name, false, owner.span);
+    auto call = std::make_unique<ast::CallExpression>(
+        std::move(access), std::move(arguments), owner.span);
+    call->argument_labels = std::move(labels);
+    std::vector<ast::BlockItemPtr> statements;
+    if (method.return_type.kind == TypeKind::void_type)
+      statements.push_back(std::make_unique<ast::ExpressionStatement>(
+          std::move(call), owner.span));
+    else
+      statements.push_back(
+          std::make_unique<ast::ReturnStatement>(std::move(call), owner.span));
+    auto generated = std::make_unique<ast::FunctionDeclaration>(
+        method.name, std::move(parameters),
+        clone_syntax(source.return_type.get()),
+        std::make_unique<ast::BlockStatement>(std::move(statements),
+                                              owner.span),
+        owner.span);
+    generated->modifiers.visibility = ast::Visibility::public_;
+    generated->modifiers.overload_ = !overloads.empty();
+    generated->package_name = owner.package_name;
+    auto symbol = method;
+    symbol.owner = name;
+    symbol.modifiers = generated->modifiers;
+    symbol.declaration = generated.get();
+    symbol.component_target = component_field(name, candidates.front().first);
+    symbol.package_name = owner.package_name;
+    overloads.push_back(symbol);
+    info.members[method.name] = overloads.front();
+    declaration_symbols_[generated.get()] = symbol;
+    info.generated.push_back(std::move(generated));
+  }
 }
 
 void SemanticAnalyzer::build_class(const std::string& name) {
@@ -1739,169 +2663,372 @@ void SemanticAnalyzer::build_class(const std::string& name) {
   const auto& declaration = *info.declaration;
   if (info.state == 2) return;
   if (info.state == 1) {
-    report("ARGOS-S0603", declaration.span, "ciclo de herança envolvendo " + name);
+    report("ARGOS-S0603", declaration.span, "ciclo de herança: " + name);
     return;
   }
   info.state = 1;
-  if (declaration.modifiers.final_ && (declaration.modifiers.abstract_ || declaration.is_interface))
-    report("ARGOS-S0600", declaration.span, "final não pode ser combinado com abstract ou interface");
-  if (declaration.modifiers.override_ || declaration.modifiers.static_ || declaration.modifiers.virtual_)
-    report("ARGOS-S0600", declaration.span, "modificador incompatível com declaração de tipo");
-  std::size_t class_bases = 0;
-  std::unordered_set<std::string> bases;
-  for (const auto& base : declaration.bases) {
-    if (!bases.insert(base).second) {
-      report("ARGOS-S0604", declaration.span, "tipo base repetido: " + base);
+  if (declaration.modifiers.override_ || declaration.modifiers.overload_ ||
+      declaration.modifiers.static_ || declaration.modifiers.virtual_ ||
+      (declaration.modifiers.final_ &&
+       (declaration.modifiers.abstract_ || declaration.is_interface)))
+    report("ARGOS-S0600", declaration.span,
+           "modificadores incompatíveis no tipo");
+  if (declaration.modifiers.sealed_ && declaration.modifiers.final_)
+    report("ARGOS-S0600", declaration.span, "sealed e final são incompatíveis");
+  if (!declaration.permited.empty() && !declaration.modifiers.sealed_ &&
+      !declaration.is_data)
+    report("ARGOS-S0624", declaration.span,
+           "permited exige sealed class/interface ou data");
+  std::unordered_set<std::string> granted;
+  for (const auto &entity : info.permissions) {
+    if (!granted.insert(entity).second || entity == declaration.name)
+      report("ARGOS-S0624", declaration.span,
+             "entidade permited repetida ou igual ao próprio tipo: " + entity);
+    if (!classes_.contains(entity))
+      report("ARGOS-S0624", declaration.span,
+             "entidade permited não declarada: " + entity);
+  }
+  unsigned class_count = 0;
+  std::unordered_set<std::string> seen_bases;
+  for (const auto &base : info.bases) {
+    const auto it = classes_.find(base);
+    if (it == classes_.end()) {
+      report("ARGOS-S0400", declaration.span, "base não declarada: " + base);
       continue;
     }
-    const auto parent = classes_.find(base);
-    if (parent == classes_.end()) {
-      report("ARGOS-S0400", declaration.span, "tipo base não declarado: " + base);
+    if (!seen_bases.insert(base).second) {
+      report("ARGOS-S0604", declaration.span, "base repetida");
       continue;
     }
     build_class(base);
-    if (!parent->second.declaration->is_interface) {
-      if (declaration.is_interface || ++class_bases > 1)
-        report("ARGOS-S0604", declaration.span, "herança de implementação deve ser simples; interface só estende interfaces");
-      if (parent->second.declaration->modifiers.final_)
-        report("ARGOS-S0605", declaration.span, "não é possível estender classe final " + base);
+    {
+      const auto saved_class = current_class_;
+      const auto saved_package = current_package_;
+      current_class_ = declaration.name;
+      current_package_ = declaration.package_name;
+      accessible_type(base, declaration.span);
+      current_class_ = saved_class;
+      current_package_ = saved_package;
     }
-    for (const auto& [member_name, member] : parent->second.members) {
-      if (member_name.starts_with("$") || member_name == "construct" || member.modifiers.visibility == ast::Visibility::private_) continue;
-      const auto previous = info.members.find(member_name);
-      if (previous == info.members.end()) info.members.emplace(member_name, member);
-      else if (previous->second.kind != member.kind || previous->second.type != member.type ||
-               previous->second.parameter_labels != member.parameter_labels)
-        report("ARGOS-S0606", declaration.span, "contratos herdados incompatíveis para " + member_name);
-      else {
-        const auto& existing = previous->second;
-        if ((existing.modifiers.abstract_ && existing.modifiers.visibility == ast::Visibility::public_ &&
-             !member.modifiers.abstract_ && member.modifiers.visibility != ast::Visibility::public_) ||
-            (member.modifiers.abstract_ && member.modifiers.visibility == ast::Visibility::public_ &&
-             !existing.modifiers.abstract_ && existing.modifiers.visibility != ast::Visibility::public_))
-          report("ARGOS-S0606", declaration.span, "implementação herdada deve preservar visibilidade pública: " + member_name);
-        if (existing.kind == Symbol::Kind::property && existing.mutability != member.mutability) {
-          const bool requirement = existing.modifiers.abstract_ && member.modifiers.abstract_;
-          if (requirement) previous->second.mutability = ast::Mutability::mutable_;
-          else if ((existing.modifiers.abstract_ && existing.mutability == ast::Mutability::mutable_) ||
-                   (member.modifiers.abstract_ && member.mutability == ast::Mutability::mutable_))
-            report("ARGOS-S0606", declaration.span, "implementação herdada não oferece setter exigido: " + member_name);
-        }
-        if (existing.modifiers.abstract_ && !member.modifiers.abstract_) previous->second = member;
+    const auto &parent = it->second;
+    if (parent.declaration->modifiers.sealed_ &&
+        std::find(parent.permissions.begin(), parent.permissions.end(), name) ==
+            parent.permissions.end())
+      report("ARGOS-S0624", declaration.span,
+             "entidade não autorizada em permited de " + base + ": " + name);
+    const bool implementation =
+        std::find(info.interfaces.begin(), info.interfaces.end(), base) !=
+        info.interfaces.end();
+    if (implementation &&
+        (!parent.declaration->is_interface || declaration.is_interface))
+      report("ARGOS-S0625", declaration.span,
+             "by implementa interfaces; não admite superclasses nem declaração "
+             "interface");
+    if (!implementation && parent.declaration->is_interface &&
+        !declaration.is_interface)
+      report("ARGOS-S0625", declaration.span,
+             "use by para implementar interfaces; ':' é herança de classe");
+    if (!parent.declaration->is_interface) {
+      if (++class_count > 1 || declaration.is_interface || declaration.is_data)
+        report("ARGOS-S0604", declaration.span,
+               "somente uma superclasse é permitida; data não estende classes");
+      if (parent.declaration->modifiers.final_ || parent.declaration->is_data)
+        report("ARGOS-S0605", declaration.span,
+               "classe final não pode ser estendida");
+    }
+    for (const auto &[key, member] : parent.members) {
+      if (key == "construct" || member.kind == Symbol::Kind::function)
+        continue;
+      const auto old = info.members.find(key);
+      if (old == info.members.end())
+        info.members[key] = member;
+      else if (old->second.kind != member.kind ||
+               old->second.type != member.type)
+        report("ARGOS-S0606", declaration.span,
+               "membros herdados incompatíveis: " + key);
+      else if (member.kind == Symbol::Kind::property) {
+        if (member.mutability == ast::Mutability::mutable_)
+          old->second.mutability = ast::Mutability::mutable_;
+        if (old->second.modifiers.abstract_ && !member.modifiers.abstract_)
+          old->second = member;
+        else if (!old->second.modifiers.abstract_ &&
+                 member.modifiers.abstract_ &&
+                 member.mutability == ast::Mutability::mutable_ &&
+                 old->second.mutability != member.mutability)
+          report("ARGOS-S0606", declaration.span,
+                 "setter herdado não atende contrato");
       }
     }
+    for (const auto &[key, methods] : parent.methods)
+      for (const auto &method : methods) {
+        if (key == "construct" ||
+            (method.modifiers.visibility == ast::Visibility::private_ &&
+             !parent.declaration->is_interface))
+          continue;
+        auto &target = info.methods[key];
+        auto old = std::find_if(
+            target.begin(), target.end(), [&](const Symbol &other) {
+              return dispatch_key(other) == dispatch_key(method);
+            });
+        if (old == target.end())
+          target.push_back(method);
+        else if (old->type != method.type ||
+                 old->parameter_labels != method.parameter_labels)
+          report("ARGOS-S0606", declaration.span,
+                 "assinaturas herdadas incompatíveis: " + key);
+        else {
+          const Symbol *contract =
+              parent.declaration->is_interface                    ? &method
+              : classes_.at(old->owner).declaration->is_interface ? &*old
+                                                                  : nullptr;
+          const Symbol *implementation_member =
+              old->modifiers.abstract_ ? &method : &*old;
+          if (contract && !implementation_member->modifiers.abstract_ &&
+              contract->modifiers.visibility == ast::Visibility::public_ &&
+              implementation_member->modifiers.visibility !=
+                  ast::Visibility::public_)
+            report(
+                "ARGOS-S0606", declaration.span,
+                "implementação reduz a visibilidade do contrato de interface");
+          if (old->modifiers.abstract_ && !method.modifiers.abstract_)
+            *old = method;
+        }
+      }
   }
   const auto previous_class = current_class_;
+  const auto previous_package = current_package_;
+  current_package_ = declaration.package_name;
   current_class_ = name;
-  std::unordered_set<std::string> local_names;
+  std::unordered_set<std::string> local_names, local_signatures;
+  const auto override_check = [&](const Symbol &parent, const Symbol &child,
+                                  const ast::Node &node) {
+    const bool requirement =
+        classes_.at(parent.owner).declaration->is_interface;
+    if (!child.modifiers.override_ && !requirement)
+      report("ARGOS-S0608", node.span, "sobrescrita exige override");
+    if (parent.modifiers.final_ ||
+        (!requirement && !parent.modifiers.virtual_ &&
+         !parent.modifiers.abstract_ && !parent.modifiers.override_))
+      report("ARGOS-S0608", node.span,
+             "membro herdado não permite sobrescrita");
+    if (parent.type != child.type ||
+        parent.parameter_labels != child.parameter_labels)
+      report("ARGOS-S0606", node.span,
+             "assinatura ou rótulos incompatíveis na sobrescrita");
+    if ((parent.modifiers.visibility == ast::Visibility::public_ &&
+         child.modifiers.visibility != ast::Visibility::public_) ||
+        (parent.modifiers.visibility == ast::Visibility::protected_ &&
+         child.modifiers.visibility != ast::Visibility::public_ &&
+         child.modifiers.visibility != ast::Visibility::protected_))
+      report("ARGOS-S0608", node.span,
+             "sobrescrita não pode reduzir visibilidade");
+  };
   for (const auto& member : declaration.members) {
     const auto* field = dynamic_cast<const ast::VariableDeclaration*>(member.get());
     const auto* method = dynamic_cast<const ast::FunctionDeclaration*>(member.get());
-    Symbol symbol;
     if (field) {
-      if (field->name == "construct" || field->name == "this")
-        report("ARGOS-S0600", field->span, "campo ou propriedade não pode ocultar construct ou this");
-      symbol.kind = field->is_property ? Symbol::Kind::property : Symbol::Kind::variable;
+      Symbol symbol;
       symbol.name = field->name;
-      symbol.type = field->type ? resolve_type(*field->type) : error_type();
-      symbol.mutability = field->is_property && !field->setter ? ast::Mutability::immutable : field->mutability;
-      symbol.modifiers = field->modifiers;
-      symbol.span = field->span;
       symbol.owner = name;
-      if (!field->type) report("ARGOS-S0607", field->span, "campo exige tipo explícito");
-      if (symbol.type.kind == TypeKind::void_type || symbol.type.kind == TypeKind::never_type)
-        report("ARGOS-S0501", field->span, "campo exige tipo habitável");
+      symbol.span = field->span;
+      symbol.kind =
+          field->is_property ? Symbol::Kind::property : Symbol::Kind::variable;
+      symbol.type = field->type ? resolve_type(*field->type) : error_type();
+      symbol.modifiers = field->modifiers;
+      if (declaration.is_data)
+        symbol.modifiers.sealed_ = true;
+      symbol.mutability = field->is_property && !field->setter
+                              ? ast::Mutability::immutable
+                              : field->mutability;
+      if (!field->type || symbol.type.kind == TypeKind::void_type ||
+          symbol.type.kind == TypeKind::never_type)
+        report("ARGOS-S0607", field->span,
+               "campo exige tipo explícito habitável");
+      if (field->name == "this" || field->name == "super" ||
+          field->name == "construct")
+        report("ARGOS-S0600", field->span, "nome de campo reservado");
+      if (field->name == "this" || field->name == "super" ||
+          field->name == "construct" ||
+          !local_names.insert(field->name).second ||
+          info.methods.contains(field->name))
+        report("ARGOS-S0001", field->span,
+               "nome de campo/propriedade inválido ou duplicado");
       if (declaration.is_interface && !field->is_property)
-        report("ARGOS-S0607", field->span, "interface não pode armazenar estado");
-      if (!field->is_property && (field->modifiers.abstract_ || field->modifiers.override_ || field->modifiers.final_ || field->modifiers.virtual_))
-        report("ARGOS-S0600", field->span, "modificador de método aplicado a campo");
+        report("ARGOS-S0607", field->span, "interface não armazena estado");
+      if (!field->is_property &&
+          (field->modifiers.override_ || field->modifiers.virtual_ ||
+           field->modifiers.abstract_ || field->modifiers.final_))
+        report("ARGOS-S0600", field->span,
+               "campo não admite modificadores de despacho");
+      if (declaration.is_data) {
+        std::vector<std::string> visiting{name};
+        if (field->mutability == ast::Mutability::mutable_ ||
+            field->is_property || !immutable_data_type(symbol.type, visiting))
+          report("ARGOS-S0623", field->span,
+                 "data exige campos transitivamente imutáveis; arrays, "
+                 "closures e objetos mutáveis são proibidos");
+      }
       if (field->is_property) {
-        if (!field->getter || field->initializer)
-          report("ARGOS-S0607", field->span, "propriedade exige getter e não armazena inicializador");
-        if (field->setter && field->mutability != ast::Mutability::mutable_)
-          report("ARGOS-S0607", field->span, "setter exige var mut");
-        if (declaration.is_interface) {
-          if (symbol.modifiers.visibility == ast::Visibility::private_ || symbol.modifiers.visibility == ast::Visibility::protected_)
-            report("ARGOS-S0600", field->span, "propriedade de interface deve ser pública");
-          symbol.modifiers.visibility = ast::Visibility::public_;
+        if (!field->getter || field->initializer ||
+            (field->setter && field->mutability != ast::Mutability::mutable_))
+          report("ARGOS-S0607", field->span,
+                 "propriedade exige getter; setter exige var mut e não há "
+                 "inicializador");
+        if (declaration.is_interface)
           symbol.modifiers.abstract_ = true;
-        }
-        if ((symbol.modifiers.virtual_ || symbol.modifiers.abstract_) && symbol.modifiers.visibility == ast::Visibility::private_)
-          report("ARGOS-S0600", field->span, "propriedade private não pode ser virtual ou abstract");
-        if (symbol.modifiers.final_ && (symbol.modifiers.virtual_ || symbol.modifiers.abstract_))
-          report("ARGOS-S0600", field->span, "modificadores incompatíveis na propriedade");
+        if ((symbol.modifiers.virtual_ || symbol.modifiers.abstract_) &&
+            symbol.modifiers.visibility == ast::Visibility::private_ &&
+            !declaration.is_interface)
+          report("ARGOS-S0600", field->span,
+                 "propriedade privada não pode ser virtual/abstract");
         for (const auto* accessor : {field->getter.get(), field->setter.get()})
           if (accessor && symbol.modifiers.abstract_ && accessor->body)
-            report("ARGOS-S0607", accessor->span, "requisito de acessor não pode ter corpo");
+            report("ARGOS-S0607", accessor->span,
+                   "acessor abstrato não pode ter corpo");
       }
+      if (const auto old = info.members.find(field->name);
+          old != info.members.end()) {
+        if (!field->is_property || old->second.kind != Symbol::Kind::property)
+          report("ARGOS-S0606", field->span,
+                 "campo herdado não pode ser ocultado");
+        else {
+          override_check(old->second, symbol, *field);
+          if (old->second.mutability == ast::Mutability::mutable_ &&
+              symbol.mutability != ast::Mutability::mutable_)
+            report("ARGOS-S0606", field->span,
+                   "setter do contrato deve ser preservado");
+        }
+      } else if (symbol.modifiers.override_)
+        report("ARGOS-S0608", field->span, "override sem propriedade herdada");
+      info.members[field->name] = symbol;
+      if (field->is_property)
+        for (const auto *accessor : {field->getter.get(), field->setter.get()})
+          if (accessor) {
+            auto helper = function_symbol(*accessor);
+            helper.modifiers = symbol.modifiers;
+            declaration_symbols_[accessor] = helper;
+            info.members[helper.name] = helper;
+            info.methods[helper.name] = {helper};
+          }
     } else if (method) {
-      if (method->name == "init")
-        report("ARGOS-S0600", method->span, "init foi removido; declare construct(...) para construir a instância");
-      symbol = function_symbol(*method);
+      auto symbol = function_symbol(*method);
+      if (method->name == "init" || method->name == "this" ||
+          method->name == "super")
+        report("ARGOS-S0600", method->span,
+               "nome de método inválido; use construct");
       if (declaration.is_interface) {
-        if (symbol.modifiers.visibility == ast::Visibility::private_ ||
-            symbol.modifiers.visibility == ast::Visibility::protected_ ||
-            symbol.modifiers.final_ || symbol.modifiers.override_ || symbol.modifiers.virtual_)
-          report("ARGOS-S0600", method->span, "modificador incompatível com requisito de interface");
+        if (method->body || method->name == "construct")
+          report("ARGOS-S0607", method->span,
+                 "interface contém somente contratos sem corpo");
         symbol.modifiers.abstract_ = true;
-        symbol.modifiers.visibility = ast::Visibility::public_;
-        if (method->body) report("ARGOS-S0607", method->span, "método de interface deve declarar somente assinatura");
       }
-      if ((symbol.modifiers.virtual_ || symbol.modifiers.abstract_) &&
-          symbol.modifiers.visibility == ast::Visibility::private_)
-        report("ARGOS-S0600", method->span, "método private não pode ser virtual ou abstract");
-      if (symbol.modifiers.final_ && symbol.modifiers.virtual_)
-        report("ARGOS-S0600", method->span, "final e virtual são incompatíveis");
-      if (symbol.modifiers.abstract_ && (symbol.modifiers.final_ || method->body))
-        report("ARGOS-S0600", method->span, "método abstract não pode ser final nem ter corpo");
-      if (method->name == "construct" && (method->return_type || !method->body || declaration.is_interface ||
-          method->modifiers.abstract_ || method->modifiers.override_ || method->modifiers.static_))
-        report("ARGOS-S0600", method->span, "construct exige corpo, sem retorno explícito e sem modificadores de despacho");
-    } else continue;
-    if (symbol.modifiers.static_)
-      report("ARGOS-S0600", member->span, "membros static ainda não são suportados");
-    if (!local_names.insert(symbol.name).second) {
-      report("ARGOS-S0001", member->span, "membro duplicado: " + symbol.name);
-      continue;
+      if (symbol.modifiers.sealed_ || symbol.modifiers.static_ ||
+          (symbol.modifiers.abstract_ &&
+           (method->body || symbol.modifiers.final_)) ||
+          ((symbol.modifiers.virtual_ || symbol.modifiers.abstract_) &&
+           symbol.modifiers.visibility == ast::Visibility::private_ &&
+           !declaration.is_interface) ||
+          (symbol.modifiers.virtual_ && symbol.modifiers.final_))
+        report("ARGOS-S0600", method->span,
+               "modificadores de método incompatíveis");
+      if (method->name == "construct" &&
+          (method->return_type || !method->body || symbol.modifiers.override_ ||
+           symbol.modifiers.virtual_ || symbol.modifiers.abstract_))
+        report("ARGOS-S0600", method->span,
+               "construct exige corpo e não admite retorno ou despacho");
+      const auto key = dispatch_key(symbol);
+      if (!local_signatures.insert(key).second)
+        report("ARGOS-S0001", method->span, "assinatura duplicada");
+      if (local_names.contains(method->name) ||
+          (info.members.contains(method->name) &&
+           info.members.at(method->name).kind != Symbol::Kind::function))
+        report("ARGOS-S0606", method->span,
+               "método conflita com campo/propriedade");
+      auto &methods = info.methods[method->name];
+      auto old = std::find_if(
+          methods.begin(), methods.end(),
+          [&](const Symbol &other) { return dispatch_key(other) == key; });
+      if (old != methods.end()) {
+        if (old->owner != name)
+          override_check(*old, symbol, *method);
+        *old = symbol;
+      } else {
+        if (symbol.modifiers.override_)
+          report("ARGOS-S0608", method->span,
+                 "override sem assinatura herdada correspondente");
+        if (!methods.empty() && !symbol.modifiers.overload_)
+          report("ARGOS-S0620", method->span,
+                 "sobrecarga adicional exige overload");
+        methods.push_back(symbol);
+      }
+      info.members[method->name] = methods.front();
+      declaration_symbols_[method] = symbol;
     }
-    if (const auto inherited = info.members.find(symbol.name); inherited != info.members.end()) {
-      const auto& parent = inherited->second;
-      if ((field && !field->is_property) || parent.kind != symbol.kind ||
-          (parent.kind != Symbol::Kind::function && parent.kind != Symbol::Kind::property))
-        report("ARGOS-S0606", member->span, "membros herdados incompatíveis; campos não podem ser sobrescritos");
-      else {
-        const bool requirement = classes_.at(parent.owner).declaration->is_interface;
-        if (!symbol.modifiers.override_ && !requirement)
-          report("ARGOS-S0608", member->span, "sobrescrita exige override");
-        if (parent.modifiers.final_ || (!requirement && !parent.modifiers.virtual_ &&
-            !parent.modifiers.abstract_ && !parent.modifiers.override_))
-          report("ARGOS-S0608", member->span, "método herdado não permite sobrescrita");
-        if (parent.kind == Symbol::Kind::property && parent.mutability == ast::Mutability::mutable_ &&
-            symbol.mutability != ast::Mutability::mutable_)
-          report("ARGOS-S0606", member->span, "implementação deve preservar setter do contrato");
-        if (parent.type != symbol.type || parent.parameter_labels != symbol.parameter_labels)
-          report("ARGOS-S0606", member->span, "assinatura ou rótulos incompatíveis na sobrescrita");
-        if (parent.modifiers.visibility == ast::Visibility::public_ &&
-            symbol.modifiers.visibility != ast::Visibility::public_)
-          report("ARGOS-S0608", member->span, "implementação não pode reduzir visibilidade pública");
+    if (field && field->name.starts_with("$with."))
+      report("ARGOS-S0631", field->span,
+             "nome reservado ao armazenamento de composição");
+    if (member->modifiers.static_)
+      report("ARGOS-S0600", member->span, "static não pertence a esta etapa");
+  }
+  if (declaration.is_data)
+    for (const auto builtin : {ast::FunctionDeclaration::Builtin::data_hash,
+                               ast::FunctionDeclaration::Builtin::data_text}) {
+      const auto method_name =
+          builtin == ast::FunctionDeclaration::Builtin::data_hash ? "hashCode"
+                                                                  : "toString";
+      const auto existing = info.members.find(method_name);
+      if (existing != info.members.end() &&
+          (existing->second.owner == name || existing->second.kind != Symbol::Kind::function)) {
+        report("ARGOS-S0632", declaration.span,
+               "método reservado à geração de data: " +
+                   std::string{method_name});
+        continue;
       }
-    } else if (symbol.modifiers.override_)
-      report("ARGOS-S0608", member->span, "override sem método herdado correspondente");
-    info.members.insert_or_assign(symbol.name, symbol);
-    if (field && field->is_property) {
-      for (const auto* accessor : {field->getter.get(), field->setter.get()}) {
-        if (!accessor) continue;
-        auto helper = function_symbol(*accessor);
-        helper.modifiers = symbol.modifiers;
-        info.members.insert_or_assign(helper.name, std::move(helper));
+      auto method = std::make_unique<ast::FunctionDeclaration>(
+          method_name, std::vector<ast::ParameterPtr>{},
+          std::make_unique<ast::TypeSyntax>(
+              builtin == ast::FunctionDeclaration::Builtin::data_hash
+                  ? "int"
+                  : "string",
+              0, declaration.span),
+          nullptr, declaration.span);
+      method->modifiers.visibility = ast::Visibility::public_;
+      method->builtin = builtin;
+      method->package_name = declaration.package_name;
+      auto symbol = function_symbol(*method);
+      declaration_symbols_[method.get()] = symbol;
+      auto& methods = info.methods[method_name];
+      const auto inherited = std::find_if(methods.begin(), methods.end(), [&](const Symbol& candidate) {
+        return dispatch_key(candidate) == dispatch_key(symbol);
+      });
+      if (inherited != methods.end()) {
+        override_check(*inherited, symbol, *method);
+        *inherited = symbol;
+      } else {
+        methods.push_back(symbol);
       }
+      info.members[method_name] = methods.front();
+      info.generated.push_back(std::move(method));
     }
+  build_components(name);
+  for (const auto &[key, methods] : info.methods) {
+    if (!methods.empty())
+      info.members[key] = methods.front();
+    if (!declaration.is_interface && !declaration.modifiers.abstract_)
+      for (const auto &method : methods)
+        if (method.modifiers.abstract_)
+          report("ARGOS-S0609", declaration.span,
+                 "classe concreta não implementa " + dispatch_key(method));
   }
   if (!declaration.is_interface && !declaration.modifiers.abstract_)
-    for (const auto& [member_name, member] : info.members)
-      if (!member_name.starts_with("$") && member.modifiers.abstract_)
-        report("ARGOS-S0609", declaration.span, "classe concreta não implementa " + member_name);
+    for (const auto &[key, member] : info.members)
+      if (member.kind == Symbol::Kind::property && member.modifiers.abstract_)
+        report("ARGOS-S0609", declaration.span,
+               "propriedade abstrata sem implementação");
+  if (declaration.is_data && declaration.modifiers.abstract_)
+    report("ARGOS-S0623", declaration.span, "data é final e concreta");
   current_class_ = previous_class;
+  current_package_ = previous_package;
   info.state = 2;
 }
 
@@ -1915,18 +3042,17 @@ const Symbol* SemanticAnalyzer::find_member(const Type& type, const std::string&
     return nullptr;
   }
   const auto& symbol = member->second;
-  if ((symbol.modifiers.visibility == ast::Visibility::private_ && current_class_ != symbol.owner) ||
-      (symbol.modifiers.visibility == ast::Visibility::protected_ &&
-       (current_class_.empty() || !is_subtype(current_class_, symbol.owner)))) {
-    report("ARGOS-S0611", span, "membro inacessível: " + name);
+  if (!(resolving_callee_ && symbol.kind == Symbol::Kind::function) &&
+      !accessible(symbol, span))
     return nullptr;
-  }
   return &symbol;
 }
 
 void SemanticAnalyzer::analyze_class(const ast::ClassDeclaration& declaration) {
   const auto previous_class = current_class_;
   current_class_ = declaration.name;
+  const auto previous_package = current_package_;
+  current_package_ = declaration.package_name;
   enter_scope();
   declare(Symbol{.name = "this", .kind = Symbol::Kind::parameter,
                  .type = Type{TypeKind::nominal_type, 0, declaration.name}, .initialized = true});
@@ -1935,6 +3061,15 @@ void SemanticAnalyzer::analyze_class(const ast::ClassDeclaration& declaration) {
     symbol.initialized = true;
     declare(std::move(symbol));
   }
+  for (const auto &field : classes_.at(declaration.name).fields)
+    if (field->initializer) {
+      initializing_field_ = true;
+      const auto actual =
+          analyze_expression(*field->initializer, Type{TypeKind::nominal_type,
+                                                       0, field->type->name});
+      (void)actual;
+      initializing_field_ = false;
+    }
   for (const auto& member : declaration.members) {
     if (const auto* field = dynamic_cast<const ast::VariableDeclaration*>(member.get())) {
       if (field->is_property) {
@@ -1960,6 +3095,11 @@ void SemanticAnalyzer::analyze_class(const ast::ClassDeclaration& declaration) {
       const auto before_method = scopes_;
       // Initialization facts are local to each constructor or method.
       if (method->name == "construct") {
+        for (const auto &generated : classes_.at(declaration.name).fields)
+          if (auto *symbol = lookup_field(generated->name))
+            symbol->initialized =
+                generated->initializer != nullptr &&
+                !explicitly_initializes(*method, generated->name);
         for (const auto& field_member : declaration.members)
           if (const auto* constructor_field = dynamic_cast<const ast::VariableDeclaration*>(field_member.get());
               constructor_field && !constructor_field->is_property)
@@ -1967,14 +3107,70 @@ void SemanticAnalyzer::analyze_class(const ast::ClassDeclaration& declaration) {
       }
       const bool previous_constructor = in_constructor_;
       in_constructor_ = method->name == "construct";
+      const auto previous_super = super_initialized_;
+      super_initialized_ = true;
+      if (in_constructor_) {
+        const auto base = superclass(declaration.name);
+        if (!base.empty()) {
+          const auto *first =
+              method->body && !method->body->items.empty()
+                  ? dynamic_cast<const ast::ExpressionStatement *>(
+                        method->body->items.front().get())
+                  : nullptr;
+          const auto *call = first ? dynamic_cast<const ast::CallExpression *>(
+                                         first->expression.get())
+                                   : nullptr;
+          const auto *target =
+              call ? dynamic_cast<const ast::IdentifierExpression *>(
+                         call->callee.get())
+                   : nullptr;
+          const bool explicit_super = target && target->name == "super";
+          super_initialized_ = !explicit_super;
+          if (!explicit_super) {
+            const auto &constructors = classes_.at(base).methods;
+            if (constructors.contains("construct")) {
+              const auto &options = constructors.at("construct");
+              const auto zero = std::find_if(
+                  options.begin(), options.end(),
+                  [](const Symbol &m) { return m.parameter_types.empty(); });
+              if (zero == options.end())
+                report("ARGOS-S0622", method->span,
+                       "superclasse exige super(argumentos) como primeira "
+                       "instrução");
+              else
+                accessible(*zero, method->span);
+            }
+          }
+        }
+      }
       analyze_function_declaration(*method);
+      super_initialized_ = previous_super;
       in_constructor_ = previous_constructor;
       // Constructor bodies use the regular definite-initialization analysis.
       scopes_ = before_method;
     }
   }
+  for (const auto &generated : classes_.at(declaration.name).generated)
+    analyze_function_declaration(*generated);
+  if (!classes_.at(declaration.name).methods.contains("construct")) {
+    const auto base = superclass(declaration.name);
+    if (!base.empty() && classes_.at(base).methods.contains("construct")) {
+      const auto &options = classes_.at(base).methods.at("construct");
+      const auto zero =
+          std::find_if(options.begin(), options.end(), [](const Symbol &m) {
+            return m.parameter_types.empty();
+          });
+      if (zero == options.end())
+        report(
+            "ARGOS-S0622", declaration.span,
+            "classe exige construct com chamada explícita super(argumentos)");
+      else
+        accessible(*zero, declaration.span);
+    }
+  }
   leave_scope();
   current_class_ = previous_class;
+  current_package_ = previous_package;
 }
 
 Type SemanticAnalyzer::analyze_lambda(const ast::LambdaExpression& expression) {

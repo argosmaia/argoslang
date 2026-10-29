@@ -1,12 +1,15 @@
 #include "argos/codegen/ir/executable_ir_generator.hpp"
 #include "argos/diagnostics/diagnostic_catalog.hpp"
 
+#include <algorithm>
 #include <charconv>
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -97,6 +100,8 @@ std::optional<ValueType> runtime_type(const ast::TypeSyntax *type,
   if (!type)
     return std::nullopt;
   ValueType payload;
+  const auto &name =
+      type->resolved_name.empty() ? type->name : type->resolved_name;
   if (type->element_type) {
     const auto element = runtime_type(type->element_type.get(), layouts);
     if (!element || !argos::ir::valid_type(*element) ||
@@ -112,17 +117,17 @@ std::optional<ValueType> runtime_type(const ast::TypeSyntax *type,
     if (!runtime_type(type->result_type.get(), layouts))
       return std::nullopt;
     payload = ValueType::closure;
-  } else if (type->name == "int")
+  } else if (name == "int" || name == "byte" || name == "uint_8")
     payload = ValueType::int32;
-  else if (type->name == "bool")
+  else if (name == "bool")
     payload = ValueType::boolean;
-  else if (type->name == "float" || type->name == "double")
+  else if (name == "float" || name == "double")
     payload = ValueType::float64;
-  else if (type->name == "string")
+  else if (name == "string")
     payload = ValueType::string;
-  else if (type->name == "void" && !type->nullable_depth)
+  else if (name == "void" && !type->nullable_depth)
     payload = ValueType::void_type;
-  else if (layouts.contains(type->name))
+  else if (layouts.contains(name))
     payload = ValueType::object;
   else
     return std::nullopt;
@@ -149,7 +154,11 @@ public:
         source_(source), parameters_(source.parameters), return_type_(source.return_type.get()),
         body_(source.body.get()), ids_(ids), arities_(arities), work_(work), layouts_(layouts), owner_(owner) {
     function_.id = id;
-    function_.name = owner ? owner->name + "." + source.name : source.name;
+    function_.name =
+        semantics.declaration_symbol(source)
+            ? semantics::SemanticAnalyzer::function_key(
+                  *semantics.declaration_symbol(source))
+            : (owner ? owner->name + "." + source.name : source.name);
     scopes_.emplace_back();
     current_ = make_block();
   }
@@ -224,10 +233,67 @@ public:
         emit(store);
       }
     }
+    if (owner_ &&
+        static_cast<const ast::FunctionDeclaration &>(source_).builtin !=
+            ast::FunctionDeclaration::Builtin::none) {
+      const auto &source =
+          static_cast<const ast::FunctionDeclaration &>(source_);
+      const auto &layout = layouts_.at(owner_->name);
+      const auto value = data_value(
+          this_value(), &layout,
+          source.builtin == ast::FunctionDeclaration::Builtin::data_hash);
+      if (value) {
+        Instruction ret;
+        ret.opcode = Opcode::ret;
+        ret.src1 = *value;
+        emit(ret);
+      }
+      return std::move(function_);
+    }
     if (owner_ && static_cast<const ast::FunctionDeclaration&>(source_).name == "construct") {
       const auto& layout = layouts_.at(owner_->name);
+      const ast::CallExpression *explicit_super = nullptr;
+      if (body_ && !body_->items.empty()) {
+        const auto *first = dynamic_cast<const ast::ExpressionStatement *>(
+            body_->items.front().get());
+        explicit_super = first ? dynamic_cast<const ast::CallExpression *>(
+                                     first->expression.get())
+                               : nullptr;
+        const auto *id = explicit_super
+                             ? dynamic_cast<const ast::IdentifierExpression *>(
+                                   explicit_super->callee.get())
+                             : nullptr;
+        if (!id || id->name != "super")
+          explicit_super = nullptr;
+      }
+      if (explicit_super) {
+        expression(*explicit_super);
+        super_call_ = explicit_super;
+      } else
+        for (const auto &base : semantics_.bases_of(owner_->name))
+          if (!layouts_.at(base).declaration->is_interface) {
+            static const std::vector<ast::ExpressionPtr> empty;
+            auto key = base + ".construct";
+            for (const auto &method : semantics_.methods_of(base))
+              if (method.name == "construct" && method.parameter_types.empty())
+                key = semantics::SemanticAnalyzer::function_key(method);
+            direct_call(source_, ids_.at(key), empty, {}, ValueType::void_type,
+                        this_value());
+          }
       for (std::size_t i = 0; i < layout.fields.size(); ++i) {
-        if (!layout.fields[i]->initializer) continue;
+        const auto *field = layout.fields[i];
+        bool own = std::any_of(
+            owner_->members.begin(), owner_->members.end(),
+            [&](const auto &member) { return member.get() == field; });
+        for (const auto &generated : semantics_.generated_fields(owner_->name))
+          if (generated.get() == field)
+            own = true;
+        if (semantics_.explicitly_initializes(
+                static_cast<const ast::FunctionDeclaration &>(source_),
+                field->name))
+          continue;
+        if (!own || !field->initializer)
+          continue;
         const auto value = expression(*layout.fields[i]->initializer);
         if (value) store_field(layout, static_cast<std::uint32_t>(i), this_value(), *value);
       }
@@ -247,7 +313,13 @@ public:
         ret.src1 = constant("0");
         emit(ret);
       }
-    } else error(source_, "função sem corpo não pode ser executada");
+    } else if (owner_) {
+      Instruction never;
+      never.opcode = Opcode::jmp;
+      never.label = current_;
+      emit(never);
+    } else
+      error(source_, "função sem corpo não pode ser executada");
     return std::move(function_);
   }
 
@@ -291,20 +363,43 @@ private:
     store.src2 = value;
     emit(store);
   }
+  std::uint32_t virtual_slot(const semantics::Symbol &symbol) const {
+    const auto key = semantics::SemanticAnalyzer::virtual_key(symbol);
+    for (std::size_t i = 0; i < module_.virtual_functions.size(); ++i) {
+      const auto *candidate = semantics_.declaration_symbol(
+          *work_[module_.virtual_functions[i]].function);
+      if (candidate &&
+          semantics::SemanticAnalyzer::virtual_key(*candidate) == key)
+        return static_cast<std::uint32_t>(i);
+    }
+    throw std::runtime_error("slot virtual não registrado: " + key);
+  }
   Register accessor_call(argos::ir::FunctionId id, Register receiver,
-                         std::optional<Register> value = std::nullopt) {
+                         std::optional<Register> value = std::nullopt,
+                         bool super = false) {
     Instruction call;
     call.opcode = Opcode::call;
     call.function = id;
+    if (!super) {
+      const auto *symbol = semantics_.declaration_symbol(*work_[id].function);
+      if (symbol && symbol->modifiers.visibility != ast::Visibility::private_) {
+        call.opcode = Opcode::call_virtual;
+        call.constant = virtual_slot(*symbol);
+        call.function = module_.virtual_functions[call.constant];
+      }
+    }
     call.dst = reg(value ? ValueType::void_type : syntax_type(work_[id].function->return_type.get()));
     call.arguments = {receiver};
     if (value) call.arguments.push_back(*value);
     emit(call);
     return call.dst;
   }
-  std::optional<Register> direct_call(const ast::Node& node, argos::ir::FunctionId id,
-      const std::vector<ast::ExpressionPtr>& arguments, const std::vector<std::string>& labels,
-      ValueType returned, std::optional<Register> receiver = std::nullopt) {
+  std::optional<Register>
+  direct_call(const ast::Node &node, argos::ir::FunctionId id,
+              const std::vector<ast::ExpressionPtr> &arguments,
+              const std::vector<std::string> &labels, ValueType returned,
+              std::optional<Register> receiver = std::nullopt,
+              const semantics::Symbol *dynamic = nullptr) {
     const auto* declaration = work_[id].function;
     if (!declaration || arguments.size() + (receiver ? 1 : 0) > 6) {
       error(node, "chamada excede limite de seis argumentos incluindo this"); return std::nullopt;
@@ -312,20 +407,33 @@ private:
     Instruction call;
     call.opcode = Opcode::call;
     call.function = id;
+    if (dynamic) {
+      call.opcode = Opcode::call_virtual;
+      call.constant = virtual_slot(*dynamic);
+      call.function = module_.virtual_functions[call.constant];
+    }
     call.dst = reg(returned);
     call.arguments.resize(arguments.size() + (receiver ? 1 : 0));
     if (receiver) call.arguments[0] = *receiver;
     // Evaluate in source order before arranging registers by parameter label.
+    std::vector<bool> bound(arguments.size());
+    std::size_t next_positional = 0;
     for (std::size_t i = 0; i < arguments.size(); ++i) {
       const auto value = expression(*arguments[i]);
       if (!value) return std::nullopt;
-      std::size_t position = i;
-      if (i < labels.size() && !labels[i].empty())
+      std::size_t position = arguments.size();
+      if (i < labels.size() && !labels[i].empty()) {
         for (std::size_t j = 0; j < declaration->parameters.size(); ++j)
           if (declaration->parameters[j]->external_label == labels[i]) { position = j; break; }
-      if (position + (receiver ? 1 : 0) >= call.arguments.size()) {
+      } else {
+        while (next_positional < bound.size() && bound[next_positional])
+          ++next_positional;
+        position = next_positional++;
+      }
+      if (position >= bound.size() || bound[position]) {
         error(node, "rótulo não corresponde ao parâmetro"); return std::nullopt;
       }
+      bound[position] = true;
       call.arguments[position + (receiver ? 1 : 0)] = *value;
     }
     emit(call);
@@ -358,7 +466,9 @@ private:
         return argos::ir::array_type(*element);
       return std::nullopt;
     }
-    if (type.kind == semantics::TypeKind::int_type) return ValueType::int32;
+    if (type.kind == semantics::TypeKind::int_type ||
+        type.kind == semantics::TypeKind::byte)
+      return ValueType::int32;
     if (type.kind == semantics::TypeKind::bool_type) return ValueType::boolean;
     if (type.kind == semantics::TypeKind::float_type ||
         type.kind == semantics::TypeKind::double_type)
@@ -427,6 +537,10 @@ private:
     current_expression_ = &node;
     auto result = expression_impl(node);
     const auto coercion = semantics_.coercion_of(node);
+    const auto actual = coercion ? *coercion : semantics_.type_of(node);
+    if (result && actual.kind == semantics::TypeKind::byte &&
+        function_.register_types[*result] == ValueType::int32)
+      result = unary_ir(Opcode::check_uint8, *result, ValueType::int32, &node);
     if (!result || !coercion) return result;
     const auto target = semantic_type(*coercion);
     if (!target) {
@@ -505,9 +619,38 @@ private:
     emit(load);
     return load.dst;
   }
-  std::optional<Register> equality(Register a, Register b) {
+  std::optional<Register> equality(Register a, Register b,
+                                   const ClassLayout *data = nullptr) {
     const auto type = function_.register_types[a];
     if (!argos::ir::is_optional(type)) {
+      if (data && data->declaration->is_data) {
+        auto result = constant("1", ValueType::boolean);
+        for (std::size_t index = 0; index < data->fields.size(); ++index) {
+          const auto left =
+              load_field(*data, static_cast<std::uint32_t>(index), a);
+          const auto right =
+              load_field(*data, static_cast<std::uint32_t>(index), b);
+          const auto nested =
+              layouts_.find(data->fields[index]->type->resolved_name.empty()
+                                ? data->fields[index]->type->name
+                                : data->fields[index]->type->resolved_name);
+          const auto same =
+              equality(left, right,
+                       nested == layouts_.end() ? nullptr : &nested->second);
+          if (!same)
+            return std::nullopt;
+          const auto both = choose(
+              result, ValueType::boolean,
+              [&]() -> std::optional<Register> { return *same; },
+              [&]() -> std::optional<Register> {
+                return constant("0", ValueType::boolean);
+              });
+          if (!both)
+            return std::nullopt;
+          result = *both;
+        }
+        return result;
+      }
       Instruction i;
       i.opcode = Opcode::cmp_eq;
       i.src1 = a;
@@ -530,8 +673,87 @@ private:
               [&]() -> std::optional<Register> {
                 return constant("0", ValueType::boolean);
               },
-              [&]() { return equality(unwrap(a), unwrap(b)); });
+              [&]() { return equality(unwrap(a), unwrap(b), data); });
         });
+  }
+  Register string_constant(const std::string &text) {
+    Instruction load;
+    load.opcode = Opcode::load_string;
+    load.constant =
+        static_cast<argos::ir::ConstantId>(module_.constants.size());
+    module_.constants.push_back({load.constant, text});
+    load.dst = reg(ValueType::string);
+    emit(load);
+    return load.dst;
+  }
+  Register binary_value(Opcode opcode, Register a, Register b, ValueType type) {
+    Instruction instruction;
+    instruction.opcode = opcode;
+    instruction.src1 = a;
+    instruction.src2 = b;
+    instruction.dst = reg(type);
+    emit(instruction);
+    return instruction.dst;
+  }
+  std::optional<Register> data_value(Register value, const ClassLayout *layout,
+                                     bool hash) {
+    const auto type = function_.register_types[value];
+    if (argos::ir::is_optional(type)) {
+      return choose(
+          unary_ir(Opcode::is_nil, value, ValueType::boolean),
+          hash ? ValueType::int32 : ValueType::string,
+          [&]() -> std::optional<Register> {
+            return hash ? constant("0") : string_constant("nil");
+          },
+          [&]() -> std::optional<Register> {
+            const auto inner = data_value(unwrap(value), layout, hash);
+            if (!inner)
+              return std::nullopt;
+            return hash ? binary_value(Opcode::add, *inner, constant("1"),
+                                       ValueType::int32)
+                        : *inner;
+          });
+    }
+    if (layout && layout->declaration->is_data) {
+      std::uint32_t seed = 2166136261u;
+      for (const char byte : layout->declaration->name)
+        seed = (seed ^ static_cast<unsigned char>(byte)) * 16777619u;
+      auto result =
+          hash ? constant(std::to_string(static_cast<std::int32_t>(seed)))
+               : string_constant(layout->declaration->simple_name + "(");
+      for (std::size_t index = 0; index < layout->fields.size(); ++index) {
+        const auto *field = layout->fields[index];
+        const auto &name = field->type->resolved_name.empty()
+                               ? field->type->name
+                               : field->type->resolved_name;
+        const auto nested = layouts_.find(name);
+        const auto part = data_value(
+            load_field(*layout, static_cast<std::uint32_t>(index), value),
+            nested == layouts_.end() ? nullptr : &nested->second, hash);
+        if (!part)
+          return std::nullopt;
+        if (hash)
+          result = binary_value(Opcode::add,
+                                binary_value(Opcode::mul, result,
+                                             constant("31"), ValueType::int32),
+                                *part, ValueType::int32);
+        else {
+          result = binary_value(
+              Opcode::concat_strings, result,
+              string_constant((index ? ", " : "") + field->name + "="),
+              ValueType::string);
+          result = binary_value(Opcode::concat_strings, result, *part,
+                                ValueType::string);
+        }
+      }
+      return hash ? result
+                  : binary_value(Opcode::concat_strings, result,
+                                 string_constant(")"), ValueType::string);
+    }
+    if (!hash && type == ValueType::string)
+      return value;
+    return unary_ir(hash ? Opcode::hash_scalar : Opcode::stringify_scalar,
+                    value, hash ? ValueType::int32 : ValueType::string);
   }
   void print_value(Register value) {
     const auto type = function_.register_types[value];
@@ -630,18 +852,30 @@ private:
           });
     }
     if (const auto* creation = dynamic_cast<const ast::NewExpression*>(&node)) {
-      const auto found = layouts_.find(creation->type->name);
+      const auto found =
+          layouts_.find(semantics_.type_of(*creation).nominal_name);
       if (found == layouts_.end()) { error(node, "classe ainda não possui layout executável"); return std::nullopt; }
       Instruction allocation;
       allocation.opcode = Opcode::new_object;
       allocation.constant = found->second.id;
       allocation.dst = reg(ValueType::object);
       emit(allocation);
-      direct_call(node, ids_.at(creation->type->name + ".construct"), creation->call->arguments,
-                  creation->call->argument_labels, ValueType::void_type, allocation.dst);
+      const auto *constructor = semantics_.resolved_call(*creation->call);
+      const auto key =
+          constructor
+              ? semantics::SemanticAnalyzer::function_key(*constructor)
+              : semantics_.type_of(*creation).nominal_name + ".construct";
+      direct_call(node, ids_.at(key), creation->call->arguments,
+                  creation->call->argument_labels, ValueType::void_type,
+                  allocation.dst);
       return allocation.dst;
     }
     if (const auto* access = dynamic_cast<const ast::MemberAccessExpression*>(&node)) {
+      if (const auto *binding = semantics_.component_binding(*access)) {
+        const auto &layout = layouts_.at(binding->receiver);
+        return load_field(layout, *field_index(layout, binding->field),
+                          this_value());
+      }
       const auto type = semantics_.type_of(*access->base);
       const auto found = layouts_.find(type.nominal_name);
       if (found == layouts_.end()) { error(node, "membro sem layout executável"); return std::nullopt; }
@@ -652,9 +886,13 @@ private:
       }
       const auto base = expression(*access->base);
       if (!base) return std::nullopt;
+      const auto *base_id =
+          dynamic_cast<const ast::IdentifierExpression *>(access->base.get());
+      const bool super = base_id && base_id->name == "super";
       const auto read = [&](Register receiver) {
         return index ? load_field(found->second, *index, receiver)
-                     : accessor_call(getter->second, receiver);
+                     : accessor_call(getter->second, receiver, std::nullopt,
+                                     super);
       };
       if (!access->safe)
         return read(*base);
@@ -736,6 +974,13 @@ private:
     if (const auto *group = dynamic_cast<const ast::GroupingExpression *>(&node))
       return expression(*group->expression);
     if (const auto *identifier = dynamic_cast<const ast::IdentifierExpression *>(&node)) {
+      if (const auto *binding = semantics_.component_binding(*identifier)) {
+        const auto &layout = layouts_.at(binding->receiver);
+        return load_field(layout, *field_index(layout, binding->field),
+                          this_value());
+      }
+      if (identifier->name == "super")
+        return this_value();
       const auto place = slot(identifier->name);
       if (!place && owner_) {
         const auto& layout = layouts_.at(owner_->name);
@@ -751,11 +996,17 @@ private:
           return std::nullopt;
         }
       }
-      if (!place && ids_.contains(identifier->name)) {
+      auto function_name = identifier->name;
+      if (const auto binding = semantics_.symbol_id_of(node))
+        if (const auto *symbol = semantics_.symbol_by_id(*binding);
+            symbol && symbol->kind == semantics::Symbol::Kind::function &&
+            symbol->owner.empty())
+          function_name = semantics::SemanticAnalyzer::function_key(*symbol);
+      if (!place && ids_.contains(function_name)) {
         Instruction instruction;
         instruction.opcode = Opcode::make_closure;
         instruction.function = static_cast<argos::ir::FunctionId>(work_.size());
-        work_.push_back({nullptr, nullptr, ids_.at(identifier->name)});
+        work_.push_back({nullptr, nullptr, ids_.at(function_name)});
         instruction.dst = reg(ValueType::closure);
         const auto result = instruction.dst;
         emit(instruction);
@@ -798,10 +1049,14 @@ private:
             [&]() { return expression(*binary->right); },
             [&]() -> std::optional<Register> { return unwrap(*left); });
       }
+      const auto nominal = semantics_.type_of(*binary->left).nominal_name;
+      const auto data_layout = layouts_.find(nominal);
+      const bool data_equality = data_layout != layouts_.end() &&
+                                 data_layout->second.declaration->is_data;
       if (binary->op == ast::BinaryOperator::lifted_equal ||
           ((binary->op == ast::BinaryOperator::equal ||
             binary->op == ast::BinaryOperator::not_equal) &&
-           (semantics_.type_of(*binary->left).is_optional() ||
+           (data_equality || semantics_.type_of(*binary->left).is_optional() ||
             semantics_.type_of(*binary->right).is_optional() ||
             semantics_.type_of(*binary->left).is_null() ||
             semantics_.type_of(*binary->right).is_null()))) {
@@ -818,7 +1073,8 @@ private:
           result = unary_ir(Opcode::is_nil, left_nil ? *right : *left,
                             ValueType::boolean);
         else
-          result = equality(*left, *right);
+          result = equality(*left, *right,
+                            data_equality ? &data_layout->second : nullptr);
         if (result && binary->op == ast::BinaryOperator::not_equal)
           return unary_ir(Opcode::logical_not, *result, ValueType::boolean);
         return result;
@@ -917,6 +1173,7 @@ private:
       std::optional<Register> receiver;
       std::string member;
       std::string class_name;
+      bool super = false;
       if (const auto *subscript = dynamic_cast<const ast::IndexExpression *>(
               assignment->target.get())) {
         array_receiver = expression(*subscript->base);
@@ -927,6 +1184,9 @@ private:
                      dynamic_cast<const ast::MemberAccessExpression *>(
                          assignment->target.get())) {
         class_name = semantics_.type_of(*access->base).nominal_name;
+        const auto *base_id =
+            dynamic_cast<const ast::IdentifierExpression *>(access->base.get());
+        super = base_id && base_id->name == "super";
         const auto found = layouts_.find(class_name);
         if (found != layouts_.end()) {
           layout = &found->second;
@@ -937,7 +1197,12 @@ private:
                      dynamic_cast<const ast::IdentifierExpression *>(
                          assignment->target.get())) {
         local = slot(identifier->name);
-        if (!local && owner_) {
+        if (const auto *binding = semantics_.component_binding(*identifier)) {
+          class_name = binding->receiver;
+          layout = &layouts_.at(class_name);
+          member = binding->field;
+          receiver = this_value();
+        } else if (!local && owner_) {
           class_name = owner_->name;
           layout = &layouts_.at(class_name);
           member = identifier->name;
@@ -978,7 +1243,8 @@ private:
           if (index)
             return load_field(*layout, *index, *receiver);
           if (getter != ids_.end())
-            return accessor_call(getter->second, *receiver);
+            return accessor_call(getter->second, *receiver, std::nullopt,
+                                 super);
           error(
               node,
               "atribuição condicional exige getter para produzir valor final");
@@ -1002,7 +1268,7 @@ private:
           } else if (index)
             store_field(*layout, *index, *receiver, v);
           else
-            accessor_call(setter->second, *receiver, v);
+            accessor_call(setter->second, *receiver, v, super);
           return v;
         };
         if (assignment->op == ast::AssignmentOperator::null_coalescing_assign) {
@@ -1058,7 +1324,9 @@ private:
           previous = load.dst;
         } else if (index)
           previous = load_field(*layout, *index, *receiver);
-        else if (getter != ids_.end()) previous = accessor_call(getter->second, *receiver);
+        else if (getter != ids_.end())
+          previous =
+              accessor_call(getter->second, *receiver, std::nullopt, super);
         else { error(node, "atribuição composta exige getter"); return std::nullopt; }
       }
       auto value = expression(*assignment->value);
@@ -1072,6 +1340,11 @@ private:
         emit(arithmetic);
         value = arithmetic.dst;
       }
+      if (semantics_.type_of(*assignment->target).kind ==
+              semantics::TypeKind::byte &&
+          function_.register_types[*value] == ValueType::int32)
+        value = unary_ir(Opcode::check_uint8, *value, ValueType::int32,
+                         assignment->target.get());
       if (array_receiver) {
         Instruction i;
         i.opcode = Opcode::array_store;
@@ -1087,16 +1360,89 @@ private:
         emit(store);
       } else if (index)
         store_field(*layout, *index, *receiver, *value);
-      else accessor_call(setter->second, *receiver, *value);
+      else
+        accessor_call(setter->second, *receiver, *value, super);
       return value;
     }
     if (const auto *call = dynamic_cast<const ast::CallExpression *>(&node)) {
+      if (call == super_call_)
+        return constant("0");
+      if (const auto *selected = semantics_.resolved_call(*call)) {
+        const auto key = semantics::SemanticAnalyzer::function_key(*selected);
+        const auto id = ids_.at(key);
+        const auto *member = dynamic_cast<const ast::MemberAccessExpression *>(
+            call->callee.get());
+        const auto *identifier =
+            dynamic_cast<const ast::IdentifierExpression *>(call->callee.get());
+        const auto *base_id =
+            member ? dynamic_cast<const ast::IdentifierExpression *>(
+                         member->base.get())
+                   : nullptr;
+        const bool super = (identifier && identifier->name == "super") ||
+                           (base_id && base_id->name == "super");
+        const auto returned =
+            selected->name == "construct" || !work_[id].function->return_type
+                ? ValueType::void_type
+                : syntax_type(work_[id].function->return_type.get());
+        const auto invoke = [&](std::optional<Register> receiver) {
+          return direct_call(node, id, call->arguments, call->argument_labels,
+                             returned, receiver,
+                             !selected->owner.empty() &&
+                                     selected->name != "construct" && !super &&
+                                     selected->modifiers.visibility !=
+                                         ast::Visibility::private_
+                                 ? selected
+                                 : nullptr);
+        };
+        if (selected->owner.empty())
+          return invoke(std::nullopt);
+        if (member) {
+          const auto receiver = expression(*member->base);
+          if (!receiver)
+            return std::nullopt;
+          if (!member->safe)
+            return invoke(*receiver);
+          const auto result_type = semantic_type(semantics_.type_of(node));
+          if (!result_type)
+            return std::nullopt;
+          const auto chosen_type = returned == ValueType::void_type
+                                       ? ValueType::int32
+                                       : *result_type;
+          const auto present =
+              unary_ir(Opcode::logical_not,
+                       unary_ir(Opcode::is_nil, *receiver, ValueType::boolean),
+                       ValueType::boolean);
+          return choose(
+              present, chosen_type,
+              [&] {
+                const auto value = invoke(unwrap(*receiver));
+                return returned == ValueType::void_type ? constant("0")
+                       : value ? convert(*value, chosen_type)
+                               : constant("0");
+              },
+              [&] {
+                return returned == ValueType::void_type ? constant("0")
+                                                        : nil(chosen_type);
+              });
+        }
+        return invoke(selected->owner.empty()
+                          ? std::nullopt
+                          : std::optional<Register>{this_value()});
+      }
       const auto *callee = dynamic_cast<const ast::IdentifierExpression *>(call->callee.get());
       if (callee && callee->name == "print") {
         for (const auto &argument : call->arguments) {
           const auto value = expression(*argument);
           if (!value) return std::nullopt;
           const auto type = function_.register_types[*value];
+          const auto layout =
+              layouts_.find(semantics_.type_of(*argument).nominal_name);
+          if (layout != layouts_.end() && layout->second.declaration->is_data) {
+            const auto text = data_value(*value, &layout->second, false);
+            if (text)
+              print_value(*text);
+            continue;
+          }
           if (argos::ir::payload_type(type) == ValueType::array ||
               argos::ir::payload_type(type) == ValueType::closure ||
               argos::ir::payload_type(type) == ValueType::object ||
@@ -1332,6 +1678,7 @@ private:
   const std::unordered_map<std::string, std::size_t> &arities_;
   std::vector<WorkItem>& work_;
   const ClassLayouts& layouts_;
+  const ast::CallExpression *super_call_{};
   const ast::ClassDeclaration* owner_{nullptr};
   argos::ir::Function function_;
   LabelId current_{};
@@ -1349,24 +1696,45 @@ argos::ir::Module IrGenerator::generate(const ast::Program &program) {
   ClassLayouts layouts;
   std::vector<std::unique_ptr<ast::FunctionDeclaration>> implicit_constructors;
   std::unordered_map<const ast::FunctionDeclaration*, const ast::ClassDeclaration*> owners;
-  for (const auto& item : program.items) {
-    const auto* declaration = dynamic_cast<const ast::ClassDeclaration*>(item.get());
-    if (!declaration) continue;
-    if (declaration->is_interface) continue;
-    if (!declaration->bases.empty() || declaration->modifiers.abstract_) {
-      diagnostics_.emit(diagnostics::catalog::compiler::unsupported_lowering, declaration->span,
-                        "herança e despacho polimórfico possuem análise estática, mas ainda não têm lowering executável");
-      continue;
-    }
+  for (const auto *declaration : semantics_.class_declarations()) {
     ClassLayout layout{declaration, static_cast<std::uint32_t>(module.objects.size()), {}};
     argos::ir::ObjectLayout object;
     object.name = declaration->name;
-    for (const auto& member : declaration->members)
-      if (const auto* field = dynamic_cast<const ast::VariableDeclaration*>(member.get()); field && !field->is_property)
-        layout.fields.push_back(field);
     layouts.emplace(declaration->name, layout);
     module.objects.push_back(object);
   }
+  std::unordered_set<std::string> built_layouts;
+  const auto flatten = [&](auto &&self, const std::string &name) -> void {
+    if (!built_layouts.insert(name).second)
+      return;
+    auto &layout = layouts.at(name);
+    for (const auto &base : semantics_.bases_of(layout.declaration->name)) {
+      self(self, base);
+      if (!layouts.at(base).declaration->is_interface) {
+        layout.fields = layouts.at(base).fields;
+        module.objects[layout.id].owned_fields =
+            module.objects[layouts.at(base).id].owned_fields;
+      }
+      auto &ancestors = module.objects[layout.id].ancestors;
+      ancestors.push_back(layouts.at(base).id);
+      for (auto ancestor : module.objects[layouts.at(base).id].ancestors)
+        if (std::find(ancestors.begin(), ancestors.end(), ancestor) ==
+            ancestors.end())
+          ancestors.push_back(ancestor);
+    }
+    for (const auto &field : semantics_.generated_fields(name)) {
+      module.objects[layout.id].owned_fields.push_back(
+          static_cast<std::uint32_t>(layout.fields.size()));
+      layout.fields.push_back(field.get());
+    }
+    for (const auto &member : layout.declaration->members)
+      if (const auto *field =
+              dynamic_cast<const ast::VariableDeclaration *>(member.get());
+          field && !field->is_property)
+        layout.fields.push_back(field);
+  };
+  for (const auto &[name, layout] : layouts)
+    flatten(flatten, name);
   for (const auto& [name, layout] : layouts) {
     for (const auto* field : layout.fields) {
       const auto type = runtime_type(field->type.get(), layouts);
@@ -1379,50 +1747,100 @@ argos::ir::Module IrGenerator::generate(const ast::Program &program) {
   }
   std::unordered_map<std::string, argos::ir::FunctionId> ids;
   std::unordered_map<std::string, std::size_t> arities;
-  for (const auto &item : program.items) {
-    const auto *function = dynamic_cast<const ast::FunctionDeclaration *>(item.get());
-    if (const auto* declaration = dynamic_cast<const ast::ClassDeclaration*>(item.get())) {
-      if (declaration->is_interface || !layouts.contains(declaration->name)) continue;
-      bool has_constructor = false;
-      for (const auto& member : declaration->members) {
-        if (const auto* property = dynamic_cast<const ast::VariableDeclaration*>(member.get());
-            property && property->is_property) {
-          for (const auto* accessor : {property->getter.get(), property->setter.get()}) {
-            if (!accessor) continue;
-            ids.emplace(declaration->name + "." + accessor->name, static_cast<argos::ir::FunctionId>(functions.size()));
-            arities.emplace(declaration->name + "." + accessor->name, accessor->parameters.size());
-            functions.push_back(accessor);
-            owners.emplace(accessor, declaration);
-          }
-          continue;
-        }
-        const auto* method = dynamic_cast<const ast::FunctionDeclaration*>(member.get());
-        if (!method) continue;
-        has_constructor = has_constructor || method->name == "construct";
-        ids.emplace(declaration->name + "." + method->name, static_cast<argos::ir::FunctionId>(functions.size()));
-        arities.emplace(declaration->name + "." + method->name, method->parameters.size());
-        functions.push_back(method);
-        owners.emplace(method, declaration);
-      }
-      if (!has_constructor) {
-        auto constructor = std::make_unique<ast::FunctionDeclaration>("construct", std::vector<ast::ParameterPtr>{},
-            nullptr, std::make_unique<ast::BlockStatement>(std::vector<ast::BlockItemPtr>{}, declaration->span), declaration->span);
-        ids.emplace(declaration->name + ".construct", static_cast<argos::ir::FunctionId>(functions.size()));
-        arities.emplace(declaration->name + ".construct", 0);
-        functions.push_back(constructor.get());
-        owners.emplace(constructor.get(), declaration);
-        implicit_constructors.push_back(std::move(constructor));
-      }
-      continue;
+  const auto register_function = [&](const ast::FunctionDeclaration *function,
+                                     const ast::ClassDeclaration *owner) {
+    const auto id = static_cast<argos::ir::FunctionId>(functions.size());
+    const auto *symbol = semantics_.declaration_symbol(*function);
+    if (symbol)
+      ids.emplace(semantics::SemanticAnalyzer::function_key(*symbol), id);
+    const auto alias = (owner ? owner->name + "." : "") + function->name;
+    ids.emplace(alias, id);
+    arities.emplace(alias, function->parameters.size());
+    if (!symbol && owner) {
+      semantics::Symbol implicit;
+      implicit.name = "construct";
+      implicit.owner = owner->name;
+      ids.emplace(semantics::SemanticAnalyzer::function_key(implicit), id);
     }
+    functions.push_back(function);
+    if (owner)
+      owners.emplace(function, owner);
+  };
+  for (const auto *declaration : semantics_.class_declarations()) {
+    if (!layouts.contains(declaration->name))
+      continue;
+    bool has_constructor = false;
+    for (const auto &member : declaration->members) {
+      if (const auto *property =
+              dynamic_cast<const ast::VariableDeclaration *>(member.get());
+          property && property->is_property) {
+        for (const auto *accessor :
+             {property->getter.get(), property->setter.get()}) {
+          if (!accessor)
+            continue;
+          register_function(accessor, declaration);
+        }
+        continue;
+      }
+      const auto *method =
+          dynamic_cast<const ast::FunctionDeclaration *>(member.get());
+      if (!method)
+        continue;
+      has_constructor = has_constructor || method->name == "construct";
+      register_function(method, declaration);
+    }
+    for (const auto &generated :
+         semantics_.generated_methods(declaration->name))
+      register_function(generated.get(), declaration);
+    if (!has_constructor && !declaration->is_interface) {
+      auto constructor = std::make_unique<ast::FunctionDeclaration>(
+          "construct", std::vector<ast::ParameterPtr>{}, nullptr,
+          std::make_unique<ast::BlockStatement>(
+              std::vector<ast::BlockItemPtr>{}, declaration->span),
+          declaration->span);
+      register_function(constructor.get(), declaration);
+      implicit_constructors.push_back(std::move(constructor));
+    }
+  }
+  for (const auto &item : program.items) {
+    if (dynamic_cast<const ast::ClassDeclaration *>(item.get()))
+      continue;
+    const auto *function =
+        dynamic_cast<const ast::FunctionDeclaration *>(item.get());
     if (!function) {
       diagnostics_.emit(diagnostics::catalog::compiler::unsupported_lowering,
                         item->span, "somente funções são compiláveis no nível superior");
       continue;
     }
-    ids.emplace(function->name, static_cast<argos::ir::FunctionId>(functions.size()));
-    arities.emplace(function->name, function->parameters.size());
-    functions.push_back(function);
+    register_function(function, nullptr);
+  }
+  std::unordered_map<std::string, std::uint32_t> virtual_slots;
+  for (std::size_t id = 0; id < functions.size(); ++id) {
+    const auto *symbol = semantics_.declaration_symbol(*functions[id]);
+    if (!symbol || symbol->owner.empty() || symbol->name == "construct")
+      continue;
+    const auto key = semantics::SemanticAnalyzer::virtual_key(*symbol);
+    if (!virtual_slots.contains(key)) {
+      virtual_slots[key] =
+          static_cast<std::uint32_t>(module.virtual_functions.size());
+      module.virtual_functions.push_back(
+          static_cast<argos::ir::FunctionId>(id));
+    }
+  }
+  for (const auto &[name, layout] : layouts) {
+    auto &table = module.objects[layout.id].methods;
+    table.resize(module.virtual_functions.size(), UINT32_MAX);
+    for (const auto &method : semantics_.methods_of(name)) {
+      if (method.name == "construct")
+        continue;
+      const auto key = semantics::SemanticAnalyzer::function_key(method);
+      if (!ids.contains(key))
+        continue;
+      ids.emplace(name + "." + method.name, ids.at(key));
+      if (!method.modifiers.abstract_)
+        table[virtual_slots.at(
+            semantics::SemanticAnalyzer::virtual_key(method))] = ids.at(key);
+    }
   }
   if (!ids.contains("main")) {
     diagnostics_.emit(diagnostics::catalog::compiler::invalid_entry_point,

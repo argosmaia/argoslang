@@ -34,6 +34,29 @@ CheckResult check_source(const std::string &source) {
     return {valid && !diagnostics.has_errors(), std::move(codes)};
 }
 
+CheckResult check_units(std::initializer_list<std::string> sources) {
+  argos::diagnostics::DiagnosticEngine diagnostics;
+  argos::ast::Program combined{{}, {}};
+  std::size_t index = 0;
+  for (const auto &source : sources) {
+    const argos::source::SourceFile file{
+        .path =
+            std::filesystem::path{"unit" + std::to_string(index++) + ".argos"},
+        .content = source};
+    argos::lexer::Lexer lexer{file, diagnostics};
+    argos::parser::Parser parser{lexer.tokenize(), diagnostics};
+    auto unit = parser.parse_program();
+    for (auto &item : unit.items)
+      combined.items.push_back(std::move(item));
+  }
+  argos::semantics::SemanticAnalyzer analyzer{diagnostics};
+  const bool valid = !diagnostics.has_errors() && analyzer.analyze(combined);
+  std::vector<std::string> codes;
+  for (const auto &diagnostic : diagnostics.diagnostics())
+    codes.push_back(diagnostic.code);
+  return {valid && !diagnostics.has_errors(), std::move(codes)};
+}
+
 bool has_code(const CheckResult &result, const std::string &code) {
     return std::find(result.codes.begin(), result.codes.end(), code) != result.codes.end();
 }
@@ -120,34 +143,39 @@ TEST_CASE("rejects nominal member access until nominal types exist") {
                      "ARGOS-S0352"));
 }
 
-TEST_CASE("resolves protocol components and safe member chains") {
-    const auto source = "protocol Profile(name: string);"
-                        "protocol User(profile: Profile?);"
-                        "function display(user: User?) -> string {"
-                        "  return user?.profile?.name ?? \"Anonymous\";"
-                        "}";
-    REQUIRE(check_source(source).valid);
-    REQUIRE(has_code(check_source("protocol User(name: string);"
-                                  "function f(user: User) -> string { return user.missing; }"),
-                     "ARGOS-S0353"));
-    REQUIRE(has_code(check_source("protocol User(name: string, name: string);"),
-                     "ARGOS-S0500"));
+TEST_CASE("resolves data components and safe member chains") {
+  const auto source =
+      "data Profile(name: string) permited Display;"
+      "data User(profile: Profile?) permited Display;"
+      "class Display { public function display(user: User?) -> string {"
+      "  return user?.profile?.name ?? \"Anonymous\";"
+      "} }";
+  REQUIRE(check_source(source).valid);
+  REQUIRE(has_code(
+      check_source("data User(name: string);"
+                   "function f(user: User) -> string { return user.missing; }"),
+      "ARGOS-S0353"));
+  REQUIRE(has_code(check_source("data User(name: string, name: string);"),
+                   "ARGOS-S0001"));
 }
 
 TEST_CASE("checks the null-safety example with explicit nominal definitions") {
-    const auto source =
-        "protocol Profile(name: string);"
-        "protocol User(profile: Profile?);"
-        "function loadUser() -> User? { return nil; }"
-        "function displayName(user: User?) -> string {"
-        " var name: string = user?.profile?.name ?? \"Anonymous\";"
-        " return name;"
-        "}"
-        "var mut cachedUser: User? = nil;"
-        "cachedUser ?" "?= loadUser();"
-        "var mut preferredName: string = \"Unknown\";"
-        "preferredName ?= cachedUser?.profile?.name;";
-    REQUIRE(check_source(source).valid);
+  const auto source =
+      "data Profile(name: string) { public function getName() -> string { "
+      "return name; } }"
+      "data User(profile: Profile?) { public function getProfile() -> Profile? "
+      "{ return profile; } }"
+      "function loadUser() -> User? { return nil; }"
+      "function displayName(user: User?) -> string {"
+      " var name: string = user?.getProfile()?.getName() ?? \"Anonymous\";"
+      " return name;"
+      "}"
+      "var mut cachedUser: User? = nil;"
+      "cachedUser ?"
+      "?= loadUser();"
+      "var mut preferredName: string = \"Unknown\";"
+      "preferredName ?= cachedUser?.getProfile()?.getName();";
+  REQUIRE(check_source(source).valid);
 }
 
 TEST_CASE("retains resolved symbol bindings for later phases") {
@@ -226,27 +254,42 @@ TEST_CASE("enforces class access control", "[oop]") {
 }
 
 TEST_CASE("checks interfaces virtual overrides and nominal subtyping", "[oop]") {
-    REQUIRE(check_source(R"(
+  REQUIRE(check_source(R"(
         interface Readable { function read() -> int; }
-        abstract class Base : Readable { public abstract function read() -> int; }
+        abstract class Base by Readable { public abstract function read() -> int; }
         final class Value : Base {
             public final override function read() -> int { return 42; }
         }
         var value: Readable = new Value();
         var n = value.read();
-    )").valid);
-    REQUIRE(has_code(check_source("interface I { function f() -> int; } class A : I {}"), "ARGOS-S0609"));
-    REQUIRE(has_code(check_source("interface I { var x: int; }"), "ARGOS-S0607"));
-    REQUIRE(has_code(check_source("abstract class A {} var a = new A();"), "ARGOS-S0602"));
-    REQUIRE(has_code(check_source("interface I {} var i = new I();"), "ARGOS-S0602"));
-    REQUIRE(has_code(check_source("final class A {} class B : A {}"), "ARGOS-S0605"));
-    REQUIRE(has_code(check_source("class A : B {} class B : A {}"), "ARGOS-S0603"));
-    REQUIRE(has_code(check_source("class A {} class B {} class C : A, B {}"), "ARGOS-S0604"));
-    REQUIRE(has_code(check_source("class A { function f() {} } class B : A { override function f() {} }"), "ARGOS-S0608"));
-    REQUIRE(has_code(check_source("class A { virtual function f() {} } class B : A { function f() {} }"), "ARGOS-S0608"));
-    REQUIRE(has_code(check_source("class A { override function f() {} }"), "ARGOS-S0608"));
-    REQUIRE(has_code(check_source("interface I { function f(); } class A { function f() {} } class B : A, I {}"), "ARGOS-S0606"));
-
+    )")
+              .valid);
+  REQUIRE(has_code(
+      check_source("interface I { function f() -> int; } class A by I {}"),
+      "ARGOS-S0609"));
+  REQUIRE(has_code(check_source("interface I { var x: int; }"), "ARGOS-S0607"));
+  REQUIRE(has_code(check_source("abstract class A {} var a = new A();"),
+                   "ARGOS-S0602"));
+  REQUIRE(
+      has_code(check_source("interface I {} var i = new I();"), "ARGOS-S0602"));
+  REQUIRE(
+      has_code(check_source("final class A {} class B : A {}"), "ARGOS-S0605"));
+  REQUIRE(
+      has_code(check_source("class A : B {} class B : A {}"), "ARGOS-S0603"));
+  REQUIRE(has_code(check_source("class A {} class B {} class C : A, B {}"),
+                   "ARGOS-S0604"));
+  REQUIRE(has_code(check_source("class A { public function f() {} } class B : "
+                                "A { override function f() {} }"),
+                   "ARGOS-S0608"));
+  REQUIRE(has_code(check_source("class A { public virtual function f() {} } "
+                                "class B : A { public function f() {} }"),
+                   "ARGOS-S0608"));
+  REQUIRE(has_code(check_source("class A { override function f() {} }"),
+                   "ARGOS-S0608"));
+  REQUIRE(
+      has_code(check_source("interface I { function f(); } class A { internal "
+                            "function f() {} } class B : A by I {}"),
+               "ARGOS-S0606"));
 }
 
 TEST_CASE("supports structurally typed higher order functions and closures", "[functional]") {
@@ -278,11 +321,15 @@ TEST_CASE("isolates closure capture initialization and loop control", "[function
 }
 
 TEST_CASE("rejects contradictory member modifiers and unsafe field defaults", "[oop]") {
-    REQUIRE(has_code(check_source("interface I { private function f(); }"), "ARGOS-S0600"));
-    REQUIRE(has_code(check_source("class A { private abstract function f(); }"), "ARGOS-S0600"));
-    REQUIRE(has_code(check_source("class A { final virtual function f() {} }"), "ARGOS-S0600"));
-    REQUIRE(has_code(check_source("class A { var x: int = 1; var y: int = this.x; }"), "ARGOS-S0614"));
-    REQUIRE(has_code(check_source("var value = print(1);"), "ARGOS-S0100"));
+  REQUIRE(check_source("interface I { private function f(); }").valid);
+  REQUIRE(has_code(check_source("class A { private abstract function f(); }"),
+                   "ARGOS-S0600"));
+  REQUIRE(has_code(check_source("class A { final virtual function f() {} }"),
+                   "ARGOS-S0600"));
+  REQUIRE(
+      has_code(check_source("class A { var x: int = 1; var y: int = this.x; }"),
+               "ARGOS-S0614"));
+  REQUIRE(has_code(check_source("var value = print(1);"), "ARGOS-S0100"));
 }
 
 TEST_CASE("prevents observation of partially initialized instances", "[oop]") {
@@ -348,9 +395,9 @@ TEST_CASE("checks property accessors and rejects writes to getter only propertie
 }
 
 TEST_CASE("checks interface property contracts and required setters", "[oop][accessors]") {
-    REQUIRE(check_source(R"(
+  REQUIRE(check_source(R"(
       interface Named { var mut name: string { getter(); setter(); } }
-      class Item : Named {
+      class Item by Named {
         private var mut stored: string = "";
         public var mut name: string {
           getter() { return stored; }
@@ -359,11 +406,24 @@ TEST_CASE("checks interface property contracts and required setters", "[oop][acc
       }
       var item: Named = new Item();
       item.name = "new";
-    )").valid);
-    REQUIRE(has_code(check_source("interface I { var x: int { getter(); } } class A : I {}"), "ARGOS-S0609"));
-    REQUIRE(has_code(check_source("interface I { var mut x: int { getter(); setter(); } } class A : I { public var x: int { getter() { return 1; } } }"), "ARGOS-S0606"));
-    REQUIRE(has_code(check_source("interface I { var x: int { getter() { return 1; } } }"), "ARGOS-S0607"));
-    REQUIRE(has_code(check_source("interface R { var x: int { getter(); } } interface W { var mut x: int { getter(); setter(); } } class A : R, W { public var x: int { getter() { return 1; } } }"), "ARGOS-S0606"));
+    )")
+              .valid);
+  REQUIRE(has_code(
+      check_source("interface I { var x: int { getter(); } } class A by I {}"),
+      "ARGOS-S0609"));
+  REQUIRE(has_code(
+      check_source(
+          "interface I { var mut x: int { getter(); setter(); } } class A by I "
+          "{ public var x: int { getter() { return 1; } } }"),
+      "ARGOS-S0606"));
+  REQUIRE(has_code(
+      check_source("interface I { var x: int { getter() { return 1; } } }"),
+      "ARGOS-S0607"));
+  REQUIRE(has_code(
+      check_source("interface R { var x: int { getter(); } } interface W { var "
+                   "mut x: int { getter(); setter(); } } class A by R, W { "
+                   "public var x: int { getter() { return 1; } } }"),
+      "ARGOS-S0606"));
 }
 
 TEST_CASE("null safety enforces optional boundaries", "[optional]") {
@@ -434,4 +494,503 @@ TEST_CASE(
               .valid);
   REQUIRE_FALSE(check_source("var a = [];").valid);
   REQUIRE_FALSE(check_source("var a: [[int]]? = nil;").valid);
+}
+
+TEST_CASE("enforces overload signatures and resolves exact argument types",
+          "[oop][overload]") {
+  REQUIRE(check_source(R"(
+      function select(_ x: int) -> int { return x; }
+      overload function select(_ x: string) -> int { return 2; }
+      var a = select(1); var b = select("text");
+      class A {
+        construct(_ x: int) {}
+        overload construct() {}
+        public function f(_ x: int) -> int { return x; }
+        public overload function f(_ x: bool) -> int { return 2; }
+      }
+      var a1 = new A(); var result = a1.f(true);
+    )")
+              .valid);
+  REQUIRE(
+      has_code(check_source("function f(_ x: int) {} function f(_ x: bool) {}"),
+               "ARGOS-S0620"));
+  REQUIRE(has_code(check_source("function f(_ x: int) {} overload function f(_ "
+                                "x: int) -> int { return 1; }"),
+                   "ARGOS-S0001"));
+  REQUIRE(has_code(check_source("function f(_ x: int?) {} overload function "
+                                "f(_ x: string?) {} f(nil);"),
+                   "ARGOS-S0621"));
+  REQUIRE(has_code(check_source("function f(_ x: int) {} overload function f(_ "
+                                "x: string) {} f(true);"),
+                   "ARGOS-S0621"));
+  REQUIRE(has_code(check_source("function f(_ x: int) {} overload function f(_ "
+                                "x: bool) {} var ref = f;"),
+                   "ARGOS-S0621"));
+  REQUIRE(has_code(
+      check_source("class A { function f(_ x: int) {} overload function f(_ x: "
+                   "string) {} } var a = new A(); a.f(true);"),
+      "ARGOS-S0621"));
+}
+
+TEST_CASE("requires one superclass and a valid construction chain",
+          "[oop][super]") {
+  REQUIRE(check_source(R"(
+      class A { protected var x: int; protected construct(_ n: int) { x = n; } }
+      class B : A { construct(_ n: int) { super(n); } function read() -> int { return super.x; } }
+      var b = new B(3);
+    )")
+              .valid);
+  REQUIRE(has_code(check_source("class A {} class B {} class C : A, B {}"),
+                   "ARGOS-S0604"));
+  REQUIRE(has_code(
+      check_source("class A { construct(_ n: int) {} } class B : A {}"),
+      "ARGOS-S0622"));
+  REQUIRE(has_code(
+      check_source(
+          "class A {} class B : A { construct() { print(1); super(); } }"),
+      "ARGOS-S0622"));
+  REQUIRE(has_code(
+      check_source(
+          "class A {} class B : A { construct() { super(); super(); } }"),
+      "ARGOS-S0622"));
+  REQUIRE(
+      has_code(check_source("class A { construct(_ x: int) {} } class B : A { "
+                            "var x: int = 1; construct() { super(this.x); } }"),
+               "ARGOS-S0622"));
+  REQUIRE(has_code(check_source("class A {} function f() { super(); }"),
+                   "ARGOS-S0622"));
+  REQUIRE(has_code(
+      check_source("abstract class A { public abstract function f(); } class B "
+                   ": A { public override function f() { super.f(); } }"),
+      "ARGOS-S0622"));
+  REQUIRE(has_code(check_source("class A {} class B : A { public function f() "
+                                "{ var f = () => super; } }"),
+                   "ARGOS-S0622"));
+}
+
+TEST_CASE("preserves encapsulation through inherited fields and overloads",
+          "[oop][visibility]") {
+  REQUIRE(has_code(check_source("class A { private var x: int = 1; } class B : "
+                                "A { function f() -> int { return x; } }"),
+                   "ARGOS-S0611"));
+  REQUIRE(has_code(check_source("class A { protected var x: int = 1; } var a = "
+                                "new A(); var n = a.x;"),
+                   "ARGOS-S0611"));
+  REQUIRE(has_code(
+      check_source("class A { private construct() {} } class B : A {}"),
+      "ARGOS-S0611"));
+  REQUIRE(has_code(
+      check_source("class A { private function f(_ n: int) {} public overload "
+                   "function f(_ s: string) {} } var a = new A(); a.f(1);"),
+      "ARGOS-S0611"));
+  REQUIRE(
+      check_source("class A { private function f(_ n: int) {} public overload "
+                   "function f(_ s: string) {} } var a = new A(); a.f(\"ok\");")
+          .valid);
+  REQUIRE(has_code(check_source("class A { public virtual function f() {} } "
+                                "class B : A { override function f() {} }"),
+                   "ARGOS-S0608"));
+  REQUIRE(has_code(check_source("class A { public function f() {} } class B : "
+                                "A { public override function f() {} }"),
+                   "ARGOS-S0608"));
+  REQUIRE(has_code(check_source("class A { public virtual function f() {} } "
+                                "class B : A { public function f() {} }"),
+                   "ARGOS-S0608"));
+  REQUIRE(
+      check_source("interface I { private var x: int { getter(); } }").valid);
+}
+
+TEST_CASE("data is final and transitively immutable", "[oop][data]") {
+  REQUIRE(check_source(
+              "data Point(x: int, label: string?); data Box(point: Point); var "
+              "b = new Box(point: new Point(x: 1, label: nil));")
+              .valid);
+  REQUIRE(
+      has_code(check_source("data A { var mut x: int = 1; }"), "ARGOS-S0623"));
+  REQUIRE(has_code(check_source("data A(values: [int]);"), "ARGOS-S0623"));
+  REQUIRE(has_code(check_source("class Mutable {} data A(value: Mutable);"),
+                   "ARGOS-S0623"));
+  REQUIRE(
+      has_code(check_source("data A(callback: () -> int);"), "ARGOS-S0623"));
+  REQUIRE(has_code(check_source("data A(next: A?);"), "ARGOS-S0623"));
+  REQUIRE(
+      has_code(check_source("data A(x: int); class B : A {}"), "ARGOS-S0605"));
+  REQUIRE(has_code(
+      check_source("data A(x: int) { function change() { this.x = 2; } }"),
+      "ARGOS-S0330"));
+  REQUIRE_FALSE(check_source("protocol A(x: int);").valid);
+  REQUIRE_FALSE(check_source("class A { @override function f() {} }").valid);
+}
+
+TEST_CASE("overload keys distinguish optional functions from optional returns",
+          "[oop][overload][optional]") {
+  REQUIRE(check_source(R"(
+      function f(_ callback: (() -> int)?) -> int { return 1; }
+      overload function f(_ callback: () -> int?) -> int { return 2; }
+      var optionalFunction: (() -> int)? = nil;
+      var returningOptional = () -> int? => nil;
+      var first = f(optionalFunction);
+      var second = f(returningOptional);
+    )")
+              .valid);
+}
+
+TEST_CASE("constructors cannot dispatch into partially built derived objects",
+          "[oop][super][safety]") {
+  REQUIRE(has_code(check_source(R"(
+      class A {
+        var x: int;
+        construct() { x = 1; read(); }
+        public virtual function read() -> int { return x; }
+      }
+      class B : A {
+        var y: int = 2;
+        public override function read() -> int { return y; }
+      }
+    )"),
+                   "ARGOS-S0614"));
+  REQUIRE(has_code(check_source(R"(
+      function observe(_ a: A) -> int { return a.read(); }
+      class A {
+        var x: int;
+        construct() { x = 1; observe(this); }
+        public virtual function read() -> int { return x; }
+      }
+    )"),
+                   "ARGOS-S0614"));
+}
+
+TEST_CASE("overload resolution prefers a more specific nominal contract",
+          "[oop][overload]") {
+  REQUIRE(check_source(R"(
+      interface I {}
+      class A by I {}
+      class B : A {}
+      function f(_ a: I) -> int { return 1; }
+      overload function f(_ a: A) -> int { return 2; }
+      var n = f(new B());
+    )")
+              .valid);
+  REQUIRE(check_source(R"(
+      function f(items: [int]) {}
+      overload function f(value: int) {}
+      f(items: []);
+    )")
+              .valid);
+  REQUIRE(has_code(check_source(R"(
+      function f(_ a: int, _ b: double) {}
+      overload function f(_ a: double, _ b: int) {}
+      f(1, 2);
+    )"),
+                   "ARGOS-S0621"));
+}
+
+TEST_CASE("nested member receivers do not hide ambiguous function references",
+          "[oop][overload]") {
+  REQUIRE(has_code(check_source(R"(
+      function f(_ n: int) -> int { return n; }
+      overload function f(_ b: bool) -> int { return 1; }
+      class A { public function value() -> int { return 1; } }
+      function create(_ callback: (int) -> int) -> A { return new A(); }
+      var n = create(f).value();
+    )"),
+                   "ARGOS-S0621"));
+}
+
+TEST_CASE("public declarations and private methods are the default",
+          "[oop][access]") {
+  REQUIRE(has_code(
+      check_source("class A { function f() {} } var a = new A(); a.f();"),
+      "ARGOS-S0611"));
+  REQUIRE(
+      check_source(
+          "class A { function hidden() -> int { return 1; } public function "
+          "f() -> int { return hidden(); } } var a = new A(); a.f();")
+          .valid);
+  REQUIRE(check_source("interface I { private function f(); } class A by I { "
+                       "function f() {} }")
+              .valid);
+  REQUIRE(check_source("interface I { protected function f(); } class A by I { "
+                       "protected function f() {} }")
+              .valid);
+}
+
+TEST_CASE("sealed classes admit only explicitly permited descendants",
+          "[oop][sealed]") {
+  REQUIRE(check_source("sealed class Pessoa permited Funcionario, Aluno {} "
+                       "class Funcionario: Pessoa {} class Aluno: Pessoa {}")
+              .valid);
+  REQUIRE(has_code(
+      check_source("sealed class A permited B {} class B: A {} class C: A {}"),
+      "ARGOS-S0624"));
+  REQUIRE(has_code(check_source("sealed class A permited Missing {}"),
+                   "ARGOS-S0624"));
+  REQUIRE(
+      has_code(check_source("sealed class A permited B, B {} class B: A {}"),
+               "ARGOS-S0624"));
+  REQUIRE(has_code(check_source("class A permited B {} class B {}"),
+                   "ARGOS-S0624"));
+  REQUIRE(
+      has_code(check_source("sealed class A {} class B: A {}"), "ARGOS-S0624"));
+  REQUIRE(check_source("sealed interface I permited A { function f(); } class "
+                       "A by I { public function f() {} }")
+              .valid);
+}
+
+TEST_CASE("by implements contracts and colon inherits the single superclass",
+          "[oop][relations]") {
+  REQUIRE(check_source("class B {} interface I {} class A: B by I {}").valid);
+  REQUIRE(
+      has_code(check_source("interface I {} class A: I {}"), "ARGOS-S0625"));
+  REQUIRE(has_code(check_source("class B {} class A by B {}"), "ARGOS-S0625"));
+  REQUIRE(has_code(check_source("interface I {} interface J by I {}"),
+                   "ARGOS-S0625"));
+  REQUIRE(
+      check_source("interface I {} interface J: I {} class A by J {}").valid);
+}
+
+TEST_CASE(
+    "data fields are sealed to their owner and explicitly permited entities",
+    "[oop][data][access]") {
+  REQUIRE(check_source(R"(
+    data Person(name: string) permited Funcionario, Aluno;
+    class Funcionario { public function name(_ p: Person) -> string { return p.name; } }
+    class Aluno { public function name(_ p: Person) -> string { return p.name; } }
+  )")
+              .valid);
+  REQUIRE(has_code(check_source("data Person(name: string); var p = new "
+                                "Person(name: \"Ada\"); var n = p.name;"),
+                   "ARGOS-S0624"));
+  REQUIRE(has_code(
+      check_source("data Person(name: string) permited A; class A {} class B { "
+                   "function f(_ p: Person) -> string { return p.name; } }"),
+      "ARGOS-S0624"));
+  REQUIRE(has_code(
+      check_source("data Person(name: string) permited A; class A { function "
+                   "f(_ p: Person) { p.name = \"changed\"; } }"),
+      "ARGOS-S0330"));
+}
+
+TEST_CASE("with delegates public overloads without introducing subtyping",
+          "[oop][with]") {
+  REQUIRE(check_source(R"(
+    class B { public function f(_ n: int) -> int { return n; } public overload function f(_ s: string) -> int { return 2; } }
+    class C { public function g() {} }
+    class A with B, C { public function h() -> int { C.g(); return B.f(1); } }
+    var a = new A(); a.f(1); a.f("x"); a.g(); a.h();
+  )")
+              .valid);
+  REQUIRE(
+      has_code(check_source("class B {} class A with B {} var b: B = new A();"),
+               "ARGOS-S0101"));
+  REQUIRE(has_code(check_source("class B { private function f() {} } class A "
+                                "with B {} var a = new A(); a.f();"),
+                   "ARGOS-S0353"));
+  REQUIRE(has_code(check_source("class B { protected function f() {} } class A "
+                                "with B {} var a = new A(); a.f();"),
+                   "ARGOS-S0353"));
+  REQUIRE(
+      has_code(check_source("class B {} class A with B, B {}"), "ARGOS-S0626"));
+  REQUIRE(has_code(check_source("class A with B {} class B with A {}"),
+                   "ARGOS-S0626"));
+  REQUIRE(has_code(check_source("abstract class B {} class A with B {}"),
+                   "ARGOS-S0626"));
+  REQUIRE(has_code(check_source("interface B {} class A with B {}"),
+                   "ARGOS-S0626"));
+}
+
+TEST_CASE("delegation conflicts require an explicit same-signature method",
+          "[oop][with]") {
+  REQUIRE(
+      has_code(check_source("class B { public function f() {} } class C { "
+                            "public function f() {} } class A with B, C {}"),
+               "ARGOS-S0627"));
+  REQUIRE(check_source("class B { public function f() {} } class C { public "
+                       "function f() {} } class A with B, C { public function "
+                       "f() { B.f(); C.f(); } } var a = new A(); a.f();")
+              .valid);
+  REQUIRE(check_source("class B { public function f(_ n: int) {} } class C { "
+                       "public function f(_ s: string) {} } class A with B, C "
+                       "{} var a = new A(); a.f(1); a.f(\"x\");")
+              .valid);
+  REQUIRE(
+      has_code(check_source("class B { public function f() {} } class Base { "
+                            "public function f() {} } class A: Base with B {}"),
+               "ARGOS-S0627"));
+  REQUIRE(has_code(
+      check_source(
+          "abstract class Base { public abstract function f(); } class B { "
+          "public function f() {} } class A: Base with B {}"),
+      "ARGOS-S0609"));
+}
+
+TEST_CASE("exclusive components use existing constructor assignment syntax",
+          "[oop][with][ownership]") {
+  REQUIRE(
+      check_source(
+          "class B { public construct(_ n: int) {} public function f() {} } "
+          "class A with B { public construct() { B = new B(1); B.f(); f(); } }")
+          .valid);
+  REQUIRE(has_code(
+      check_source(
+          "class B { public construct(_ n: int) {} } class A with B {}"),
+      "ARGOS-S0628"));
+  REQUIRE(has_code(check_source("class B { public construct(_ n: int) {} } "
+                                "class A with B { construct() {} }"),
+                   "ARGOS-S0614"));
+  REQUIRE(has_code(
+      check_source(
+          "class B { public construct(_ n: int) {} public function f() {} } "
+          "class A with B { construct() { B.f(); B = new B(1); } }"),
+      "ARGOS-S0628"));
+  REQUIRE(
+      check_source("class B {} class A with B { construct() { B = new B(); } }")
+          .valid);
+  REQUIRE(has_code(check_source("class B {} class A with B { construct() { B = "
+                                "new B(); B = new B(); } }"),
+                   "ARGOS-S0330"));
+  REQUIRE(
+      has_code(check_source("class B { public construct(_ n: int) {} } class A "
+                            "with B { construct(_ b: B) { B = b; } }"),
+               "ARGOS-S0628"));
+  REQUIRE(has_code(
+      check_source(
+          "class B {} class A with B { function escape() -> B { return B; } }"),
+      "ARGOS-S0631"));
+  REQUIRE_FALSE(check_source("class B {} class A with &B {}").valid);
+  REQUIRE_FALSE(check_source("class B {} class A with shared B {}").valid);
+}
+
+TEST_CASE("private and protected top-level classes are rejected",
+          "[oop][visibility]") {
+  REQUIRE(has_code(check_source("private class A {}"), "ARGOS-S0629"));
+  REQUIRE(has_code(check_source("protected class A {}"), "ARGOS-S0629"));
+  REQUIRE(
+      check_source("class A { private class B {} protected class C {} public "
+                   "function f() { var b = new B(); var c = new C(); } }")
+          .valid);
+  REQUIRE(has_code(
+      check_source("class A { private class B {} } var b = new A.B();"),
+      "ARGOS-S0630"));
+  REQUIRE(check_source("class A { protected class B {} } class D: A { function "
+                       "f() { var b = new B(); } }")
+              .valid);
+  REQUIRE(has_code(check_source("class A { private class B { public class C {} "
+                                "} } var c = new A.B.C();"),
+                   "ARGOS-S0630"));
+  REQUIRE_FALSE(check_source("public default class A {}").valid);
+}
+
+TEST_CASE("sealed permissions must name direct existing subclasses",
+          "[oop][sealed]") {
+  REQUIRE(has_code(check_source("sealed class A {}"), "ARGOS-S0624"));
+  REQUIRE(has_code(check_source("sealed class A permited B {} class B {}"),
+                   "ARGOS-S0624"));
+  REQUIRE(check_source(
+              "abstract sealed class A permited B { public abstract function "
+              "f(); } class B: A { public override function f() {} }")
+              .valid);
+}
+
+TEST_CASE("body data components generate canonical constructor hash and text",
+          "[oop][data]") {
+  REQUIRE(
+      check_source("data Person permited Reader { name: string; age: uint_8; } "
+                   "class Reader { public function age(_ p: Person) -> uint_8 "
+                   "{ return p.age; } } var p = new Person(name: \"Ada\", age: "
+                   "255); var hash = p.hashCode(); var text = p.toString();")
+          .valid);
+  REQUIRE_FALSE(
+      check_source("data A { age: uint_8; } var a = new A(age: 256);").valid);
+  REQUIRE(has_code(check_source("data A { name: string; } var a = new A(name: "
+                                "\"x\"); var n = a.name;"),
+                   "ARGOS-S0624"));
+  REQUIRE(has_code(
+      check_source("data A { function hashCode() -> int { return 0; } }"),
+      "ARGOS-S0632"));
+}
+
+TEST_CASE("default access follows the declared package across source units",
+          "[oop][package]") {
+  REQUIRE(check_units({"package auth; default class A {}",
+                       "package auth; function f() { var a = new A(); }"})
+              .valid);
+  REQUIRE(has_code(
+      check_units({"package auth; default class A {}",
+                   "package client; function f() { var a = new auth.A(); }"}),
+      "ARGOS-S0630"));
+  REQUIRE(has_code(check_units({"package auth; default class A {}",
+                                "package client; class B: auth.A {}"}),
+                   "ARGOS-S0630"));
+  REQUIRE(
+      check_units({"package auth; class A {}",
+                   "package client; function f() { var a = new auth.A(); }"})
+          .valid);
+  REQUIRE(has_code(
+      check_units({"package auth; default class A { public class B {} }",
+                   "package client; function f() { var b = new auth.A.B(); }"}),
+      "ARGOS-S0630"));
+  REQUIRE(check_units({"package auth; function f() -> int { return 1; }",
+                       "package client; function f() -> int { return 2; } "
+                       "function main() -> int { return f() + auth.f(); }"})
+              .valid);
+}
+
+TEST_CASE("data permissions remain lexical and do not transfer through APIs",
+          "[oop][data][package]") {
+  REQUIRE(check_units({"package model; data Person permited api.Controller { "
+                       "name: string; }",
+                       "package api; class Controller { public function read(_ "
+                       "p: model.Person) -> string { return p.name; } }"})
+              .valid);
+  REQUIRE(has_code(
+      check_units(
+          {"package model; data Person permited api.Controller { name: string; "
+           "}",
+           "package api; class Controller {} class Serializer { function "
+           "read(_ p: model.Person) -> string { return p.name; } }"}),
+      "ARGOS-S0624"));
+  REQUIRE(
+      has_code(check_source("data A(x: int) permited B; class B {} class C: B "
+                            "{ function read(_ a: A) -> int { return a.x; } }"),
+               "ARGOS-S0624"));
+  REQUIRE(check_source("data A(x: int); function transport(_ a: A) -> A { "
+                       "return a; } var a = transport(new A(x: 1));")
+              .valid);
+}
+
+TEST_CASE("qualified delegated components preserve package type identity",
+          "[oop][with][package]") {
+  REQUIRE(
+      check_units(
+          {"package one; class Engine { public function f() -> int { return 1; "
+           "} }",
+           "package two; class Engine { public function g() -> int { return 2; "
+           "} }",
+           "package app; class Car with one.Engine, two.Engine { public "
+           "function both() -> int { return one.Engine.f() + two.Engine.g(); } "
+           "} var c = new Car(); c.f(); c.g(); c.both();"})
+          .valid);
+  REQUIRE_FALSE(check_source("class B {} class A with B { construct() { var "
+                             "leaked = this.`$with.A.B`; } }")
+                    .valid);
+}
+
+TEST_CASE(
+    "composition can bypass an inaccessible default constructor explicitly",
+    "[oop][with]") {
+  REQUIRE(check_source("class Engine { private construct() {} public overload "
+                       "construct(_ n: int) {} public function run() {} } "
+                       "class Car with Engine { public construct() { Engine = "
+                       "new Engine(4); } } var c = new Car(); c.run();")
+              .valid);
+  REQUIRE(has_code(
+      check_source(
+          "class Engine { protected construct() {} } class Car with Engine {}"),
+      "ARGOS-S0628"));
+}
+
+TEST_CASE("generated data helpers implement matching interface contracts", "[oop][data]") {
+  REQUIRE(check_source("interface Value { function hashCode() -> int; function toString() -> string; } data Item(value: int) by Value; var item: Value = new Item(value: 3); item.hashCode(); item.toString();").valid);
+  REQUIRE(has_code(check_source("interface Value { function hashCode() -> string; } data Item(value: int) by Value;"), "ARGOS-S0606"));
 }

@@ -1,0 +1,24 @@
+data Person permited Controller {
+    name: string;
+    age: uint_8;
+    active: bool;
+    rating: double?;
+}
+data Envelope(value: Person?);
+class Controller {
+    public function name(_ person: Person) -> string { return person.name; }
+}
+function main() -> int {
+    var a = new Person(name: "Ada", age: 255, active: true, rating: 1.5);
+    var b = new Person(name: "Ada", age: 255, active: true, rating: 1.5);
+    print(a);
+    print(a.toString());
+    print(a == b, a.hashCode() == b.hashCode());
+    print(new Controller().name(a));
+    var x = new Envelope(value: a);
+    var y = new Envelope(value: b);
+    print(x, x == y, x.hashCode() == y.hashCode());
+    var empty = new Envelope(value: nil);
+    print(empty);
+    return 0;
+}

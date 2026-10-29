@@ -646,3 +646,67 @@ Uma funcionalidade executável somente é considerada entregue quando percorre o
 A ArgosLang deve evoluir como uma linguagem híbrida com um único frontend semântico e uma IR própria. O parser LR(1) fornece espaço de crescimento gramatical sem acoplar a AST ao mecanismo de análise. A VM oferece portabilidade e iteração rápida; o backend de máquina produz código nativo diretamente, sem transpilação por C, C++ ou LLVM. C, C++, Rust, Swift e Assembly aparecem somente como linguagens interoperáveis por executores e FFI. `unsafe`, raw, FFI e assembly são extensões controladas do núcleo tipado, não atalhos que anulam seus contratos.
 
 O princípio orientador é simples: primeiro tornar o significado da linguagem inequívoco; depois representá-lo em uma IR verificável; por fim executar a mesma semântica, com fidelidade, em cada backend.
+
+## Implementação de POO — 29/10/2026
+
+O frontend resolve uma superclasse concreta e múltiplos contratos de interface,
+valida visibilidade, inicialização, sobrecargas e sobrescritas e registra a
+assinatura selecionada de cada chamada. `protocol` foi removido da AST; `data`
+usa declarações de classe finais com campos transitivamente imutáveis e
+construtor canônico gerado para componentes primários.
+
+O layout de uma subclasse conserva os campos da base como prefixo, inclusive
+os privados. Cada layout contém ancestrais e uma tabela de implementações por
+assinatura de método. A IR distingue `CALL` de `CALL_VIRTUAL`; suas tabelas,
+assinaturas de parâmetros/retorno e prefixos de campos são validados antes da
+execução ou emissão nativa. `super` e chamadas privadas usam seleção direta.
+Propriedades usam o mesmo mecanismo por meio dos acessores.
+
+A VM seleciona a implementação na tabela do layout real. O backend x86-64
+seleciona pelo identificador do layout e emite chamada indireta, preservando
+a ABI de inteiros, referências, opcionais e doubles. A construção chama a base
+antes dos inicializadores próprios; cada nível inicializa apenas seus campos.
+Igualdade de `data` é expandida em comparações recursivas dos campos; classes
+comuns continuam com igualdade de identidade.
+
+Objetos e ambientes permanecem na arena de duração da execução. Esta etapa
+não implementa ownership/borrow, destruição por escopo ou `deinit`. As regras
+observáveis e limitações estão no [guia de POO](guide/10-classes-e-interfaces.md).
+
+
+### Padrões de acesso e permissões nominais
+
+A AST conserva `:` e `by` em metadados distintos, além da lista `permited`.
+O parser atribui acesso público a tipos e funções de topo, privado aos métodos
+de classe/data e público aos requisitos de interface, preservando acesso explícito.
+A semântica valida relações, subclasses diretas sealed e permissões de leitura
+dos campos de data antes do lowering. Essas restrições não alteram o layout
+ou a ABI de despacho. `default class` usa o pacote declarado; classes
+privadas/protegidas exigem contenedor nominal.
+
+### Pacotes, composição exclusiva e geração de records
+
+O driver reúne os arquivos fornecidos explicitamente em uma análise conjunta.
+Cada item conserva seu pacote e cada span conserva o arquivo de origem, inclusive
+nos diagnósticos. Nomes nominais são qualificados por pacote e contenedores;
+`TypeSyntax.resolved_name` registra a resolução para o lowering. A verificação de
+acesso inclui os contenedores e não apenas o tipo final.
+
+Componentes de `with` ficam separados das bases na AST e no grafo de subtipagem.
+A semântica gera campos internos e métodos de encaminhamento cuja chamada usa a
+instância real do componente; não copia corpos. O resolvedor normal escolhe
+sobrecargas e rejeita colisões não resolvidas. Qualificadores de componente são
+vinculados aos campos internos, inclusive em closures que capturam o receptor.
+
+Os layouts conservam o prefixo herdado e enumeram `owned_fields`. O validador
+confere índices, tipos e preservação do prefixo de ownership. A VM valida dono
+único ao anexar componentes. No nativo, o cabeçalho de objeto ocupa 16 bytes:
+identificador de layout e ponteiro do dono; os campos começam no deslocamento 16.
+A alocação continua na arena; liberação inversa ocorre no encerramento da VM ou
+via `atexit` no nativo. Não há destrutores por escopo nem borrow checker.
+
+O lowering de `data` gera igualdade recursiva, `hashCode()` e `toString()`, sem
+abrir a visibilidade de componentes ao código usuário. `HASH_SCALAR`,
+`STRINGIFY_SCALAR` e `CONCAT_STRINGS` executam na VM e no backend x86-64. Strings
+geradas usam armazenamento de duração da execução. `CHECK_UINT8` valida 0..255
+antes de armazenar resultados de operações em `byte`/`uint_8`.

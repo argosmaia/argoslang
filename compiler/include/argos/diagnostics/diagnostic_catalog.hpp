@@ -197,11 +197,6 @@ inline constexpr auto invalid_postfix_not =
     semantic_error("ARGOS-S0365", "! pós-fixo inválido",
                    "Use ! para negação ou !! para desembrulhar.");
 } // namespace postfix
-namespace protocols {
-inline constexpr auto duplicate_protocol_component = semantic_error("ARGOS-S0500", "componente de protocolo duplicado", "Cada componente precisa ter nome único.");
-inline constexpr auto invalid_protocol_component_type = semantic_error("ARGOS-S0501", "tipo de componente inválido", "Use um tipo de armazenamento válido.");
-inline constexpr auto incompatible_protocol_default = semantic_error("ARGOS-S0502", "valor padrão de protocolo incompatível", "Use um valor compatível com o tipo do componente.");
-} // namespace protocols
 } // namespace semantic
 
 namespace semantic::calls {
@@ -255,6 +250,72 @@ inline constexpr DiagnosticDefinition inaccessible_member{"ARGOS-S0611", Severit
 inline constexpr DiagnosticDefinition lambda_annotation{"ARGOS-S0612", Severity::error, "tipo de lambda não inferível", "Esta lambda precisa de uma anotação explícita.", "Anote os parâmetros e, quando necessário, o retorno."};
 inline constexpr DiagnosticDefinition invalid_capture{"ARGOS-S0613", Severity::error, "captura de lambda inválida", "Capturas exigem bindings locais imutáveis inicializados.", "Capture um binding var já inicializado; captura mutável ainda não está disponível."};
 inline constexpr DiagnosticDefinition field_initialization{"ARGOS-S0614", Severity::error, "inicialização de campo inválida", "O estado da instância deve ser inicializado antes de ser utilizado.", "Inicialize cada campo em todos os caminhos de construct antes de retornar."};
+inline constexpr DiagnosticDefinition invalid_overload{
+    "ARGOS-S0620", Severity::error, "sobrecarga inválida",
+    "Cada assinatura adicional exige a palavra-chave overload.",
+    "Use overload e diferencie os tipos dos parâmetros; retorno e rótulos não "
+    "criam sobrecarga."};
+inline constexpr DiagnosticDefinition overload_resolution{
+    "ARGOS-S0621", Severity::error, "resolução de sobrecarga inválida",
+    "Uma chamada deve selecionar exatamente uma assinatura compatível.",
+    "Confira tipos e rótulos ou forneça argumentos com tipos mais "
+    "específicos."};
+inline constexpr DiagnosticDefinition invalid_super{
+    "ARGOS-S0622", Severity::error, "uso inválido de super",
+    "A superclasse deve ser construída antes dos membros da subclasse.",
+    "Use super(argumentos) uma única vez como primeira instrução de construct; "
+    "super.membro acessa a implementação da base."};
+inline constexpr DiagnosticDefinition immutable_data{
+    "ARGOS-S0623", Severity::error, "data exige imutabilidade",
+    "Um data é final e seus campos devem ser transitivamente imutáveis.",
+    "Use var com tipos escalares ou outros data; arrays, closures, referências "
+    "mutáveis e ciclos são proibidos."};
+inline constexpr DiagnosticDefinition sealed_permission{
+    "ARGOS-S0624", Severity::error, "entidade sealed não autorizada",
+    "Uma entidade sealed limita a hierarquia ou o acesso aos dados à lista "
+    "permited.",
+    "Declare a entidade na lista permited e confira os nomes e modificadores."};
+inline constexpr DiagnosticDefinition invalid_relation{
+    "ARGOS-S0625", Severity::error, "relação nominal inválida",
+    "Herança de classe usa ':'; implementação de interface usa by.",
+    "Escreva class Filha: Base by Contrato; uma interface estende interfaces "
+    "com ':'."};
+inline constexpr DiagnosticDefinition composition{
+    "ARGOS-S0626", Severity::error, "composição inválida",
+    "with exige componentes concretos e independentes, sem ciclos ou tipos "
+    "repetidos.",
+    "Confira os tipos, a visibilidade e os qualificadores dos componentes."};
+inline constexpr DiagnosticDefinition delegation_conflict{
+    "ARGOS-S0627", Severity::error, "assinatura delegada ambígua",
+    "Componentes ou herança fornecem a mesma assinatura efetiva.",
+    "Declare um método explícito e use Componente.metodo() para encaminhar a "
+    "chamada."};
+inline constexpr DiagnosticDefinition component_initialization{
+    "ARGOS-S0628", Severity::error,
+    "inicialização exclusiva de componente inválida",
+    "Cada componente pertence a um único objeto e precisa estar inicializado "
+    "antes do uso.",
+    "Use construtor padrão acessível ou atribua Componente = new Tipo(...) uma "
+    "única vez em construct."};
+inline constexpr DiagnosticDefinition nested_visibility{
+    "ARGOS-S0629", Severity::error, "visibilidade inválida no topo",
+    "private class e protected class exigem uma classe contenedora.",
+    "Aninhe o tipo ou use class/public/default no nível superior."};
+inline constexpr DiagnosticDefinition type_visibility{
+    "ARGOS-S0630", Severity::error, "tipo inacessível",
+    "default restringe ao pacote declarado; tipos aninhados conservam as "
+    "restrições dos contenedores.",
+    "Confira package, acesso do tipo e acesso da classe externa."};
+inline constexpr DiagnosticDefinition component_escape{
+    "ARGOS-S0631", Severity::error, "acesso ao componente interno inválido",
+    "O armazenamento exclusivo de with não faz parte da API pública.",
+    "Use métodos encaminhados ou Componente.metodo() dentro da classe "
+    "receptora."};
+inline constexpr DiagnosticDefinition data_generation{
+    "ARGOS-S0632", Severity::error, "membro reservado de data",
+    "hashCode e toString são gerados com a semântica dos componentes "
+    "imutáveis.",
+    "Use outro nome para componentes e métodos definidos manualmente."};
 } // namespace semantic::objects
 
 namespace semantic {
@@ -276,6 +337,19 @@ find_definition(std::string_view code) noexcept {
       &objects::lambda_annotation,
       &objects::invalid_capture,
       &objects::field_initialization,
+      &objects::invalid_overload,
+      &objects::overload_resolution,
+      &objects::invalid_super,
+      &objects::immutable_data,
+      &objects::sealed_permission,
+      &objects::invalid_relation,
+      &objects::composition,
+      &objects::delegation_conflict,
+      &objects::component_initialization,
+      &objects::nested_visibility,
+      &objects::type_visibility,
+      &objects::component_escape,
+      &objects::data_generation,
 
       &symbols::duplicate_declaration,
       &symbols::invalid_ast_node,
@@ -335,9 +409,6 @@ find_definition(std::string_view code) noexcept {
       &postfix::increment_requires_mutable_target,
       &postfix::unsupported_propagation,
       &postfix::invalid_postfix_not,
-      &protocols::duplicate_protocol_component,
-      &protocols::invalid_protocol_component_type,
-      &protocols::incompatible_protocol_default,
       &calls::non_named_callee,
       &calls::undeclared_function,
       &calls::missing_argument,

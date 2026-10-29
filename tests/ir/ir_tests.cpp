@@ -1,4 +1,6 @@
 #include "argos/ir/validator.hpp"
+#include "argos/vm/vm.hpp"
+#include <stdexcept>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -160,4 +162,105 @@ TEST_CASE("array IR verifies element and index types",
   f.blocks[0].instructions[2].dst = 2;
   f.blocks[0].instructions[2].src2 = 2;
   REQUIRE(validate_module(module));
+}
+
+TEST_CASE("validates virtual tables and inherited field prefixes",
+          "[ir][oop]") {
+  using namespace argos::ir;
+  auto module = valid_module();
+  auto method = module.functions.front();
+  method.id = 1;
+  method.name = "A.read";
+  method.parameter_count = 1;
+  method.slot_count = 1;
+  method.parameter_types = {ValueType::object};
+  method.slot_types = {ValueType::object};
+  module.functions.push_back(method);
+  module.virtual_functions = {1};
+  module.objects = {{"A", {ValueType::int32}, {}, {1}},
+                    {"B", {ValueType::int32, ValueType::string}, {0}, {1}}};
+  REQUIRE_FALSE(validate_module(module));
+  SECTION("missing dispatch signature") {
+    module.virtual_functions.front() = 99;
+    REQUIRE(validate_module(module));
+  }
+  SECTION("missing implementation function") {
+    module.objects.back().methods.front() = 99;
+    REQUIRE(validate_module(module));
+  }
+  SECTION("incompatible method ABI") {
+    module.objects.back().methods.front() = 0;
+    REQUIRE(validate_module(module));
+  }
+  SECTION("incompatible field prefix") {
+    module.objects.back().fields.front() = ValueType::boolean;
+    REQUIRE(validate_module(module));
+  }
+  SECTION("invalid ancestor") {
+    module.objects.back().ancestors.front() = 99;
+    REQUIRE(validate_module(module));
+  }
+  SECTION("invalid virtual call slot") {
+    auto &main = module.functions.front();
+    Instruction call;
+    call.opcode = Opcode::call_virtual;
+    call.function = 1;
+    call.constant = 99;
+    main.blocks.front().instructions.insert(
+        main.blocks.front().instructions.begin(), call);
+    REQUIRE(validate_module(module));
+  }
+}
+
+TEST_CASE("exclusive composition metadata is validated",
+          "[ir][with][ownership]") {
+  using namespace argos::ir;
+  auto module = valid_module();
+  module.objects = {{"Owner", {ValueType::object}, {}, {}, {0}},
+                    {"Component", {}, {}, {}, {}}};
+  REQUIRE_FALSE(validate_module(module));
+  SECTION("owner field must be object typed") {
+    module.objects[0].fields[0] = ValueType::int32;
+    REQUIRE(validate_module(module));
+  }
+  SECTION("duplicate ownership slot") {
+    module.objects[0].owned_fields = {0, 0};
+    REQUIRE(validate_module(module));
+  }
+  SECTION("out of bounds ownership slot") {
+    module.objects[0].owned_fields = {1};
+    REQUIRE(validate_module(module));
+  }
+}
+
+TEST_CASE("runtime exclusive composition rejects duplicate ownership",
+          "[ir][with][ownership]") {
+  using namespace argos::ir;
+  auto module = valid_module();
+  module.objects = {{"Owner", {ValueType::object}, {}, {}, {0}},
+                    {"Component", {}, {}, {}, {}}};
+  auto &main = module.functions[0];
+  main.register_count = 3;
+  main.register_types = {ValueType::int32, ValueType::object,
+                         ValueType::object};
+  Instruction parent;
+  parent.opcode = Opcode::new_object;
+  parent.dst = 1;
+  parent.constant = 0;
+  Instruction child;
+  child.opcode = Opcode::new_object;
+  child.dst = 2;
+  child.constant = 1;
+  Instruction attach;
+  attach.opcode = Opcode::store_field;
+  attach.src1 = 1;
+  attach.src2 = 2;
+  attach.constant = 0;
+  attach.count = 0;
+  auto &code = main.blocks[0].instructions;
+  code.insert(code.end() - 1, {parent, child, attach, attach});
+  REQUIRE_FALSE(validate_module(module));
+  argos::vm::VM vm;
+  vm.load(module);
+  REQUIRE_THROWS_AS(vm.run(), std::runtime_error);
 }

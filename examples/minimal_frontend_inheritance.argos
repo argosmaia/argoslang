@@ -1,6 +1,5 @@
-// check aceita; run/compile informam que o despacho polimórfico ainda falta.
 interface Readable { function read() -> int; }
-abstract class Source : Readable {
+abstract class Source by Readable {
     public abstract function read() -> int;
 }
 final class Constant : Source {

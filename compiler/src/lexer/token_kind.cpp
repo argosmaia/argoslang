@@ -22,6 +22,10 @@ std::string_view token_kind_name(TokenKind kind) noexcept {
         case TokenKind::KwClass: return "KwClass";
         case TokenKind::KwStruct: return "KwStruct";
         case TokenKind::KwInterface: return "KwInterface";
+        case TokenKind::KwData:
+          return "KwData";
+        case TokenKind::KwOverload:
+          return "KwOverload";
         case TokenKind::KwProtocol: return "KwProtocol";
         case TokenKind::KwModule: return "KwModule";
         case TokenKind::KwType: return "KwType";
@@ -49,6 +53,12 @@ std::string_view token_kind_name(TokenKind kind) noexcept {
         case TokenKind::KwStatic: return "KwStatic";
         case TokenKind::KwFinal: return "KwFinal";
         case TokenKind::KwSealed: return "KwSealed";
+        case TokenKind::KwPermited:
+          return "KwPermited";
+        case TokenKind::KwBy:
+          return "KwBy";
+        case TokenKind::KwWith:
+          return "KwWith";
         case TokenKind::KwAbstract: return "KwAbstract";
         case TokenKind::KwOverride: return "KwOverride";
         case TokenKind::KwVirtual: return "KwVirtual";

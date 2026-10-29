@@ -82,6 +82,10 @@ void validate(const argos::ir::Module &module, const argos::ir::Function &functi
   case Opcode::store_field:
   case Opcode::make_closure:
   case Opcode::load_capture:
+  case Opcode::check_uint8:
+  case Opcode::hash_scalar:
+  case Opcode::stringify_scalar:
+  case Opcode::concat_strings:
   case Opcode::call_closure:
     // Full structural validation is performed by validate_module.
     break;
@@ -120,6 +124,7 @@ void validate(const argos::ir::Module &module, const argos::ir::Function &functi
     if (std::none_of(function.blocks.begin(), function.blocks.end(),
                      [&](const auto &block) { return block.label == instruction.label; })) throw std::runtime_error("IR: salto inválido");
     break;
+  case Opcode::call_virtual:
   case Opcode::call:
     valid_reg(instruction.dst);
     if (instruction.function >= module.functions.size()) throw std::runtime_error("IR: função inválida");
@@ -155,6 +160,17 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
   bool prints_double = false;
   bool uses_modulo = false;
   bool uses_closures = !m.objects.empty();
+  bool uses_data = false;
+  for (const auto &function : m.functions)
+    for (const auto &block : function.blocks)
+      for (const auto &instruction : block.instructions)
+        if (instruction.opcode == argos::ir::Opcode::hash_scalar ||
+            instruction.opcode == argos::ir::Opcode::stringify_scalar ||
+            instruction.opcode == argos::ir::Opcode::concat_strings) {
+          uses_data = true;
+          uses_closures = true;
+          prints_boolean = true;
+        }
   for (const auto& function : m.functions)
     for (const auto& block : function.blocks)
       for (const auto& instruction : block.instructions)
@@ -272,6 +288,50 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
       << ".Largos_closure_error:\n  movl $70, %edi\n  call exit@PLT\n  ud2\n";
   }
 
+  if (uses_data) {
+    o << ".section .rodata\n.Largos_data_int:\n  .string \"%d\"\n"
+      << ".Largos_data_double:\n  .string \"%.17g\"\n.Largos_data_bool:\n  "
+         ".string \"%s\"\n.text\n"
+      << ".Largos_format_int:\n  pushq %rbp\n  movq %rsp, %rbp\n  subq $144, "
+         "%rsp\n"
+      << "  movl %edi, %ecx\n  leaq .Largos_data_int(%rip), %rdx\n  xorl %eax, "
+         "%eax\n  jmp .Largos_format_body\n"
+      << ".Largos_format_double:\n  pushq %rbp\n  movq %rsp, %rbp\n  subq "
+         "$144, %rsp\n"
+      << "  leaq .Largos_data_double(%rip), %rdx\n  movl $1, %eax\n  jmp "
+         ".Largos_format_body\n"
+      << ".Largos_format_bool:\n  pushq %rbp\n  movq %rsp, %rbp\n  subq $144, "
+         "%rsp\n"
+      << "  testl %edi, %edi\n  leaq .Largos_false(%rip), %rcx\n  leaq "
+         ".Largos_true(%rip), %rax\n  cmovneq %rax, %rcx\n"
+      << "  leaq .Largos_data_bool(%rip), %rdx\n  xorl %eax, %eax\n"
+      << ".Largos_format_body:\n  leaq -128(%rbp), %rdi\n  movl $128, %esi\n  "
+         "call snprintf@PLT\n"
+      << "  testl %eax, %eax\n  js .Largos_closure_error\n  cmpl $128, %eax\n  "
+         "jae .Largos_closure_error\n"
+      << "  movslq %eax, %rax\n  movq %rax, -136(%rbp)\n  leaq 8(%rax), %rdi\n "
+         " call .Largos_alloc\n"
+      << "  movq %rax, -144(%rbp)\n  movq -136(%rbp), %rdx\n  movq %rdx, "
+         "(%rax)\n"
+      << "  leaq 8(%rax), %rdi\n  leaq -128(%rbp), %rsi\n  call memcpy@PLT\n  "
+         "movq -144(%rbp), %rax\n  leave\n  ret\n"
+      << ".Largos_concat:\n  pushq %rbp\n  movq %rsp, %rbp\n  subq $48, %rsp\n"
+      << "  movq %rdi, -8(%rbp)\n  movq %rsi, -16(%rbp)\n  movq (%rdi), %rax\n "
+         " addq (%rsi), %rax\n  jc .Largos_closure_error\n"
+      << "  movq %rax, -24(%rbp)\n  addq $8, %rax\n  jc "
+         ".Largos_closure_error\n  movq %rax, %rdi\n  call .Largos_alloc\n"
+      << "  movq %rax, -32(%rbp)\n  movq -24(%rbp), %rcx\n  movq %rcx, "
+         "(%rax)\n  leaq 8(%rax), %rdi\n"
+      << "  movq -8(%rbp), %rsi\n  movq (%rsi), %rdx\n  addq $8, %rsi\n  call "
+         "memcpy@PLT\n"
+      << "  movq -32(%rbp), %rdi\n  movq -8(%rbp), %rax\n  addq (%rax), %rdi\n "
+         " addq $8, %rdi\n"
+      << "  movq -16(%rbp), %rsi\n  movq (%rsi), %rdx\n  addq $8, %rsi\n  call "
+         "memcpy@PLT\n"
+      << "  movq -32(%rbp), %rax\n  leave\n  ret\n";
+  }
+  o << ".section .rodata\n.Largos_uint8_message:\n  .string \"uint_8 fora do "
+       "intervalo 0..255\\n\"\n.text\n";
   o << ".Largos_optional_error:\n  pushq %rbp\n  movq %rsp, %rbp\n  subq $16, "
        "%rsp\n"
     << "  movq %rdi, -8(%rbp)\n  call strlen@PLT\n  movq %rax, %rdx\n"
@@ -308,6 +368,7 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
       }
     }
     unsigned optional_site = 0;
+    unsigned dispatch_site = 0;
     std::size_t division_site = 0;
     std::size_t string_comparison_site = 0;
     for (const auto &b : f.blocks) {
@@ -369,21 +430,103 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
             << done << ":\n";
           break;
         }
+        case Opcode::concat_strings:
+          o << "  movq " << register_address(f, i.src1) << ", %rdi\n  movq "
+            << register_address(f, i.src2)
+            << ", %rsi\n  call .Largos_concat\n  movq %rax, "
+            << register_address(f, i.dst) << "\n";
+          break;
+        case Opcode::stringify_scalar: {
+          const auto type = f.register_types[i.src1];
+          if (type == argos::ir::ValueType::string)
+            o << "  movq " << register_address(f, i.src1) << ", %rax\n";
+          else if (type == argos::ir::ValueType::float64)
+            o << "  movq " << register_address(f, i.src1)
+              << ", %xmm0\n  call .Largos_format_double\n";
+          else
+            o << "  movl " << register_address(f, i.src1) << ", %edi\n  call "
+              << (type == argos::ir::ValueType::boolean ? ".Largos_format_bool"
+                                                        : ".Largos_format_int")
+              << "\n";
+          o << "  movq %rax, " << register_address(f, i.dst) << "\n";
+          break;
+        }
+        case Opcode::check_uint8: {
+          const auto ok = ".Largos_uint8_" + std::to_string(f.id) + "_" +
+                          std::to_string(dispatch_site++);
+          o << "  movl " << register_address(f, i.src1)
+            << ", %eax\n  cmpl $255, %eax\n  jbe " << ok
+            << "\n  leaq .Largos_uint8_message(%rip), %rdi\n  call "
+               ".Largos_optional_error\n"
+            << ok << ":\n  movslq %eax, %rax\n  movq %rax, "
+            << register_address(f, i.dst) << "\n";
+          break;
+        }
+        case Opcode::hash_scalar: {
+          const auto type = f.register_types[i.src1];
+          const auto stem = ".Largos_hash_" + std::to_string(f.id) + "_" +
+                            std::to_string(dispatch_site++);
+          o << "  movq " << register_address(f, i.src1) << ", %rax\n";
+          if (type == argos::ir::ValueType::string) {
+            o << "  movq (%rax), %rdx\n  leaq 8(%rax), %rcx\n  movl "
+                 "$2166136261, %eax\n"
+              << stem << ":\n  testq %rdx, %rdx\n  je " << stem
+              << "_done\n  movzbl (%rcx), %r8d\n  xorl %r8d, %eax\n  imull "
+                 "$16777619, %eax\n  incq %rcx\n  decq %rdx\n  jmp "
+              << stem << "\n"
+              << stem << "_done:\n";
+          } else if (type == argos::ir::ValueType::float64) {
+            o << "  movq %rax, %rcx\n  shlq $1, %rcx\n  jnz " << stem
+              << "\n  xorl %eax, %eax\n"
+              << stem
+              << ":\n  movq %rax, %rcx\n  shrq $32, %rcx\n  xorl %ecx, %eax\n";
+          }
+          o << "  movslq %eax, %rax\n  movq %rax, "
+            << register_address(f, i.dst) << "\n";
+          break;
+        }
         case Opcode::new_object:
-          o << "  movq $" << (8 + m.objects[i.constant].fields.size() * 8) << ", %rdi\n"
+          o << "  movq $" << (16 + m.objects[i.constant].fields.size() * 8)
+            << ", %rdi\n"
             << "  call .Largos_alloc\n  movq $" << i.constant << ", (%rax)\n"
             << "  movq %rax, " << register_address(f, i.dst) << "\n";
+          for (std::size_t field = 0;
+               field <= m.objects[i.constant].fields.size(); ++field)
+            o << "  movq $0, " << (8 + field * 8) << "(%rax)\n";
           break;
         case Opcode::load_field:
         case Opcode::store_field:
           o << "  movq " << register_address(f, i.src1) << ", %rax\n"
-            << "  testq %rax, %rax\n  je .Largos_closure_error\n"
-            << "  cmpq $" << i.constant << ", (%rax)\n  jne .Largos_closure_error\n";
+            << "  testq %rax, %rax\n  je .Largos_closure_error\n";
+          {
+            const auto ok = ".Largos_field_" + std::to_string(f.id) + "_" +
+                            std::to_string(dispatch_site++);
+            for (std::size_t id = 0; id < m.objects.size(); ++id) {
+              const auto &ancestors = m.objects[id].ancestors;
+              if (id == i.constant ||
+                  std::find(ancestors.begin(), ancestors.end(), i.constant) !=
+                      ancestors.end())
+                o << "  cmpq $" << id << ", (%rax)\n  je " << ok << "\n";
+            }
+            o << "  jmp .Largos_closure_error\n" << ok << ":\n";
+          }
           if (i.opcode == Opcode::load_field)
-            o << "  movq " << 8 + static_cast<std::uint64_t>(i.count) * 8 << "(%rax), %rax\n"
+            o << "  movq " << 16 + static_cast<std::uint64_t>(i.count) * 8
+              << "(%rax), %rax\n"
               << "  movq %rax, " << register_address(f, i.dst) << "\n";
-          else o << "  movq " << register_address(f, i.src2) << ", %rcx\n"
-                 << "  movq %rcx, " << 8 + static_cast<std::uint64_t>(i.count) * 8 << "(%rax)\n";
+          else {
+            o << "  movq " << register_address(f, i.src2) << ", %rcx\n";
+            const auto &owned = m.objects[i.constant].owned_fields;
+            if (std::find(owned.begin(), owned.end(), i.count) != owned.end()) {
+              o << "  testq %rcx, %rcx\n  je .Largos_closure_error\n"
+                << "  cmpq $0, " << 16 + static_cast<std::uint64_t>(i.count) * 8
+                << "(%rax)\n  jne .Largos_closure_error\n"
+                << "  cmpq $0, 8(%rcx)\n  jne .Largos_closure_error\n  movq "
+                   "%rax, 8(%rcx)\n";
+            }
+            o << "  movq %rcx, " << 16 + static_cast<std::uint64_t>(i.count) * 8
+              << "(%rax)\n";
+          }
           break;
         case Opcode::make_closure: {
           const auto& target = m.functions[i.function];
@@ -607,8 +750,28 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
           o << "  movl " << register_address(f, i.src1) << ", %eax\n"
             << "  testl %eax, %eax\n  je " << label(f.id, i.label) << "\n";
           break;
+        case Opcode::call_virtual:
         case Opcode::call:
         {
+          if (i.opcode == Opcode::call_virtual) {
+            const auto site = dispatch_site++;
+            const auto done = ".Largos_dispatch_" + std::to_string(f.id) + "_" +
+                              std::to_string(site);
+            o << "  movq " << register_address(f, i.arguments.front())
+              << ", %rax\n"
+              << "  testq %rax, %rax\n  je .Largos_closure_error\n";
+            for (std::size_t id = 0; id < m.objects.size(); ++id) {
+              const auto target = m.objects[id].methods[i.constant];
+              if (target == UINT32_MAX)
+                continue;
+              const auto next = done + "_" + std::to_string(id);
+              o << "  cmpq $" << id << ", (%rax)\n  jne " << next << "\n"
+                << "  leaq " << symbol(m.functions[target])
+                << "(%rip), %r11\n  jmp " << done << "\n"
+                << next << ":\n";
+            }
+            o << "  jmp .Largos_closure_error\n" << done << ":\n";
+          }
           const auto &callee = m.functions[i.function];
           std::size_t integer_argument = 0;
           std::size_t double_argument = 0;
@@ -627,7 +790,10 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
                 << "\n";
             }
           }
-          o << "  call " << symbol(callee) << "\n";
+          if (i.opcode == Opcode::call_virtual)
+            o << "  call *%r11\n";
+          else
+            o << "  call " << symbol(callee) << "\n";
           if (f.register_types[i.dst] == argos::ir::ValueType::float64)
             o << "  movq %xmm0, %rax\n  movq %rax, "
               << register_address(f, i.dst) << "\n";
