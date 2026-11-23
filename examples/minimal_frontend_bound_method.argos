@@ -1,7 +1,7 @@
-// Referências ligadas a métodos ainda não possuem lowering.
+// Referências ligadas preservam o receptor em um ambiente de closure.
 class Value { public function read() -> int { return 42; } }
 function main() -> int {
-    var value = new Value();
-    var read = value.read;
+    let value = new Value();
+    let read = value.read;
     return read();
 }

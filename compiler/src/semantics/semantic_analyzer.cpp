@@ -1,5 +1,6 @@
 #include "argos/semantics/semantic_analyzer.hpp"
 #include "argos/diagnostics/diagnostic_catalog.hpp"
+#include "argos/semantics/raw_intrinsics.hpp"
 
 #include <utility>
 #include <algorithm>
@@ -101,6 +102,7 @@ std::string_view type_kind_name(TypeKind kind) noexcept {
   case TypeKind::char_type:
     return "char";
   case TypeKind::string_type: return "string";
+  case TypeKind::raw_pointer: return "ptr";
   case TypeKind::nominal_type: return "<nominal>";
   case TypeKind::function_type: return "function";
   case TypeKind::array_type:
@@ -158,6 +160,8 @@ bool SemanticAnalyzer::analyze(const ast::Program &program) {
   initializing_field_ = false;
   constructor_lambda_context_ = false;
   accessing_member_base_ = false;
+  unsafe_depth_ = 0;
+  manual_memory_used_ = arena_memory_used_ = false;
   loop_depth_ = 0;
 
   enter_scope();
@@ -276,6 +280,8 @@ bool SemanticAnalyzer::analyze(const ast::Program &program) {
   }
 
   leave_scope();
+  if (manual_memory_used_ && (arena_memory_used_ || !classes_.empty()))
+    report("ARGOS-S0702", program.span, "escolha memória manual ou arena gerenciada para o módulo; não misture os dois modos");
   return !diagnostics_.has_errors();
 }
 
@@ -331,6 +337,10 @@ const Symbol *SemanticAnalyzer::lookup(std::string_view name) const {
 }
 
 bool SemanticAnalyzer::declare(Symbol symbol) {
+  if (is_raw_intrinsic(symbol.name)) {
+    report("ARGOS-S0701", symbol.span, "nome reservado para intrínseco de memória: " + symbol.name);
+    return false;
+  }
   if (scopes_.empty()) {
     enter_scope();
   }
@@ -362,6 +372,8 @@ void SemanticAnalyzer::report(std::string_view code,
 
 void SemanticAnalyzer::record_coercion(
     const ast::Expression &expression, Type from, Type to) {
+  if (!from.is_null() && !from.is_error() && to.nullable_depth > from.nullable_depth)
+    arena_memory_used_ = true;
   if (!from.is_error() && !to.is_error() && from != to)
     expression_coercions_[&expression] = std::move(to);
 }
@@ -512,6 +524,11 @@ void SemanticAnalyzer::analyze_variable_declaration(
 
 void SemanticAnalyzer::analyze_function_declaration(
     const ast::FunctionDeclaration &declaration) {
+  struct Boundary {
+    std::size_t &depth; std::size_t previous;
+    ~Boundary() { depth = previous; }
+  } boundary{unsafe_depth_, unsafe_depth_};
+  unsafe_depth_ = 0;
   if (declaration.builtin != ast::FunctionDeclaration::Builtin::none)
     return;
   const auto declared = declaration_symbols_.find(&declaration);
@@ -603,7 +620,9 @@ void SemanticAnalyzer::analyze_statement(const ast::Statement &statement) {
   case ast::NodeKind::unsafe_block_statement: {
     const auto &unsafe_stmt =
         static_cast<const ast::UnsafeBlockStatement &>(statement);
+    ++unsafe_depth_;
     analyze_block(*unsafe_stmt.block);
+    --unsafe_depth_;
     break;
   }
   default:
@@ -690,9 +709,11 @@ Type SemanticAnalyzer::analyze_expression(const ast::Expression &expression,
 
   switch (expression.kind) {
   case ast::NodeKind::lambda_expression:
+    arena_memory_used_ = true;
     result = analyze_lambda(static_cast<const ast::LambdaExpression&>(expression));
     break;
   case ast::NodeKind::new_expression: {
+    arena_memory_used_ = true;
     const auto& creation = static_cast<const ast::NewExpression&>(expression);
     result = resolve_type(*creation.type);
     const auto found = classes_.find(result.nominal_name);
@@ -757,6 +778,7 @@ Type SemanticAnalyzer::analyze_expression(const ast::Expression &expression,
     result = analyze_call(static_cast<const ast::CallExpression &>(expression));
     break;
   case ast::NodeKind::array_expression: {
+    arena_memory_used_ = true;
     const auto &array = static_cast<const ast::ArrayExpression &>(expression);
     const auto context = coercion_of(expression);
     Type element = context && context->kind == TypeKind::array_type &&
@@ -764,7 +786,7 @@ Type SemanticAnalyzer::analyze_expression(const ast::Expression &expression,
                        ? context->signature.front()
                        : unknown_type();
     for (const auto &item : array.elements) {
-      const auto type = analyze_expression(*item);
+      const auto type = analyze_expression(*item, element.is_unknown() ? std::nullopt : std::optional<Type>{element});
       if (element.is_unknown() && !type.is_null())
         element = type;
     }
@@ -775,7 +797,7 @@ Type SemanticAnalyzer::analyze_expression(const ast::Expression &expression,
           break;
         }
     if (element.is_unknown() || element.kind == TypeKind::void_type ||
-        element.kind == TypeKind::array_type) {
+        element.kind == TypeKind::never_type) {
       report("ARGOS-S0377", expression.span,
              "array exige elementos homogêneos habitáveis; array vazio ou "
              "somente nil exige contexto tipado");
@@ -1393,6 +1415,28 @@ Type SemanticAnalyzer::analyze_call(const ast::CallExpression &expression) {
     for (const auto& arg : expression.arguments) analyze_expression(*arg);
     return Type{TypeKind::void_type};
   }
+  if (identifier && is_raw_intrinsic(identifier->name)) {
+    manual_memory_used_ = true;
+    const auto &name = identifier->name;
+    if (!unsafe_depth_)
+      report("ARGOS-S0700", expression.span, "operação de memória manual exige bloco unsafe");
+    const std::vector<Type> parameters = name == "raw_alloc" ? std::vector<Type>{Type{TypeKind::int_type}} :
+        name == "raw_free" ? std::vector<Type>{Type{TypeKind::raw_pointer}} :
+        name == "raw_load" ? std::vector<Type>{Type{TypeKind::raw_pointer}, Type{TypeKind::int_type}} :
+        std::vector<Type>{Type{TypeKind::raw_pointer}, Type{TypeKind::int_type}, Type{TypeKind::byte}};
+    if (expression.arguments.size() != parameters.size())
+      report("ARGOS-S0701", expression.span, "quantidade de argumentos inválida para " + name);
+    for (std::size_t n = 0; n < expression.arguments.size(); ++n) {
+      const auto expected = n < parameters.size() ? std::optional<Type>{parameters[n]} : std::nullopt;
+      const auto actual = analyze_expression(*expression.arguments[n], expected);
+      if (expected && !is_assignable_expression(actual, *expected, *expression.arguments[n]))
+        report("ARGOS-S0701", expression.arguments[n]->span, "tipo incompatível na operação " + name);
+      else if (expected) record_coercion(*expression.arguments[n], actual, *expected);
+      if (n < expression.argument_labels.size() && !expression.argument_labels[n].empty())
+        report("ARGOS-S0701", expression.span, "intrínsecos de memória usam argumentos posicionais");
+    }
+    return Type{name == "raw_alloc" ? TypeKind::raw_pointer : name == "raw_load" ? TypeKind::byte : TypeKind::void_type};
+  }
   if (identifier && identifier->name == "super") {
     const auto base = superclass(current_class_);
     if (!in_constructor_ || base.empty() || super_initialized_ ||
@@ -1765,11 +1809,9 @@ Type SemanticAnalyzer::resolve_type(const ast::TypeSyntax &syntax) {
   if (syntax.element_type) {
     auto element = resolve_type(*syntax.element_type);
     if (element.kind == TypeKind::void_type ||
-        element.kind == TypeKind::never_type ||
-        element.kind == TypeKind::array_type) {
+        element.kind == TypeKind::never_type) {
       report("ARGOS-S0377", syntax.span,
-             "array exige elemento habitável; arrays multidimensionais ainda "
-             "não são suportados");
+             "array exige elemento habitável");
       return error_type();
     }
     Type type{TypeKind::array_type, syntax.nullable_depth};
@@ -1792,6 +1834,7 @@ Type SemanticAnalyzer::resolve_type(const ast::TypeSyntax &syntax) {
 
   if (name == "bool")
     kind = TypeKind::bool_type;
+  else if (name == "ptr") kind = TypeKind::raw_pointer;
   else if (name == "byte" || name == "uint_8")
     kind = TypeKind::byte;
   else if (name == "sbyte") kind = TypeKind::sbyte;
@@ -1883,6 +1926,15 @@ bool SemanticAnalyzer::is_boolean(Type type) noexcept {
 
 bool SemanticAnalyzer::is_assignable_expression(
     Type from, Type to, const ast::Expression &expression) const {
+  if (const auto *unary = dynamic_cast<const ast::UnaryExpression *>(&expression);
+      unary && unary->op == ast::UnaryOperator::minus) {
+    if (const auto magnitude = integer_literal_value(*unary->operand))
+      if (const auto maximum = integer_max(to.kind)) {
+        const bool signed_type = to.kind == TypeKind::sbyte || to.kind == TypeKind::short_type ||
+            to.kind == TypeKind::int_type || to.kind == TypeKind::long_type || to.kind == TypeKind::isize;
+        return to.nullable_depth <= 1 && (signed_type ? *magnitude <= *maximum + 1 : *magnitude == 0);
+      }
+  }
   if (dynamic_cast<const ast::IntegerLiteralExpression *>(&expression)) {
     if (const auto maximum = integer_max(to.kind)) {
       const auto value = integer_literal_value(expression);
@@ -2043,6 +2095,8 @@ bool SemanticAnalyzer::statement_guarantees_return(const ast::Statement &stateme
   case ast::NodeKind::return_statement: return true;
   case ast::NodeKind::block_statement:
     return block_guarantees_return(static_cast<const ast::BlockStatement &>(statement));
+  case ast::NodeKind::unsafe_block_statement:
+    return block_guarantees_return(*static_cast<const ast::UnsafeBlockStatement &>(statement).block);
   case ast::NodeKind::if_statement: {
     const auto &branch = static_cast<const ast::IfStatement &>(statement);
     return branch.else_branch && block_guarantees_return(*branch.then_branch) &&
@@ -2393,7 +2447,7 @@ bool SemanticAnalyzer::immutable_data_type(
           return false;
         // Resolve nominal links from syntax without mutating the analyzer.
         if (!field->type || field->type->element_type ||
-            field->type->result_type)
+            field->type->result_type || field->type->name == "ptr")
           return false;
         if (classes_.contains(
                 resolve_nominal(field->type->name, type.nominal_name,
@@ -2409,6 +2463,7 @@ bool SemanticAnalyzer::immutable_data_type(
     return true;
   }
   return type.kind != TypeKind::array_type &&
+         type.kind != TypeKind::raw_pointer &&
          type.kind != TypeKind::function_type &&
          type.kind != TypeKind::void_type && type.kind != TypeKind::never_type;
 }
@@ -2872,7 +2927,7 @@ void SemanticAnalyzer::build_class(const std::string& name) {
         if (!field->getter || field->initializer ||
             (field->setter && field->mutability != ast::Mutability::mutable_))
           report("ARGOS-S0607", field->span,
-                 "propriedade exige getter; setter exige var mut e não há "
+                 "propriedade exige getter; setter exige let mut e não há "
                  "inicializador");
         if (declaration.is_interface)
           symbol.modifiers.abstract_ = true;
@@ -3174,6 +3229,11 @@ void SemanticAnalyzer::analyze_class(const ast::ClassDeclaration& declaration) {
 }
 
 Type SemanticAnalyzer::analyze_lambda(const ast::LambdaExpression& expression) {
+  struct Boundary {
+    std::size_t &depth; std::size_t previous;
+    ~Boundary() { depth = previous; }
+  } boundary{unsafe_depth_, unsafe_depth_};
+  unsafe_depth_ = 0;
   const auto before = scopes_;
   const auto previous_loop_depth = loop_depth_;
   const bool previous_constructor = in_constructor_;

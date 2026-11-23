@@ -1,10 +1,12 @@
 #include "argos/driver/native_compile.hpp"
 
 #include "argos/codegen/native/x86_64/x86_64_codegen.hpp"
+#include "argos/codegen/native/avr/avr_codegen.hpp"
 
 #include <fstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #if defined(__linux__) && defined(__x86_64__)
 #include <cerrno>
@@ -18,11 +20,16 @@ extern char **environ;
 namespace argos::driver {
 int emit_assembly(const argos::ir::Module &module,
                   const std::filesystem::path &output,
-                  std::string &error) {
+                  std::string &error, Target target) {
   std::string assembly;
   try {
-    codegen::native::x86_64::CodeGenerator backend;
-    assembly = backend.generate(module);
+    if (target == Target::avr_atmega328p) {
+      codegen::native::avr::CodeGenerator backend;
+      assembly = backend.generate(module);
+    } else {
+      codegen::native::x86_64::CodeGenerator backend;
+      assembly = backend.generate(module);
+    }
   } catch (const std::exception &exception) {
     error = exception.what();
     return 65;
@@ -39,12 +46,17 @@ int emit_assembly(const argos::ir::Module &module,
 
 int compile_native(const argos::ir::Module &module,
                    const std::filesystem::path &output,
-                   std::string &error) {
+                   std::string &error, Target target) {
 #if defined(__linux__) && defined(__x86_64__)
   std::string assembly;
   try {
-    codegen::native::x86_64::CodeGenerator backend;
-    assembly = backend.generate(module);
+    if (target == Target::avr_atmega328p) {
+      codegen::native::avr::CodeGenerator backend;
+      assembly = backend.generate(module);
+    } else {
+      codegen::native::x86_64::CodeGenerator backend;
+      assembly = backend.generate(module);
+    }
   } catch (const std::exception &exception) {
     error = exception.what();
     return 65;
@@ -83,14 +95,15 @@ int compile_native(const argos::ir::Module &module,
   close(output_descriptor);
   unlink(temporary_output.c_str());
   TemporaryFile output_cleanup{temporary_output};
-  char *arguments[] = {const_cast<char *>("cc"), const_cast<char *>("-x"),
-                       const_cast<char *>("assembler"), temporary.data(),
-                       const_cast<char *>("-o"),
-                       temporary_output.data(), nullptr};
+  const auto tool = target == Target::avr_atmega328p ? "avr-gcc" : "cc";
+  std::vector<char *> arguments{const_cast<char *>(tool)};
+  if (target == Target::avr_atmega328p) arguments.push_back(const_cast<char *>("-mmcu=atmega328p"));
+  arguments.insert(arguments.end(), {const_cast<char *>("-x"), const_cast<char *>("assembler"),
+                                    temporary.data(), const_cast<char *>("-o"), temporary_output.data(), nullptr});
   pid_t process{};
-  const int spawn_error = posix_spawnp(&process, "cc", nullptr, nullptr, arguments, environ);
+  const int spawn_error = posix_spawnp(&process, tool, nullptr, nullptr, arguments.data(), environ);
   if (spawn_error != 0) {
-    error = "não foi possível iniciar cc: " + std::string{std::strerror(spawn_error)};
+    error = "não foi possível iniciar " + std::string(tool) + ": " + std::string{std::strerror(spawn_error)};
     return 69;
   }
   int status{};
@@ -108,6 +121,7 @@ int compile_native(const argos::ir::Module &module,
 #else
   (void)module;
   (void)output;
+  (void)target;
   error = "compilação nativa disponível somente em x86-64/Linux nesta versão";
   return 69;
 #endif

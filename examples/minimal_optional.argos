@@ -1,5 +1,5 @@
 // Resultado esperado: 9
 function main() -> int {
-    var value: int? = nil
+    let value: int? = nil
     return value ?? 9
 }

@@ -1,0 +1,31 @@
+class Cell {
+    public let mut storage: int = 3
+    public let mut reads: int = 0
+    public let mut writes: int = 0
+    public let mut receivers: int = 0
+    public let mut value: int {
+        getter() { this.reads += 1; return this.storage }
+        setter(next) { this.writes += 1; this.storage = next }
+    }
+}
+function receiver(_ cell: Cell) -> Cell {
+    cell.receivers += 1
+    return cell
+}
+function offset(_ cell: Cell) -> int {
+    cell.receivers += 1
+    return 0
+}
+function main() -> int {
+    let cell = new Cell()
+    let old = receiver(cell).value++
+    if old != 3 || cell.storage != 4 return 1
+    if cell.reads != 1 || cell.writes != 1 || cell.receivers != 1 return 2
+    let previous = cell.value--
+    if previous != 4 || cell.storage != 3 return 3
+    if cell.reads != 2 || cell.writes != 2 return 4
+    let mut array = [4]
+    let item = array[offset(cell)]++
+    if item != 4 || array[0] != 5 || cell.receivers != 2 return 5
+    return 0
+}

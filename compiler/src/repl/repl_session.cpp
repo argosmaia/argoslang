@@ -43,7 +43,7 @@ bool is_function_definition(std::string_view input) {
 }
 
 std::string variable_source(const Variable &variable) {
-  std::string source = "var " +
+  std::string source = "let " +
       std::string(variable.mutable_ ? "mut " : "") + "`" + variable.name +
       "`: " + variable.type;
   if (variable.initialized) source += " = " + variable.value;
@@ -75,7 +75,7 @@ std::optional<std::string> executable_type(const ast::TypeSyntax &type) {
 }
 
 bool is_string_type(const ast::TypeSyntax &type) {
-  return !type.element_type && type.name == "string";
+  return !type.element_type && (type.name == "string" || type.name == "char");
 }
 
 // Snapshot source, not raw boxed handles: reconstruct every present optional
@@ -180,13 +180,13 @@ public:
           const bool is_string_declaration =
               (declaration->type && is_string_type(*declaration->type)) ||
               (!declaration->type && declaration->initializer &&
-               probe_analyzer.type_of(*declaration->initializer).kind ==
-                   semantics::TypeKind::string_type);
+               (probe_analyzer.type_of(*declaration->initializer).kind == semantics::TypeKind::string_type ||
+                probe_analyzer.type_of(*declaration->initializer).kind == semantics::TypeKind::char_type));
           if (is_string_declaration) {
             diagnostics.emit(
                 diagnostics::catalog::compiler::unsupported_lowering,
                 declaration->span,
-                "o REPL ainda não consegue manter variáveis string entre entradas");
+                "o REPL ainda não consegue manter variáveis string ou char entre entradas");
             return false;
           }
           std::optional<std::string> type;
@@ -298,7 +298,7 @@ public:
 
   [[nodiscard]] std::vector<std::string> completion_candidates() const {
     std::vector<std::string> result{
-        ":help", ":quit", ":q", ":reset", "function", "var", "mut",
+        ":help", ":quit", ":q", ":reset", "function", "let", "mut",
         "if", "else", "while", "break", "continue", "return", "print",
         "true", "false", "nil", "int", "float", "double", "bool", "char",
         "string", "void"};

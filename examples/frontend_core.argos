@@ -1,5 +1,5 @@
 function choose(_ flag: bool, fallback value: int?) -> int {
-    var resolved: int = value ?? 0;
+    let resolved: int = value ?? 0;
     if flag {
         return resolved;
     } else {
@@ -7,4 +7,4 @@ function choose(_ flag: bool, fallback value: int?) -> int {
     }
 }
 
-var result: int = choose(true, fallback: 7);
+let result: int = choose(true, fallback: 7);

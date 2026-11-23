@@ -7,7 +7,10 @@ add_library(argos_frontend STATIC
     src/lexer/lexer.cpp
     src/lexer/token_kind.cpp
     src/parser/parser.cpp
+    src/parser/lr2.cpp
     src/ir/validator.cpp
+    src/ir/instruction.cpp
+    src/ir/optimizer.cpp
     src/repl/repl_session.cpp
     src/semantics/semantic_analyzer.cpp
     src/source/source_manager.cpp
@@ -30,15 +33,17 @@ target_link_libraries(argos_frontend
         argos_project_warnings
 )
 
-add_executable(argosc
-    src/driver/main.cpp
-    src/driver/native_compile.cpp
+add_library(argos_native STATIC
     src/codegen/native/x86_64/x86_64_codegen.cpp
+    src/codegen/native/avr/avr_codegen.cpp
 )
+target_link_libraries(argos_native PUBLIC argos_frontend argos_project_options PRIVATE argos_project_warnings)
+
+add_executable(argosc src/driver/main.cpp src/driver/native_compile.cpp)
 
 target_link_libraries(argosc
     PRIVATE
-        argos_frontend
+        argos_native
         argos_project_options
         argos_project_warnings
         ${ARGOS_READLINE_LIBRARY}

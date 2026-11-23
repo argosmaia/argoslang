@@ -36,7 +36,7 @@ arquivo.argos:4:12: error[ARGOS-S0301]: variável "answer" usada antes da inicia
   return answer
          ^
   falando simples: a variável ainda não recebeu um valor.
-  tente assim: inicialize-a antes do uso: var answer: int = 0
+  tente assim: inicialize-a antes do uso: let answer: int = 0
 ```
 
 Corrija primeiro o erro de menor linha e coluna: diagnósticos posteriores podem

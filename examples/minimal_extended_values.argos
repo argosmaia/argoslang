@@ -1,0 +1,49 @@
+class Base {
+    public virtual function value() -> int { return 1 }
+}
+class Derived: Base {
+    public override function value() -> int { return 42 }
+}
+function letter(_ value: char) -> char { return value }
+function rounded(_ value: float) -> float { return value }
+function main() -> int {
+    let ch: char = '\u{1F680}'
+    if letter(ch) != '🚀' return 1
+    let apostrophe: char = '\''
+    if apostrophe != '\u{27}' return 2
+    print(ch, apostrophe)
+    let small: sbyte = -128
+    let shortValue: short = -32768
+    let unsignedShort: ushort = 65535
+    let smallCopy: sbyte = -128
+    let shortCopy: short = -32768
+    let unsignedCopy: ushort = 65535
+    if small != smallCopy || shortValue != shortCopy || unsignedShort != unsignedCopy return 9
+    let bits: int = 0xff + 0b10 + 0o7
+    if bits != 264 return 10
+    let minimum: int = -2147483648
+    if -minimum != minimum return 11
+    let mut count = 2
+    let before = count++
+    if before != 2 || count != 3 return 12
+    let exact: double = 16777217.0
+    let single: float = exact
+    let expected: float = 16777216.0
+    if single != expected return 3
+    if rounded(exact) != expected return 4
+    let mut matrix: [[int]] = [[1, 2], []]
+    matrix[0][1] = 9
+    if matrix[0][1] != 9 return 5
+    let cube: [[[int]]] = [[[7]], [[]]]
+    if cube[0][0][0] != 7 return 6
+    let object: Base = new Derived()
+    let method = object.value
+    if method() != 42 return 7
+    let optional: Base? = object
+    let optionalMethod = optional?.value
+    if (optionalMethod!!)() != 42 return 13
+    let mut value = 0
+    unsafe { value = method() }
+    if value != 42 return 8
+    return 0
+}

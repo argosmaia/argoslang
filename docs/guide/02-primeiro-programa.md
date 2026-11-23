@@ -24,17 +24,17 @@ linha.
 Uma variável é uma caixinha com nome. Diga o tipo depois dos dois-pontos:
 
 ```argos
-var name: string = "Argos"
-var answer: int = 42
-var ready: bool = true
+let name: string = "Argos"
+let answer: int = 42
+let ready: bool = true
 ```
 
-`var` não deixa trocar o valor depois da primeira atribuição. Para uma caixinha
-que pode mudar, use `var mut`:
+`let` não deixa trocar o valor depois da primeira atribuição. Para uma caixinha
+que pode mudar, use `let mut`:
 
 ```argos
 function main() -> void {
-    var mut score: int = 0
+    let mut score: int = 0
     score = score + 1
     print("Pontos: ", score)
 }
@@ -46,7 +46,7 @@ os comandos. `{` e `}` juntam comandos em um bloco. Comentários começam com
 
 ```argos
 // Este comentário é para quem está lendo o código.
-var number: int = 7
+let number: int = 7
 ```
 
 Use retorno `int` quando o valor final for importante para outra função ou para

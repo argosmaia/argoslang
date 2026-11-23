@@ -1,5 +1,8 @@
 #include "argos/codegen/ir/executable_ir_generator.hpp"
 #include "argos/diagnostics/diagnostic_catalog.hpp"
+#include "argos/ir/optimizer.hpp"
+#include "argos/ir/validator.hpp"
+#include "argos/semantics/raw_intrinsics.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -23,6 +26,19 @@ using argos::ir::Slot;
 using argos::ir::LabelId;
 using argos::ir::ValueType;
 
+std::optional<std::uint64_t> parse_integer(std::string digits) {
+  std::erase(digits, '_');
+  int base = 10;
+  if (digits.starts_with("0x") || digits.starts_with("0X")) base = 16;
+  else if (digits.starts_with("0b") || digits.starts_with("0B")) base = 2;
+  else if (digits.starts_with("0o") || digits.starts_with("0O")) base = 8;
+  if (base != 10) digits.erase(0, 2);
+  std::uint64_t value{};
+  const auto [end, error] = std::from_chars(digits.data(), digits.data() + digits.size(), value, base);
+  if (error != std::errc{} || end != digits.data() + digits.size()) return std::nullopt;
+  return value;
+}
+
 std::optional<std::string> decode_string_literal(std::string_view spelling) {
   const bool multiline = spelling.starts_with("\"\"\"");
   const std::size_t delimiter_size = multiline ? 3 : 1;
@@ -32,7 +48,7 @@ std::optional<std::string> decode_string_literal(std::string_view spelling) {
 
   std::string result;
   const auto append_code_point = [&](std::uint32_t value) {
-    if (value <= 0x7f) {
+    if (value <= 0x7f) { // compara com 0x7f para evitar warnings de conversão de int32_t para char
       result.push_back(static_cast<char>(value));
     } else if (value <= 0x7ff) {
       result.push_back(static_cast<char>(0xc0 | (value >> 6)));
@@ -62,6 +78,7 @@ std::optional<std::string> decode_string_literal(std::string_view spelling) {
     case 'n': result.push_back('\n'); break;
     case 'r': result.push_back('\r'); break;
     case '\\': result.push_back('\\'); break;
+    case '\'': result.push_back('\''); break;
     case '"': result.push_back('"'); break;
     case 'u': {
       if (index + 1 >= spelling.size() || spelling[index + 1] != '{')
@@ -104,8 +121,7 @@ std::optional<ValueType> runtime_type(const ast::TypeSyntax *type,
       type->resolved_name.empty() ? type->name : type->resolved_name;
   if (type->element_type) {
     const auto element = runtime_type(type->element_type.get(), layouts);
-    if (!element || !argos::ir::valid_type(*element) ||
-        argos::ir::payload_type(*element) == ValueType::array)
+    if (!element || !argos::ir::valid_type(*element))
       return std::nullopt;
     payload = argos::ir::array_type(*element);
   } else if (type->result_type) {
@@ -117,13 +133,16 @@ std::optional<ValueType> runtime_type(const ast::TypeSyntax *type,
     if (!runtime_type(type->result_type.get(), layouts))
       return std::nullopt;
     payload = ValueType::closure;
-  } else if (name == "int" || name == "byte" || name == "uint_8")
+  } else if (name == "int" || name == "byte" || name == "uint_8" ||
+             name == "sbyte" || name == "short" || name == "ushort")
     payload = ValueType::int32;
   else if (name == "bool")
     payload = ValueType::boolean;
   else if (name == "float" || name == "double")
     payload = ValueType::float64;
-  else if (name == "string")
+  else if (name == "ptr")
+    payload = ValueType::raw_pointer;
+  else if (name == "string" || name == "char")
     payload = ValueType::string;
   else if (name == "void" && !type->nullable_depth)
     payload = ValueType::void_type;
@@ -139,6 +158,8 @@ struct WorkItem {
   const ast::LambdaExpression* lambda{};
   std::optional<argos::ir::FunctionId> adapter;
   const ast::ClassDeclaration* owner{};
+  bool bound{false};
+  std::optional<std::uint32_t> dispatch{};
 };
 
 class Lowerer final {
@@ -324,6 +345,32 @@ public:
   }
 
 private:
+  Register narrow_integer(Register value, const semantics::Type &type, const ast::Node &node) {
+    if (function_.register_types[value] != ValueType::int32) return value;
+    const auto width = type.kind == semantics::TypeKind::sbyte ? 8u :
+                       type.kind == semantics::TypeKind::short_type ? 16u :
+                       type.kind == semantics::TypeKind::ushort_type ? 272u : 0u;
+    if (!width) return value;
+    Instruction i;
+    i.opcode = Opcode::check_narrow; i.src1 = value; i.count = width; i.dst = reg(ValueType::int32);
+    i.source_line = static_cast<std::uint32_t>(node.span.begin.line);
+    i.source_column = static_cast<std::uint32_t>(node.span.begin.column);
+    emit(i); return i.dst;
+  }
+  Register bound_method(Register receiver, const semantics::Symbol &symbol, bool direct = false) {
+    const auto target = ids_.at(semantics::SemanticAnalyzer::function_key(symbol));
+    std::optional<std::uint32_t> dispatch;
+    if (!direct && symbol.modifiers.visibility != ast::Visibility::private_)
+      dispatch = virtual_slot(symbol);
+    Instruction closure;
+    closure.opcode = Opcode::make_closure;
+    closure.function = static_cast<argos::ir::FunctionId>(work_.size());
+    work_.push_back({nullptr, nullptr, target, nullptr, true, dispatch});
+    closure.arguments = {receiver};
+    closure.dst = reg(ValueType::closure);
+    emit(closure);
+    return closure.dst;
+  }
   bool supported_type(const ast::TypeSyntax* type) const {
     const auto value = runtime_type(type, layouts_);
     return value && argos::ir::valid_type(*value);
@@ -467,15 +514,18 @@ private:
       return std::nullopt;
     }
     if (type.kind == semantics::TypeKind::int_type ||
-        type.kind == semantics::TypeKind::byte)
+        type.kind == semantics::TypeKind::byte || type.kind == semantics::TypeKind::sbyte ||
+        type.kind == semantics::TypeKind::short_type || type.kind == semantics::TypeKind::ushort_type)
       return ValueType::int32;
     if (type.kind == semantics::TypeKind::bool_type) return ValueType::boolean;
+    if (type.kind == semantics::TypeKind::raw_pointer) return ValueType::raw_pointer;
     if (type.kind == semantics::TypeKind::float_type ||
         type.kind == semantics::TypeKind::double_type)
       return ValueType::float64;
     if (type.kind == semantics::TypeKind::function_type) return ValueType::closure;
     if (type.kind == semantics::TypeKind::nominal_type) return ValueType::object;
-    if (type.kind == semantics::TypeKind::string_type) return ValueType::string;
+    if (type.kind == semantics::TypeKind::string_type ||
+        type.kind == semantics::TypeKind::char_type) return ValueType::string;
     if (type.kind == semantics::TypeKind::void_type) return ValueType::void_type;
     return std::nullopt;
   }
@@ -538,6 +588,11 @@ private:
     auto result = expression_impl(node);
     const auto coercion = semantics_.coercion_of(node);
     const auto actual = coercion ? *coercion : semantics_.type_of(node);
+    if (result) result = narrow_integer(*result, actual, node);
+    const auto source_type = semantics_.type_of(node);
+    if (result && source_type.kind == semantics::TypeKind::float_type &&
+        function_.register_types[*result] == ValueType::float64)
+      result = unary_ir(Opcode::round_float, *result, ValueType::float64, &node);
     if (result && actual.kind == semantics::TypeKind::byte &&
         function_.register_types[*result] == ValueType::int32)
       result = unary_ir(Opcode::check_uint8, *result, ValueType::int32, &node);
@@ -547,7 +602,11 @@ private:
       error(node, "a conversão numérica desta expressão ainda não é compilável");
       return std::nullopt;
     }
-    return convert(*result, *target);
+    const auto converted = convert(*result, *target);
+    if (actual.kind == semantics::TypeKind::float_type &&
+        *target == ValueType::float64)
+      return unary_ir(Opcode::round_float, converted, ValueType::float64, &node);
+    return converted;
   }
 
   Register unary_ir(Opcode op, Register value, ValueType type,
@@ -787,6 +846,11 @@ private:
   }
 
   std::optional<Register> expression_impl(const ast::Expression &node) {
+    if (const auto *literal = dynamic_cast<const ast::CharacterLiteralExpression *>(&node)) {
+      const auto decoded = decode_string_literal(literal->spelling);
+      if (!decoded) { error(node, "literal char inválido"); return std::nullopt; }
+      return string_constant(*decoded);
+    }
     if (semantics_.type_of(node).is_null()) {
       const auto context = semantics_.coercion_of(node);
       const auto type = context ? semantic_type(*context) : std::nullopt;
@@ -882,7 +946,18 @@ private:
       const auto index = field_index(found->second, access->member);
       const auto getter = ids_.find(type.nominal_name + ".$getter." + access->member);
       if (!index && getter == ids_.end()) {
-        error(node, "referência ligada a método ainda não é compilável; use chamada direta"); return std::nullopt;
+        const auto methods = semantics_.methods_of(type.nominal_name);
+        const auto method = std::find_if(methods.begin(), methods.end(), [&](const auto &m) { return m.name == access->member; });
+        if (method == methods.end()) { error(node, "método sem representação executável"); return std::nullopt; }
+        const auto receiver = expression(*access->base);
+        if (!receiver) return std::nullopt;
+        const auto *id = dynamic_cast<const ast::IdentifierExpression *>(access->base.get());
+        if (!access->safe) return bound_method(*receiver, *method, id && id->name == "super");
+        const auto target = expression_type(node);
+        if (!target) return std::nullopt;
+        return choose(unary_ir(Opcode::is_nil, *receiver, ValueType::boolean), *target,
+                      [&]() -> std::optional<Register> { return nil(*target); },
+                      [&]() -> std::optional<Register> { return convert(bound_method(unwrap(*receiver), *method), *target); });
       }
       const auto base = expression(*access->base);
       if (!base) return std::nullopt;
@@ -944,15 +1019,12 @@ private:
       return result;
     }
     if (const auto *literal = dynamic_cast<const ast::IntegerLiteralExpression *>(&node)) {
-      std::string digits;
-      for (char c : literal->spelling) if (c != '_') digits.push_back(c);
-      std::int32_t value{};
-      const auto [end, status] = std::from_chars(digits.data(), digits.data() + digits.size(), value);
-      if (status != std::errc{} || end != digits.data() + digits.size()) {
-        error(node, "somente literais decimais int são compiláveis");
+      const auto value = parse_integer(literal->spelling);
+      if (!value || *value > 2147483647u) {
+        error(node, "literal inteiro fora do intervalo executável de int");
         return std::nullopt;
       }
-      return constant(std::to_string(value));
+      return constant(std::to_string(*value));
     }
     if (const auto *literal = dynamic_cast<const ast::FloatLiteralExpression *>(&node)) {
       std::string text;
@@ -992,8 +1064,7 @@ private:
         const auto binding = semantics_.symbol_id_of(node);
         const auto* symbol = binding ? semantics_.symbol_by_id(*binding) : nullptr;
         if (symbol && symbol->kind == semantics::Symbol::Kind::function && !symbol->owner.empty()) {
-          error(node, "referência ligada a método ainda não é compilável; use chamada direta");
-          return std::nullopt;
+          return bound_method(this_value(), *symbol);
         }
       }
       auto function_name = identifier->name;
@@ -1025,6 +1096,12 @@ private:
       return result;
     }
     if (const auto *unary = dynamic_cast<const ast::UnaryExpression *>(&node)) {
+      if (unary->op == ast::UnaryOperator::minus)
+        if (const auto *literal = dynamic_cast<const ast::IntegerLiteralExpression *>(unary->operand.get())) {
+          const auto magnitude = parse_integer(literal->spelling);
+          if (!magnitude || *magnitude > 2147483648u) { error(node, "literal negativo fora do intervalo executável de int"); return std::nullopt; }
+          return constant(std::to_string(-static_cast<std::int64_t>(*magnitude)));
+        }
       const auto operand = expression(*unary->operand);
       if (!operand) return std::nullopt;
       if (unary->op == ast::UnaryOperator::plus) return operand;
@@ -1165,7 +1242,13 @@ private:
       emit(std::move(instruction));
       return result;
     }
-    if (const auto *assignment = dynamic_cast<const ast::AssignmentExpression *>(&node)) {
+    const auto *assignment = dynamic_cast<const ast::AssignmentExpression *>(&node);
+    const auto *postfix = dynamic_cast<const ast::PostfixExpression *>(&node);
+    const bool increment = postfix && (postfix->op == ast::PostfixOperator::increment || postfix->op == ast::PostfixOperator::decrement);
+    if (assignment || increment) {
+      const auto &target = assignment ? assignment->target : postfix->operand;
+      const auto assignment_op = assignment ? assignment->op :
+          postfix->op == ast::PostfixOperator::increment ? ast::AssignmentOperator::add_assign : ast::AssignmentOperator::subtract_assign;
       std::optional<Slot> local;
       std::optional<Register> array_receiver, array_index;
       const ClassLayout* layout = nullptr;
@@ -1175,14 +1258,14 @@ private:
       std::string class_name;
       bool super = false;
       if (const auto *subscript = dynamic_cast<const ast::IndexExpression *>(
-              assignment->target.get())) {
+              target.get())) {
         array_receiver = expression(*subscript->base);
         array_index = expression(*subscript->index);
         if (!array_receiver || !array_index)
           return std::nullopt;
       } else if (const auto *access =
                      dynamic_cast<const ast::MemberAccessExpression *>(
-                         assignment->target.get())) {
+                         target.get())) {
         class_name = semantics_.type_of(*access->base).nominal_name;
         const auto *base_id =
             dynamic_cast<const ast::IdentifierExpression *>(access->base.get());
@@ -1195,7 +1278,7 @@ private:
         }
       } else if (const auto *identifier =
                      dynamic_cast<const ast::IdentifierExpression *>(
-                         assignment->target.get())) {
+                         target.get())) {
         local = slot(identifier->name);
         if (const auto *binding = semantics_.component_binding(*identifier)) {
           class_name = binding->receiver;
@@ -1216,10 +1299,10 @@ private:
           (!receiver || !layout || (!index && setter == ids_.end()))) {
         error(node, "atribuição exige variável, campo mutável ou propriedade com setter"); return std::nullopt;
       }
-      if (assignment->op == ast::AssignmentOperator::conditional_assign ||
-          assignment->op == ast::AssignmentOperator::null_coalescing_assign ||
-          assignment->op == ast::AssignmentOperator::force_unwrap_assign) {
-        const auto target_type = expression_type(*assignment->target);
+      if (assignment_op == ast::AssignmentOperator::conditional_assign ||
+          assignment_op == ast::AssignmentOperator::null_coalescing_assign ||
+          assignment_op == ast::AssignmentOperator::force_unwrap_assign) {
+        const auto target_type = expression_type(*target);
         if (!target_type)
           return std::nullopt;
         const auto read = [&]() -> std::optional<Register> {
@@ -1271,7 +1354,7 @@ private:
             accessor_call(setter->second, *receiver, v, super);
           return v;
         };
-        if (assignment->op == ast::AssignmentOperator::null_coalescing_assign) {
+        if (assignment_op == ast::AssignmentOperator::null_coalescing_assign) {
           const auto old = read();
           if (!old)
             return std::nullopt;
@@ -1288,14 +1371,14 @@ private:
         const auto value = expression(*assignment->value);
         if (!value)
           return std::nullopt;
-        if (assignment->op == ast::AssignmentOperator::force_unwrap_assign)
+        if (assignment_op == ast::AssignmentOperator::force_unwrap_assign)
           return write(unwrap(*value, &node));
         return choose(unary_ir(Opcode::is_nil, *value, ValueType::boolean),
                       *target_type, read,
                       [&]() { return write(unwrap(*value)); });
       }
       Opcode operation = Opcode::nop;
-      switch (assignment->op) {
+      switch (assignment_op) {
       case ast::AssignmentOperator::assign: break;
       case ast::AssignmentOperator::add_assign: operation = Opcode::add; break;
       case ast::AssignmentOperator::subtract_assign: operation = Opcode::sub; break;
@@ -1329,7 +1412,8 @@ private:
               accessor_call(getter->second, *receiver, std::nullopt, super);
         else { error(node, "atribuição composta exige getter"); return std::nullopt; }
       }
-      auto value = expression(*assignment->value);
+      auto value = assignment ? expression(*assignment->value)
+                              : std::optional<Register>{constant("1", function_.register_types[*previous])};
       if (!value) return std::nullopt;
       if (previous) {
         Instruction arithmetic;
@@ -1340,11 +1424,14 @@ private:
         emit(arithmetic);
         value = arithmetic.dst;
       }
-      if (semantics_.type_of(*assignment->target).kind ==
+      if (semantics_.type_of(*target).kind ==
               semantics::TypeKind::byte &&
           function_.register_types[*value] == ValueType::int32)
         value = unary_ir(Opcode::check_uint8, *value, ValueType::int32,
-                         assignment->target.get());
+                         target.get());
+      if (semantics_.type_of(*target).kind == semantics::TypeKind::float_type)
+        value = unary_ir(Opcode::round_float, *value, ValueType::float64, target.get());
+      value = narrow_integer(*value, semantics_.type_of(*target), *target);
       if (array_receiver) {
         Instruction i;
         i.opcode = Opcode::array_store;
@@ -1362,9 +1449,28 @@ private:
         store_field(*layout, *index, *receiver, *value);
       else
         accessor_call(setter->second, *receiver, *value, super);
-      return value;
+      return increment ? previous : value;
     }
     if (const auto *call = dynamic_cast<const ast::CallExpression *>(&node)) {
+      if (const auto *id = dynamic_cast<const ast::IdentifierExpression *>(call->callee.get());
+          id && semantics::is_raw_intrinsic(id->name)) {
+        Instruction i;
+        i.opcode = id->name == "raw_alloc" ? Opcode::raw_alloc : id->name == "raw_free" ? Opcode::raw_free :
+                   id->name == "raw_load" ? Opcode::raw_load : Opcode::raw_store;
+        std::vector<Register> arguments;
+        for (const auto &argument : call->arguments) {
+          auto value = expression(*argument);
+          if (!value) return std::nullopt;
+          arguments.push_back(*value);
+        }
+        i.src1 = arguments.at(0);
+        if (arguments.size() > 1) i.src2 = arguments[1];
+        if (arguments.size() > 2) i.arguments = {arguments[2]};
+        i.dst = reg(i.opcode == Opcode::raw_alloc ? ValueType::raw_pointer :
+                    i.opcode == Opcode::raw_load ? ValueType::int32 : ValueType::void_type);
+        emit(i);
+        return i.dst;
+      }
       if (call == super_call_)
         return constant("0");
       if (const auto *selected = semantics_.resolved_call(*call)) {
@@ -1446,8 +1552,9 @@ private:
           if (argos::ir::payload_type(type) == ValueType::array ||
               argos::ir::payload_type(type) == ValueType::closure ||
               argos::ir::payload_type(type) == ValueType::object ||
+              argos::ir::payload_type(type) == ValueType::raw_pointer ||
               type == ValueType::void_type) {
-            error(*argument, "print exige int, bool, float, double ou string"); return std::nullopt;
+            error(*argument, "print exige valor escalar, char, string ou data imprimível"); return std::nullopt;
           }
           print_value(*value);
         }
@@ -1549,9 +1656,11 @@ private:
   }
 
   bool item_lower(const ast::BlockItem &node) {
+    if (const auto *unsafe = dynamic_cast<const ast::UnsafeBlockStatement *>(&node))
+      return block(*unsafe->block);
     if (const auto *variable = dynamic_cast<const ast::VariableDeclaration *>(&node)) {
       if (variable->type && !supported_type(variable->type.get())) {
-        error(node, "somente variáveis int, bool, float ou double são compiláveis");
+        error(node, "o tipo declarado não possui representação executável na IR");
         return false;
       }
       const auto type = variable->type
@@ -1560,7 +1669,7 @@ private:
                                    ? expression_type(*variable->initializer)
                                    : std::nullopt);
       if (!type) {
-        error(node, "a variável precisa ter tipo int, bool, float ou double para ser compilada");
+        error(node, "não foi possível determinar um tipo executável para a variável");
         return false;
       }
       const auto place = add_slot(*type);
@@ -1690,7 +1799,7 @@ private:
 
 } // namespace
 
-argos::ir::Module IrGenerator::generate(const ast::Program &program) {
+argos::ir::Module IrGenerator::generate(const ast::Program &program, bool optimize) {
   argos::ir::Module module;
   std::vector<const ast::FunctionDeclaration *> functions;
   ClassLayouts layouts;
@@ -1875,7 +1984,8 @@ argos::ir::Module IrGenerator::generate(const ast::Program &program) {
       adapter.name = "<adapter_" + std::to_string(id) + ">";
       adapter.return_type = target.return_type;
       adapter.parameter_types = {ValueType::closure};
-      adapter.parameter_types.insert(adapter.parameter_types.end(), target.parameter_types.begin(), target.parameter_types.end());
+      adapter.parameter_types.insert(adapter.parameter_types.end(), target.parameter_types.begin() + (item.bound ? 1 : 0), target.parameter_types.end());
+      if (item.bound) adapter.capture_types = {ValueType::object};
       adapter.parameter_count = static_cast<std::uint32_t>(adapter.parameter_types.size());
       if (adapter.parameter_count > 6)
         diagnostics_.emit(diagnostics::catalog::compiler::unsupported_lowering, program.span,
@@ -1886,10 +1996,24 @@ argos::ir::Module IrGenerator::generate(const ast::Program &program) {
       Instruction call;
       call.opcode = Opcode::call;
       call.function = *item.adapter;
-      for (std::size_t i = 0; i < target.parameter_types.size(); ++i) {
+      if (item.dispatch) {
+        call.opcode = Opcode::call_virtual;
+        call.constant = *item.dispatch;
+        call.function = module.virtual_functions[*item.dispatch];
+      }
+      if (item.bound) {
+        Instruction env;
+        env.opcode = Opcode::load_var; env.slot = 0; env.dst = adapter.register_count++;
+        adapter.register_types.push_back(ValueType::closure); block.instructions.push_back(env);
+        Instruction capture;
+        capture.opcode = Opcode::load_capture; capture.src1 = env.dst; capture.dst = adapter.register_count++;
+        adapter.register_types.push_back(ValueType::object); block.instructions.push_back(capture);
+        call.arguments.push_back(capture.dst);
+      }
+      for (std::size_t i = item.bound ? 1 : 0; i < target.parameter_types.size(); ++i) {
         Instruction load;
         load.opcode = Opcode::load_var;
-        load.slot = static_cast<Slot>(i + 1);
+        load.slot = static_cast<Slot>(i + (item.bound ? 0 : 1));
         load.dst = adapter.register_count++;
         adapter.register_types.push_back(target.parameter_types[i]);
         block.instructions.push_back(load);
@@ -1905,6 +2029,14 @@ argos::ir::Module IrGenerator::generate(const ast::Program &program) {
       adapter.blocks.push_back(block);
       module.functions.push_back(adapter);
     }
+  }
+  argos::ir::canonicalize_control_flow(module);
+  argos::ir::remove_unreachable_blocks(module);
+  if (!diagnostics_.has_errors()) {
+    if (const auto error = argos::ir::validate_module(module))
+      diagnostics_.emit(diagnostics::catalog::compiler::invalid_ir, program.span, *error);
+    else if (optimize)
+      argos::ir::optimize_module(module);
   }
   return module;
 }

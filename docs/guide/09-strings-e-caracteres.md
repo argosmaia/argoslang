@@ -8,7 +8,7 @@ function identity(_ text: string) -> string {
     return text
 }
 
-var greeting: string = identity("Oi!")
+let greeting: string = identity("Oi!")
 print(greeting)
 ```
 
@@ -50,7 +50,7 @@ tem duas linhas.""")
 O tipo `char` representa um único caractere. Use aspas simples:
 
 ```argos
-var letter: char = 'A'
+let letter: char = 'A'
 ```
 
 Um `char` não é uma palavra inteira. `'A'` é um caractere; `"A"` é uma string
@@ -61,7 +61,8 @@ O MVP executa strings normais e de várias linhas, inclusive escapes Unicode.
 `==` e `!=` comparam o conteúdo da string. Ainda não existe operador de
 concatenação.
 
-O tipo `char` é reconhecido pelo frontend, mas ainda não pode ser guardado e
-usado por um programa executável. Além disso, variáveis `string` ainda não
-continuam guardadas de uma entrada para outra no REPL; use-as dentro de uma
+`char` representa um escalar Unicode, executa na VM e no nativo, pode ser
+passado/retornado por funções e impresso. Na IR atual ele usa uma string UTF-8
+imutável com um único escalar; isso não define uma ABI C para caracteres.
+Variáveis `char` e `string` ainda não são preservadas entre entradas do REPL; use-as dentro de uma
 mesma entrada ou em um arquivo `.argos`.

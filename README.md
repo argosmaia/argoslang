@@ -1,13 +1,12 @@
 # ArgosLang Bootstrap
 
-Initial C++23 compiler skeleton for ArgosLang.
+C++23 compiler for the executable ArgosLang MVP.
 
 Current vertical slice:
 
 ```text
-source file → SourceManager → Lexer → Parser → AST → SemanticAnalyzer (Type Checker)
-                                          ↓                 ↓
-                                      AST Printer      diagnostics
+source → lexer → hybrid parser → AST → semantics → typed IR → validation
+                                                        → optimization → validation → VM / native backend
 ```
 
 The compiler supports variables, functions, classes, single inheritance,
@@ -17,9 +16,42 @@ computed properties, lambdas/closures, optionals and homogeneous arrays.
 These features execute in the VM and on native x86-64/Linux; see the
 [language guide](docs/guide/README.md) for syntax and current limits.
 `protocol` has been removed; use `interface` for contracts and `data` for
-immutable aggregates. The parser remains handwritten. The LR(1) generator,
-generics, modules, ownership, scope-based destruction and foreign executors
+immutable aggregates. Expressions use a canonical LR(2) engine; declarations,
+types, prefixes and postfixes still use handwritten parsing. Generics, automatic
+imports, Rust-style ownership/borrowing, scope-based destruction and foreign executors
 remain future work in the [general reference](docs/geral.md#gramatica).
+
+## Current implementation and limits
+
+- Declarations use `let name` or `let mut name`. The old `var` spelling is rejected.
+- VM and x86-64/Linux execute Unicode `char`, `byte`/`sbyte`/`short`/`ushort`,
+  nested arrays and bound method references. Narrow integer overflow traps;
+  `int` arithmetic wraps modulo 2^32, including negation of the minimum value.
+- `float` values round to binary32 at expression/assignment boundaries; the IR
+  transports these values in binary64 words. `double` remains binary64.
+- IR verification rejects missing terminators, undefined register/slot reads,
+  invalid control-flow edges, unknown opcodes and duplicate entry points.
+- `-O1` (default) folds local integer constants and branches, removes unreachable
+  blocks and unused non-trapping results. `-O0` disables optional optimizations.
+- `unsafe` gates `raw_alloc(int) -> ptr`, `raw_free(ptr) -> void`,
+  `raw_load(ptr, int) -> byte` and `raw_store(ptr, int, byte) -> void`.
+  A module may use manual raw memory or the existing arena, not both.
+  The arena is **not** Rust ownership/borrowing.
+- `--target=avr -S` emits scalar AVR assembly for ATmega328P. Functions,
+  six 32-bit arguments, calls, integer arithmetic, remainder, comparisons and
+  control flow are supported; heap, floating point and I/O are rejected.
+  Linking requires `avr-gcc`; hardware execution is not covered by the host tests.
+- Full LR(2) parsing of declarations/types, all 64-bit/unsigned integer types,
+  C/C++ pointer/FFI/MMIO facilities and Rust-style lifetimes remain unfinished.
+
+Examples: `examples/minimal_extended_values.argos`,
+`examples/minimal_raw_memory.argos`, `examples/minimal_avr.argos`.
+
+```bash
+argosc run examples/minimal_extended_values.argos -O0
+argosc compile examples/minimal_raw_memory.argos -O1 -o raw-memory
+argosc compile examples/minimal_avr.argos --target=avr -S -o firmware.s
+```
 
 ## Requirements on Ubuntu/Pop!_OS
 
@@ -32,6 +64,7 @@ sudo apt install -y \
   clang-tidy \
   cmake \
   libicu-dev \
+  libreadline-dev \
   ninja-build \
   git \
   gdb \

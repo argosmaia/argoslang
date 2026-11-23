@@ -12,7 +12,7 @@ TEST_CASE("catalog diagnostics retain title, explanation, and help") {
   argos::diagnostics::DiagnosticEngine diagnostics;
   argos::source::SourceFile source{
       .path = std::filesystem::path{"test.argos"},
-      .content = "var value: int;"};
+      .content = "let value: int;"};
   const auto *definition =
       argos::diagnostics::catalog::semantic::find_definition("ARGOS-S0301");
   REQUIRE(definition != nullptr);

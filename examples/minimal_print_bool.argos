@@ -1,5 +1,5 @@
 function main() -> int {
-    var flag: bool = true
+    let flag: bool = true
     print(flag)
     return 0
 }

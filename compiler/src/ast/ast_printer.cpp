@@ -8,7 +8,7 @@ namespace argos::ast {
 namespace {
 
 std::string_view mutability_name(Mutability mutability) noexcept {
-    return mutability == Mutability::mutable_ ? "var mut" : "var";
+    return mutability == Mutability::mutable_ ? "let mut" : "let";
 }
 
 std::string_view unary_operator_name(UnaryOperator op) noexcept {

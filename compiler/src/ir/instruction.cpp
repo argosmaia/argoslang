@@ -2,6 +2,12 @@
 namespace argos::ir {
 const char* opcode_name(Opcode o) noexcept {
  switch(o){
+ case Opcode::check_narrow:return "CHECK_NARROW";
+ case Opcode::raw_alloc:return "RAW_ALLOC";
+ case Opcode::raw_free:return "RAW_FREE";
+ case Opcode::raw_load:return "RAW_LOAD";
+ case Opcode::raw_store:return "RAW_STORE";
+ case Opcode::round_float:return "ROUND_FLOAT";
  case Opcode::make_nil:
    return "MAKE_NIL";
  case Opcode::make_optional:

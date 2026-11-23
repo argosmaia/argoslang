@@ -1,6 +1,6 @@
 function main() -> int {
-    var mut index: int = 0
-    var mut total: int = 0
+    let mut index: int = 0
+    let mut total: int = 0
     while index < 6 {
         index = index + 1
         if index == 2 continue

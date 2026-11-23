@@ -18,7 +18,7 @@ Seus objetivos centrais são:
 - oferecer uma experiência segura e expressiva no modo normal;
 - manter desempenho e uso de memória previsíveis;
 - permitir execução rápida por VM durante desenvolvimento, scripts e REPL;
-- permitir compilação AOT portátil por C;
+- permitir compilação AOT por backends próprios; C permanece uma fronteira de interoperabilidade;
 - permitir geração nativa direta para controle rigoroso da máquina;
 - suportar acesso a memória, registradores, MMIO e assembly somente em regiões explicitamente inseguras;
 - preservar uma arquitetura modular, apesar de o compilador poder ser distribuído como um único processo.
@@ -57,12 +57,13 @@ O frontend transforma texto em uma AST válida e tipada. A IR Argos funciona com
 
 As duas rotas são irmãs. C, C++, Rust e Swift não são destinos de transpilação nem etapas internas da compilação. Essas linguagens, assim como Assembly, pertencem exclusivamente à camada de interoperabilidade. No desenho-alvo, a VM consumirá bytecode; hoje ela executa a IR diretamente. O backend nativo consome a IR e gera assembly sem transpilar ArgosLang para C, C++, LLVM ou outra linguagem intermediária.
 
-### 4.1. Estado implementado em 22 de outubro de 2026
+### 4.1. Estado implementado em 23 de novembro de 2026
 
 O estado acima é a direção arquitetural; não descreve tudo o que já existe:
 
-- O parser é manual e usa precedência de operadores. LR(1) é uma meta futura,
-  não o algoritmo atual.
+- O motor LR(2) canônico já existe e reconhece expressões infixas com uma gramática
+  declarativa. Declarações, tipos, prefixos e postfixos continuam manuais; a migração
+  completa do frontend permanece pendente.
 - O frontend gera uma IR tipada e validada para o subconjunto do MVP.
 - A VM executa essa IR diretamente. Ainda não há bytecode binário separado:
   `BytecodeEmitter` produz apenas texto para inspeção.
@@ -70,8 +71,14 @@ O estado acima é a direção arquitetural; não descreve tudo o que já existe:
   `cc` somente para montar e ligar o executável.
 - `run`, `compile` e REPL compartilham frontend, análise semântica e lowering.
   O REPL mantém o estado reconstruindo entradas no mesmo executor VM.
-- ARM64, RISC-V e AVR permanecem backends planejados; não são destinos
-  funcionais nesta versão.
+- AVR possui um perfil escalar para ATmega328P, selecionado com `--target=avr`.
+  Gera assembly para funções, chamadas e inteiros de 32 bits; não cobre heap, reais
+  ou I/O. ARM64 e RISC-V permanecem esboços.
+- A IR é normalizada em blocos com sucessores explícitos; o verificador exige
+  definição de valores em todos os predecessores alcançáveis. Otimizações locais
+  são validadas nas duas fronteiras.
+- Memória manual `raw_*` exige `unsafe` e não pode ser misturada com a arena.
+  Ownership, borrowing, lifetimes e destruição por escopo ainda não existem.
 
 ## 5. Análise léxica
 
@@ -95,15 +102,15 @@ Novas formas sintáticas somente devem entrar na gramática depois de seu vocabu
 
 ### 6.1. Decisão principal
 
-O parser recomendado é **LR canônico com um símbolo de lookahead, isto é, LR(1)**, gerado a partir de uma gramática declarativa.
+O parser recomendado é **LR canônico com dois símbolos de lookahead, isto é, LR(2)**, gerado a partir de uma gramática declarativa.
 
-Essa escolha oferece poder de reconhecimento maior que LL(1) e, em geral, maior precisão que SLR(1) e LALR(1), porque mantém contextos LR(1) distintos em vez de fundi-los. Ela é adequada a uma linguagem que pretende crescer com declarações complexas, argumentos nomeados, genéricos, padrões, operadores, tipos compostos e construções de baixo nível.
+Essa escolha oferece poder de reconhecimento maior que LL(1) e, em geral, maior precisão que SLR(2) e LALR(2), porque mantém contextos LR(2) distintos em vez de fundi-los. Ela é adequada a uma linguagem que pretende crescer com declarações complexas, argumentos nomeados, genéricos, padrões, operadores, tipos compostos e construções de baixo nível.
 
 O custo é uma tabela de estados maior e maior disciplina na escrita da gramática. Esse custo é aceitável para o compilador hospedado em PC. Para toolchains extremamente restritas, a tabela pode ser comprimida ou o parser pode ser executado apenas no host que gera o firmware.
 
 ### 6.2. Alternativa futura
 
-GLR deve ser reservado para o caso de a linguagem aceitar ambiguidade intencional ou gramáticas que não possam ser resolvidas satisfatoriamente com LR(1). Ele não deve ser o padrão, pois aumenta o custo, pode produzir florestas de parsing e transfere ambiguidades para fases posteriores.
+GLR deve ser reservado para o caso de a linguagem aceitar ambiguidade intencional ou gramáticas que não possam ser resolvidas satisfatoriamente com LR(2). Ele não deve ser o padrão, pois aumenta o custo, pode produzir florestas de parsing e transfere ambiguidades para fases posteriores.
 
 ### 6.3. Gramática declarativa
 
@@ -565,9 +572,9 @@ Testes cruzados devem verificar tamanho de imagem, uso de RAM, layout, acesso vo
 
 Fechar o léxico, a terminologia, os tipos primitivos, `string`, Unicode, terminadores, argumentos nomeados, operadores de opcionais e a divisão entre safe, unsafe e raw.
 
-### Capítulo II — Gramática LR(1)
+### Capítulo II — Gramática LR(2)
 
-Converter a EBNF em gramática declarativa canônica, declarar precedência e associatividade, eliminar conflitos e definir recuperação de erros. Adotar LR(1) como padrão e medir o tamanho das tabelas.
+Converter a EBNF em gramática declarativa canônica, declarar precedência e associatividade, eliminar conflitos e definir recuperação de erros. Adotar LR(2) como padrão e medir o tamanho das tabelas.
 
 ### Capítulo III — CST, AST e HIR
 
@@ -643,7 +650,7 @@ Uma funcionalidade executável somente é considerada entregue quando percorre o
 
 ## 27. Síntese final
 
-A ArgosLang deve evoluir como uma linguagem híbrida com um único frontend semântico e uma IR própria. O parser LR(1) fornece espaço de crescimento gramatical sem acoplar a AST ao mecanismo de análise. A VM oferece portabilidade e iteração rápida; o backend de máquina produz código nativo diretamente, sem transpilação por C, C++ ou LLVM. C, C++, Rust, Swift e Assembly aparecem somente como linguagens interoperáveis por executores e FFI. `unsafe`, raw, FFI e assembly são extensões controladas do núcleo tipado, não atalhos que anulam seus contratos.
+A ArgosLang deve evoluir como uma linguagem híbrida com um único frontend semântico e uma IR própria. O parser LR(2) fornece espaço de crescimento gramatical sem acoplar a AST ao mecanismo de análise. A VM oferece portabilidade e iteração rápida; o backend de máquina produz código nativo diretamente, sem transpilação por C, C++ ou LLVM. C, C++, Rust, Swift e Assembly aparecem somente como linguagens interoperáveis por executores e FFI. `unsafe`, raw, FFI e assembly são extensões controladas do núcleo tipado, não atalhos que anulam seus contratos.
 
 O princípio orientador é simples: primeiro tornar o significado da linguagem inequívoco; depois representá-lo em uma IR verificável; por fim executar a mesma semântica, com fidelidade, em cada backend.
 

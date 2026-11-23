@@ -5,6 +5,19 @@ função. Para os comandos do compilador, consulte
 [Ferramentas e diagnósticos](08-ferramentas-e-diagnosticos.md); para erros de
 opcionais e arrays, consulte [null-safety](11-null-safety-e-opcionais.md#diagnosticos-erros-opcionais).
 
+## Novos diagnósticos de IR e memória
+
+| Código | Significado |
+| --- | --- |
+| `ARGOS-C0003` | O lowering produziu IR inválida; a execução é bloqueada. |
+| `ARGOS-S0700` | A operação `raw_*` exige um bloco `unsafe` lexical. |
+| `ARGOS-S0701` | Nome reservado, quantidade/rótulo/tipo de argumento inválido em intrínseco de memória. |
+| `ARGOS-S0702` | O módulo mistura memória manual e arena gerenciada. |
+
+`var` gera erro de parsing com orientação para usar `let` ou `let mut`.
+Operações de memória liberada, liberação duplicada, índice inválido e overflow
+em inteiros estreitos geram falha de runtime com status 70.
+
 ## Índice
 
 - [Sistema de diagnósticos ArgosLang](#diagnosticos)
@@ -64,8 +77,8 @@ variável, tipo ou rótulo, sem alterar o contrato do código.
 | Código | Caso | Exemplo inválido |
 | --- | --- | --- |
 | `ARGOS-P0001` | sequência sintática inesperada | `function main( {` |
-| `ARGOS-P0002` | identificador iniciado por número | `var 1total: int = 0` |
-| `ARGOS-P0003` | palavra reservada usada como nome | `var function: int = 0` |
+| `ARGOS-P0002` | identificador iniciado por número | `let 1total: int = 0` |
+| `ARGOS-P0003` | palavra reservada usada como nome | `let function: int = 0` |
 | `ARGOS-P0004` | keyword incompleta/desconhecida | `functio main() -> void {}` |
 
 Delimitadores seguem a gramática: `()` delimitam argumentos, parâmetros e

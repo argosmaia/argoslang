@@ -52,7 +52,9 @@ char** repl_completion(const char* text, int start, int end) {
 
 void print_usage(std::string_view executable) {
   std::cerr
-      << "ArgosLang compiler bootstrap\n\n"
+      << "ArgosLang compiler\n\n"
+      << "Opções: -O0 (sem otimização), -O1 (padrão), "
+         "--target=x86_64-linux, --target=avr (ATmega328P escalar)\n\n"
       << "Uso:\n"
       << "  " << executable
       << " lex <arquivo.argos>    - Analisa os tokens lexicais do arquivo\n"
@@ -105,7 +107,7 @@ int run_repl() {
             std::cout << "Digite uma expressão, instrução ou função, por exemplo:\n"
                       << "  6 * 7\n"
                       << "  print(\"Oi\")\n"
-                      << "  var total: int = 10\n"
+                      << "  let total: int = 10\n"
                       << "  if true { print(\"ok\") }\n"
                       << "  function twice(_ value: int) -> int { return value * 2 }\n"
                       << "Use :reset para limpar a sessão.\n";
@@ -128,6 +130,18 @@ int run_repl() {
 } // namespace
 
 int main(int argc, char** argv) {
+    bool optimize = true;
+    auto target = argos::driver::Target::x86_64_linux;
+    int filtered_count = 1;
+    for (int n = 1; n < argc; ++n) {
+      const std::string_view argument{argv[n]};
+      if (argument == "-O0") optimize = false;
+      else if (argument == "-O1") optimize = true;
+      else if (argument == "--target=avr") target = argos::driver::Target::avr_atmega328p;
+      else if (argument == "--target=x86_64-linux") target = argos::driver::Target::x86_64_linux;
+      else argv[filtered_count++] = argv[n];
+    }
+    argc = filtered_count;
     if (argc < 2) {
         print_usage(argc > 0 ? argv[0] : "argosc");
         return 64;
@@ -310,12 +324,12 @@ int main(int argc, char** argv) {
         }
         if (command == "compile" && success && !diagnostics.has_errors()) {
             argos::codegen::ir::IrGenerator generator{diagnostics, analyzer};
-            const auto module = generator.generate(program);
+            const auto module = generator.generate(program, optimize);
             if (!diagnostics.has_errors()) {
                 std::string compile_error;
                 const int result = assembly_only
-                    ? argos::driver::emit_assembly(module, output_path, compile_error)
-                    : argos::driver::compile_native(module, output_path, compile_error);
+                    ? argos::driver::emit_assembly(module, output_path, compile_error, target)
+                    : argos::driver::compile_native(module, output_path, compile_error, target);
                 if (result != 0) {
                     std::cerr << "argosc: " << compile_error << '\n';
                     return result;
@@ -325,7 +339,7 @@ int main(int argc, char** argv) {
         }
         if (command == "run" && success && !diagnostics.has_errors()) {
             argos::codegen::ir::IrGenerator generator{diagnostics, analyzer};
-            const auto module = generator.generate(program);
+            const auto module = generator.generate(program, optimize);
             if (!diagnostics.has_errors()) {
                 try {
                     argos::vm::VM vm;

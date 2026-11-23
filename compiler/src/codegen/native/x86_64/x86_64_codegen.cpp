@@ -39,6 +39,7 @@ bool pointer_type(argos::ir::ValueType type) {
          argos::ir::payload_type(type) == argos::ir::ValueType::array ||
          type == argos::ir::ValueType::string ||
          type == argos::ir::ValueType::closure ||
+         type == argos::ir::ValueType::raw_pointer ||
          type == argos::ir::ValueType::object;
 }
 
@@ -83,10 +84,15 @@ void validate(const argos::ir::Module &module, const argos::ir::Function &functi
   case Opcode::make_closure:
   case Opcode::load_capture:
   case Opcode::check_uint8:
+  case Opcode::check_narrow:
   case Opcode::hash_scalar:
   case Opcode::stringify_scalar:
   case Opcode::concat_strings:
   case Opcode::call_closure:
+  case Opcode::raw_alloc:
+  case Opcode::raw_free:
+  case Opcode::raw_load:
+  case Opcode::raw_store:
     // Full structural validation is performed by validate_module.
     break;
   case Opcode::load_const:
@@ -102,6 +108,7 @@ void validate(const argos::ir::Module &module, const argos::ir::Function &functi
   case Opcode::neg:
   case Opcode::logical_not:
   case Opcode::int_to_double:
+  case Opcode::round_float:
     valid_reg(instruction.dst); valid_reg(instruction.src1); break;
   case Opcode::add:
   case Opcode::sub:
@@ -161,6 +168,11 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
   bool uses_modulo = false;
   bool uses_closures = !m.objects.empty();
   bool uses_data = false;
+  bool uses_raw = false;
+  for (const auto &function : m.functions) for (const auto &block : function.blocks)
+    for (const auto &i : block.instructions)
+      uses_raw = uses_raw || i.opcode == argos::ir::Opcode::raw_alloc || i.opcode == argos::ir::Opcode::raw_free ||
+                             i.opcode == argos::ir::Opcode::raw_load || i.opcode == argos::ir::Opcode::raw_store;
   for (const auto &function : m.functions)
     for (const auto &block : function.blocks)
       for (const auto &instruction : block.instructions)
@@ -337,6 +349,30 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
     << "  movq %rdi, -8(%rbp)\n  call strlen@PLT\n  movq %rax, %rdx\n"
     << "  movq -8(%rbp), %rsi\n  movl $2, %edi\n  call write@PLT\n"
     << "  movl $70, %edi\n  call exit@PLT\n  ud2\n";
+  o << ".section .rodata\n.Largos_integer_range_message:\n  .string \"inteiro fora do intervalo do tipo\\n\"\n.text\n";
+  if (uses_raw) {
+    o << ".bss\n.p2align 3\n.Largos_raw_head:\n  .zero 8\n.section .rodata\n"
+         ".Largos_raw_message:\n  .string \"operação de memória manual inválida\\n\"\n.text\n"
+         ".Largos_raw_error:\n  leaq .Largos_raw_message(%rip), %rdi\n  jmp .Largos_optional_error\n"
+         ".Largos_raw_alloc:\n  pushq %rbp\n  movq %rsp, %rbp\n  subq $32, %rsp\n"
+         "  testl %edi, %edi\n  jle .Largos_raw_error\n  movslq %edi, %rdi\n  movq %rdi, -8(%rbp)\n"
+         "  movl $1, %esi\n  call calloc@PLT\n  testq %rax, %rax\n  je .Largos_raw_error\n"
+         "  movq %rax, -16(%rbp)\n  movl $24, %edi\n  call malloc@PLT\n  testq %rax, %rax\n  jne .Largos_raw_alloc_ok\n"
+         "  movq -16(%rbp), %rdi\n  call free@PLT\n  jmp .Largos_raw_error\n"
+         ".Largos_raw_alloc_ok:\n  movq .Largos_raw_head(%rip), %rcx\n  movq %rcx, (%rax)\n"
+         "  movq -8(%rbp), %rcx\n  movq %rcx, 8(%rax)\n  movq -16(%rbp), %rcx\n  movq %rcx, 16(%rax)\n"
+         "  movq %rax, .Largos_raw_head(%rip)\n  leave\n  ret\n"
+         ".Largos_raw_free:\n  testq %rdi, %rdi\n  je .Largos_raw_error\n  movq 16(%rdi), %rax\n"
+         "  testq %rax, %rax\n  je .Largos_raw_error\n  movq $0, 16(%rdi)\n  movq %rax, %rdi\n  jmp free@PLT\n"
+         ".Largos_raw_access:\n  testq %rdi, %rdi\n  je .Largos_raw_error\n  movq 16(%rdi), %rax\n"
+         "  testq %rax, %rax\n  je .Largos_raw_error\n  movslq %esi, %rsi\n  cmpq 8(%rdi), %rsi\n  jae .Largos_raw_error\n"
+         "  addq %rsi, %rax\n  ret\n"
+         ".Largos_raw_release:\n  pushq %rbp\n  movq %rsp, %rbp\n  subq $16, %rsp\n"
+         ".Largos_raw_release_loop:\n  movq .Largos_raw_head(%rip), %rax\n  testq %rax, %rax\n  je .Largos_raw_release_done\n"
+         "  movq %rax, -8(%rbp)\n  movq 16(%rax), %rdi\n  call free@PLT\n  movq -8(%rbp), %rdi\n"
+         "  movq (%rdi), %rax\n  movq %rax, .Largos_raw_head(%rip)\n  call free@PLT\n  jmp .Largos_raw_release_loop\n"
+         ".Largos_raw_release_done:\n  leave\n  ret\n";
+  }
   for (const auto &f : m.functions) {
     const auto name = symbol(f);
     const auto stack_bytes = static_cast<std::uint64_t>(f.slot_count + f.register_count) * 8;
@@ -345,6 +381,8 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
     o << ".type " << name << ", @function\n"
       << name << ":\n  pushq %rbp\n  movq %rsp, %rbp\n";
     if (aligned != 0) o << "  subq $" << aligned << ", %rsp\n";
+    if (uses_raw && f.name == "main")
+      o << "  leaq .Largos_raw_release(%rip), %rdi\n  call atexit@PLT\n";
     if (uses_closures && f.name == "main")
       o << "  leaq .Largos_release(%rip), %rdi\n  call atexit@PLT\n";
     static constexpr const char *integer_argument_registers[] = {
@@ -449,6 +487,17 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
                                                         : ".Largos_format_int")
               << "\n";
           o << "  movq %rax, " << register_address(f, i.dst) << "\n";
+          break;
+        }
+        case Opcode::check_narrow: {
+          const auto bits = i.count & 255u;
+          const auto low = i.count & 256u ? 0 : -(1 << (bits - 1));
+          const auto high = i.count & 256u ? (1 << bits) - 1 : (1 << (bits - 1)) - 1;
+          const auto stem = ".Largos_range_" + std::to_string(f.id) + "_" + std::to_string(dispatch_site++);
+          o << "  movl " << register_address(f, i.src1) << ", %eax\n  cmpl $" << low << ", %eax\n  jl " << stem << "_error\n"
+            << "  cmpl $" << high << ", %eax\n  jle " << stem << "_ok\n" << stem << "_error:\n"
+            << "  leaq .Largos_integer_range_message(%rip), %rdi\n  call .Largos_optional_error\n" << stem << "_ok:\n"
+            << "  movslq %eax, %rax\n  movq %rax, " << register_address(f, i.dst) << "\n";
           break;
         }
         case Opcode::check_uint8: {
@@ -570,6 +619,30 @@ std::string CodeGenerator::generate(const argos::ir::Module &m) {
           o << "  movq %rax, " << register_address(f, i.dst) << "\n";
           break;
         }
+        case Opcode::raw_alloc:
+          o << "  movl " << register_address(f, i.src1) << ", %edi\n  call .Largos_raw_alloc\n  movq %rax, "
+            << register_address(f, i.dst) << "\n";
+          break;
+        case Opcode::raw_free:
+          o << "  movq " << register_address(f, i.src1) << ", %rdi\n  call .Largos_raw_free\n  movq $0, "
+            << register_address(f, i.dst) << "\n";
+          break;
+        case Opcode::raw_load:
+        case Opcode::raw_store:
+          o << "  movq " << register_address(f, i.src1) << ", %rdi\n  movl " << register_address(f, i.src2)
+            << ", %esi\n  call .Largos_raw_access\n";
+          if (i.opcode == Opcode::raw_load)
+            o << "  movzbl (%rax), %eax\n  movq %rax, " << register_address(f, i.dst) << "\n";
+          else {
+            o << "  movq " << register_address(f, i.arguments.front()) << ", %rcx\n  cmpq $255, %rcx\n  ja .Largos_raw_error\n"
+              << "  movb %cl, (%rax)\n  movq $0, " << register_address(f, i.dst) << "\n";
+          }
+          break;
+        case Opcode::round_float:
+          o << "  movq " << register_address(f, i.src1)
+            << ", %xmm0\n  cvtsd2ss %xmm0, %xmm0\n  cvtss2sd %xmm0, %xmm0\n  movq %xmm0, %rax\n  movq %rax, "
+            << register_address(f, i.dst) << "\n";
+          break;
         case Opcode::load_const:
           if (f.register_types[i.dst] == argos::ir::ValueType::float64) {
             o << "  movsd .Largos_double_" << i.constant

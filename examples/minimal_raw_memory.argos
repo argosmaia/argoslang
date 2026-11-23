@@ -1,0 +1,21 @@
+function write(_ memory: ptr, _ offset: int, _ value: byte) -> void {
+    unsafe { raw_store(memory, offset, value) }
+}
+function main() -> int {
+    unsafe {
+        let memory: ptr = raw_alloc(4)
+        let alias = memory
+        let zero: byte = 0
+        let answer: byte = 42
+        let max: byte = 255
+        if raw_load(memory, 0) != zero return 1
+        write(alias, 0, 42)
+        raw_store(memory, 3, 255)
+        let value: byte = raw_load(memory, 0)
+        let tail: byte = raw_load(alias, 3)
+        raw_free(memory)
+        if value != answer return 2
+        if tail != max return 3
+    }
+    return 0
+}

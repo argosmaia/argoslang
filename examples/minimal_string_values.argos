@@ -3,7 +3,7 @@ function identity(_ value: string, _ marker: int, _ ratio: double) -> string {
 }
 
 function main() -> int {
-    var message: string = identity("ol\u{e1}", 3, 1.5)
+    let message: string = identity("ol\u{e1}", 3, 1.5)
     print(message)
 
     if message == "olá" {

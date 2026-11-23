@@ -1,11 +1,95 @@
 #include "argos/ir/validator.hpp"
+#include "argos/ir/instruction_traits.hpp"
 
+#include <algorithm>
 #include <charconv>
 #include <cstdint>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace argos::ir {
 namespace {
+
+std::optional<std::string> validate_flow(const Function &function) {
+  const auto size = function.blocks.size();
+  std::unordered_map<LabelId, std::size_t> indices;
+  for (std::size_t n = 0; n < size; ++n)
+    indices.emplace(function.blocks[n].label, n);
+  std::vector<std::vector<std::size_t>> successors(size), predecessors(size);
+  for (std::size_t n = 0; n < size; ++n) {
+    const auto &instructions = function.blocks[n].instructions;
+    if (instructions.empty()) return "bloco vazio sem terminador";
+    for (std::size_t p = 0; p < instructions.size(); ++p) {
+      const auto &i = instructions[p];
+      if ((i.opcode == Opcode::ret || i.opcode == Opcode::jmp) &&
+          p + 1 != instructions.size())
+        return "instrução após terminador de bloco";
+      if (i.opcode == Opcode::jmp_if_false &&
+          (p + 2 != instructions.size() ||
+           instructions.back().opcode != Opcode::jmp))
+        return "desvio condicional exige dois sucessores explícitos";
+      if (i.opcode == Opcode::jmp || i.opcode == Opcode::jmp_if_false) {
+        if (!indices.contains(i.label)) return "sucessor de bloco inexistente";
+        const auto target = indices.at(i.label);
+        successors[n].push_back(target);
+        predecessors[target].push_back(n);
+      }
+    }
+    if (instructions.back().opcode != Opcode::ret &&
+        instructions.back().opcode != Opcode::jmp)
+      return "bloco sem terminador";
+  }
+  std::vector<bool> reachable(size, false);
+  std::vector<std::size_t> pending{0};
+  while (!pending.empty()) {
+    const auto n = pending.back(); pending.pop_back();
+    if (reachable[n]) continue;
+    reachable[n] = true;
+    for (const auto target : successors[n]) pending.push_back(target);
+  }
+  const auto width = static_cast<std::size_t>(function.register_count) + function.slot_count;
+  using Definitions = std::vector<bool>;
+  Definitions entry(width, false);
+  for (std::size_t p = 0; p < function.parameter_count; ++p)
+    entry[function.register_count + p] = true;
+  std::vector<Definitions> inputs(size, Definitions(width, true));
+  std::vector<Definitions> outputs(size, Definitions(width, true));
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    for (std::size_t n = 0; n < size; ++n) {
+      if (!reachable[n]) continue;
+      auto in = n == 0 ? entry : Definitions(width, true);
+      if (n != 0)
+        for (const auto predecessor : predecessors[n])
+          if (reachable[predecessor])
+            for (std::size_t bit = 0; bit < width; ++bit)
+              in[bit] = in[bit] && outputs[predecessor][bit];
+      auto out = in;
+      for (const auto &i : function.blocks[n].instructions) {
+        if (writes_register(i.opcode)) out[i.dst] = true;
+        if (i.opcode == Opcode::store_var) out[function.register_count + i.slot] = true;
+      }
+      if (in != inputs[n] || out != outputs[n]) {
+        inputs[n] = std::move(in); outputs[n] = std::move(out); changed = true;
+      }
+    }
+  }
+  for (std::size_t n = 0; n < size; ++n) {
+    if (!reachable[n]) return "bloco inalcançável deve ser removido antes da validação";
+    auto defined = inputs[n];
+    for (const auto &i : function.blocks[n].instructions) {
+      bool valid = true;
+      visit_register_reads(i, [&](Register r) { valid = valid && defined[r]; });
+      if (!valid) return "registrador lido antes de ser definido em todos os caminhos";
+      if (i.opcode == Opcode::load_var && !defined[function.register_count + i.slot])
+        return "slot lido antes de ser inicializado em todos os caminhos";
+      if (writes_register(i.opcode)) defined[i.dst] = true;
+      if (i.opcode == Opcode::store_var) defined[function.register_count + i.slot] = true;
+    }
+  }
+  return std::nullopt;
+}
 
 std::optional<std::string> validate_function(const Module &module,
                                              const Function &function) {
@@ -61,6 +145,34 @@ std::optional<std::string> validate_function(const Module &module,
   for (const auto &block : function.blocks) {
     for (const auto &instruction : block.instructions) {
       switch (instruction.opcode) {
+      case Opcode::check_narrow:
+        if (!has_register_type(instruction.src1, ValueType::int32) ||
+            !has_register_type(instruction.dst, ValueType::int32) ||
+            (instruction.count != 8 && instruction.count != 16 && instruction.count != 272))
+          return "checagem de inteiro estreito inválida";
+        break;
+      case Opcode::raw_alloc:
+        if (!has_register_type(instruction.src1, ValueType::int32) ||
+            !has_register_type(instruction.dst, ValueType::raw_pointer))
+          return "alocação manual exige tamanho int e resultado ptr";
+        break;
+      case Opcode::raw_free:
+        if (!has_register_type(instruction.src1, ValueType::raw_pointer) ||
+            !has_register_type(instruction.dst, ValueType::void_type))
+          return "liberação manual exige ptr e resultado void";
+        break;
+      case Opcode::raw_load:
+      case Opcode::raw_store:
+        if (!has_register_type(instruction.src1, ValueType::raw_pointer) ||
+            !has_register_type(instruction.src2, ValueType::int32))
+          return "acesso manual exige ptr e deslocamento int";
+        if (instruction.opcode == Opcode::raw_load) {
+          if (!has_register_type(instruction.dst, ValueType::int32)) return "leitura manual exige resultado inteiro";
+        } else if (instruction.arguments.size() != 1 ||
+                   !has_register_type(instruction.arguments.front(), ValueType::int32) ||
+                   !has_register_type(instruction.dst, ValueType::void_type))
+          return "escrita manual exige valor inteiro e resultado void";
+        break;
       case Opcode::check_uint8:
         if (!has_register_type(instruction.src1, ValueType::int32) ||
             !has_register_type(instruction.dst, ValueType::int32))
@@ -165,6 +277,8 @@ std::optional<std::string> validate_function(const Module &module,
                 std::from_chars(text.data(), text.data() + text.size(), value);
             if (error != std::errc{} || end != text.data() + text.size())
               return "constante numérica inválida";
+            if (register_type(instruction.dst) == ValueType::boolean && value != 0 && value != 1)
+              return "constante bool deve ser 0 ou 1";
           }
         }
         break;
@@ -197,6 +311,11 @@ std::optional<std::string> validate_function(const Module &module,
         if (!has_register_type(instruction.dst, ValueType::float64) ||
             !has_register_type(instruction.src1, ValueType::int32))
           return "conversão exige origem int e destino double";
+        break;
+      case Opcode::round_float:
+        if (!has_register_type(instruction.dst, ValueType::float64) ||
+            !has_register_type(instruction.src1, ValueType::float64))
+          return "arredondamento binary32 exige representação real";
         break;
       case Opcode::logical_not:
         if (!has_register_type(instruction.dst, ValueType::boolean) ||
@@ -368,10 +487,12 @@ std::optional<std::string> validate_function(const Module &module,
         break;
       case Opcode::c_embed:
         return "opcode ainda não pertence ao subconjunto executável";
+      default:
+        return "opcode desconhecido";
       }
     }
   }
-  return std::nullopt;
+  return validate_flow(function);
 }
 
 } // namespace
@@ -379,6 +500,17 @@ std::optional<std::string> validate_function(const Module &module,
 std::optional<std::string> validate_module(const Module &module) {
   if (module.functions.empty())
     return "módulo sem funções";
+
+  bool manual = false, managed = !module.objects.empty();
+  for (const auto &function : module.functions) for (const auto &block : function.blocks)
+    for (const auto &i : block.instructions) {
+      manual = manual || i.opcode == Opcode::raw_alloc || i.opcode == Opcode::raw_free ||
+                         i.opcode == Opcode::raw_load || i.opcode == Opcode::raw_store;
+      managed = managed || i.opcode == Opcode::new_object || i.opcode == Opcode::make_closure ||
+                           i.opcode == Opcode::make_array || i.opcode == Opcode::make_optional ||
+                           i.opcode == Opcode::concat_strings || i.opcode == Opcode::stringify_scalar;
+    }
+  if (manual && managed) return "memória manual e arena gerenciada não podem coexistir no mesmo módulo";
 
   for (const auto representative : module.virtual_functions)
     if (representative >= module.functions.size())
@@ -392,10 +524,17 @@ std::optional<std::string> validate_module(const Module &module) {
       if (!owned.insert(field).second || field >= layout.fields.size() ||
           layout.fields[field] != ValueType::object)
         return "campo de composição exclusiva inválido";
+    std::unordered_set<std::uint32_t> ancestors;
+    for (const auto ancestor : layout.ancestors)
+      if (!ancestors.insert(ancestor).second)
+        return "ancestral duplicado";
     for (const auto ancestor : layout.ancestors) {
       if (ancestor >= module.objects.size() || ancestor == id)
         return "ancestral inválido";
       const auto &base = module.objects[ancestor];
+      for (const auto inherited : base.ancestors)
+        if (inherited == id || !ancestors.contains(inherited))
+          return "ciclo ou cadeia incompleta de ancestrais";
       for (const auto field : base.owned_fields)
         if (!owned.contains(field))
           return "ownership herdado incompleto";
@@ -435,6 +574,7 @@ std::optional<std::string> validate_module(const Module &module) {
     if (function.id != index)
       return "identificador de função inconsistente";
     if (function.name == "main") {
+      if (has_entry) return "múltiplas funções main";
       has_entry = true;
       if (function.parameter_count != 0 ||
           (function.return_type != ValueType::int32 &&

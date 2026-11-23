@@ -1,21 +1,21 @@
 class Gauge {
-    private var mut raw: double = 0;
-    private var mut text: string = "initial";
+    private let mut raw: double = 0;
+    private let mut text: string = "initial";
 
     public construct(_ initial: double) { this.raw = initial; }
 
-    public var mut reading: double {
+    public let mut reading: double {
         getter() { print("get"); return this.raw; }
         setter(incoming) { print("set"); this.raw = incoming; }
     }
-    public var mut title: string {
+    public let mut title: string {
         getter() { return this.text; }
         setter() { this.text = value; }
     }
-    public var active: bool {
+    public let active: bool {
         getter() { return this.raw > 0; }
     }
-    public var mut operation: (int) -> int {
+    public let mut operation: (int) -> int {
         getter() { return (x: int) => x + 1; }
         setter() { print(value(2)); }
     }
@@ -25,7 +25,7 @@ class Gauge {
 function operation(_ x: int) -> int { return 99; }
 function rhs() -> int { print("rhs"); return 2; }
 function main() -> int {
-    var gauge = new Gauge(3);
+    let gauge = new Gauge(3);
     gauge.target().reading += rhs();
     print(gauge.reading);
     gauge.reading /= 2;
@@ -33,7 +33,7 @@ function main() -> int {
     gauge.title = "updated";
     print(gauge.title);
     print(gauge.active);
-    var callback = gauge.operation;
+    let callback = gauge.operation;
     print(callback(4));
     gauge.operation = (x: int) => x * 3;
     print(gauge.apply());

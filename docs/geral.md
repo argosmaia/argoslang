@@ -10,6 +10,69 @@ O [MVP](#mvp) e o guia descrevem o suporte executável. A gramática e os planos
 incluem recursos futuros. As decisões ADR preservam o histórico; em caso de
 divergência, prevalecem a arquitetura atual e o contrato executável do MVP.
 
+## Implementação verificada — 23 de novembro de 2026
+
+Este estado prevalece sobre listas históricas do roteiro abaixo:
+
+- A declaração canônica é `let nome` ou `let mut nome`; `var` é rejeitado.
+- Há um gerador LR(2) canônico, com FIRST2, closure, goto, tabelas por pares de
+  tokens e rejeição de conflitos. Expressões infixas já usam esse motor.
+  Declarações, tipos, prefixos e postfixos ainda são reconhecidos manualmente.
+- `char` executa como um escalar Unicode representado internamente por UTF-8
+  imutável. `byte`, `sbyte`, `short` e `ushort` executam com checagem de intervalo.
+  `uint`, `long`, `ulong`, `usize` e `isize` continuam sem lowering completo.
+- `float` tem arredondamento binary32; o transporte interno usa palavras
+  binary64. Isso não significa que o layout de campos `float` seja de quatro bytes.
+- Arrays podem ser aninhados e métodos ligados podem ser usados como closures,
+  preservando o receptor e o despacho virtual. `++` e `--` postfixados executam,
+  retornando o valor anterior e avaliando o destino uma única vez.
+- Literais inteiros decimais, binários, octais e hexadecimais executam dentro
+  do intervalo de `int`. A negação de `int.min` segue o mesmo overflow modular
+  da soma, subtração e multiplicação, tanto na VM quanto no nativo.
+- O verificador da IR exige terminadores, dois sucessores explícitos em desvios,
+  valores definidos em todos os caminhos e slots inicializados. IR malformada
+  não chega aos passes de otimização nem aos executores.
+- `-O1`, padrão, faz folding local de inteiros/desvios, remove blocos
+  inalcançáveis e resultados puros sem uso. `-O0` conserva a IR sem esses passes.
+- `--target=avr -S` gera assembly AVR para ATmega328P no perfil escalar:
+  funções, até seis argumentos de 32 bits, aritmética inteira, resto, chamadas,
+  comparações e controle de fluxo. Heap, reais e I/O são rejeitados. A suíte
+  monta o resultado com LLVM quando disponível; não substitui teste em hardware.
+
+### Memória manual e fronteira unsafe
+
+```argos
+function main() -> int {
+    unsafe {
+        let memory: ptr = raw_alloc(4)
+        raw_store(memory, 0, 42)
+        let value: byte = raw_load(memory, 0)
+        print(value)
+        raw_free(memory)
+    }
+    return 0
+}
+```
+
+`raw_alloc(int) -> ptr` exige tamanho positivo e zera os bytes. `raw_load(ptr,
+int) -> byte` e `raw_store(ptr, int, byte) -> void` verificam os limites;
+`raw_free(ptr) -> void` invalida a alocação e seus aliases. Operações em ponteiro
+liberado e liberações duplicadas encerram com status 70. A VM usa handles; o
+nativo usa descritores de alocação. `ptr` não é uma ABI de ponteiro C.
+
+Todas essas chamadas exigem `unsafe` no próprio corpo executado. Lambdas e
+funções não herdam autorização do bloco que as declarou. O módulo inteiro,
+incluindo arquivos adicionais, escolhe memória manual ou arena: misturar
+`raw_*` com objetos, closures, arrays ou boxing de opcionais é erro
+`ARGOS-S0702`. Isso implementa separação entre o modo manual e a arena atual;
+**a arena ainda não implementa ownership/borrowing como no Rust**.
+
+Continuam pendentes a migração LR(2) do restante da gramática, ownership,
+borrowing, lifetimes, destruição por escopo, ponteiros C tipados, aritmética de
+ponteiros, structs com layout C, FFI, MMIO, volatile e assembly inline. O lowering
+não deve ser anunciado como completo enquanto esses recursos e os tipos
+inteiros restantes não atravessarem o pipeline.
+
 ## Índice
 
 - [ArgosLang MVP](#mvp)
@@ -52,7 +115,7 @@ valida recursos adicionais do frontend que ainda não têm lowering executável:
 
 - funções com retorno `int`, `bool`, `float`, `double`, `string` ou `void`, com
   até seis parâmetros `int`/`bool`/`float`/`double`/`string`;
-- variáveis locais `var` (imutáveis por padrão) e `var mut` (reatribuíveis);
+- variáveis locais `let` (imutáveis por padrão) e `let mut` (reatribuíveis);
 - declarações tipadas sem inicializador; uma variável imutável pode receber
   seu primeiro valor depois da declaração, mas não pode ser alterada novamente;
 - literais inteiros, booleanos, reais e strings;
@@ -69,8 +132,7 @@ valida recursos adicionais do frontend que ainda não têm lowering executável:
 Strings podem conter UTF-8, escapes reconhecidos pelo lexer e quebras de linha
 em literais de três aspas. A igualdade compara os bytes do texto; `print`
 escreve os bytes sem adicionar separadores entre argumentos e termina com uma
-quebra de linha. Ainda não há concatenação de strings nem suporte a `char`
-executável.
+quebra de linha. `char` Unicode também executa; concatenação pública de strings ainda não está disponível.
 
 `nil` representa ausência em `T?`. Opcionais, inclusive camadas aninhadas,
 executam em arquivos na VM e no nativo: `??`, `?==`, `?=`, `??=`, `!!`, `!!=` e
@@ -84,15 +146,15 @@ função, linha e coluna. A análise rejeita unwrap implícito, `void?`, alvos
 imutáveis, leituras antes da inicialização e inicialização somente em ramos
 que podem ser pulados. Consulte o [contrato de null-safety](guide/11-null-safety-e-opcionais.md).
 
-Tipos como `byte`, `char` e os demais inteiros estreitos ou sem sinal ainda não
-são executáveis. `float` e `double` usam IEEE-754 binary64.
+`byte`, `sbyte`, `short`, `ushort` e `char` executam. `uint`, `long`, `ulong`,
+`usize` e `isize` ainda não possuem lowering executável completo. `float` arredonda para IEEE-754 binary32; `double` usa binary64.
 
 <a id="mvp-estado-atual-do-pipeline"></a>
 
 ### Estado atual do pipeline
 
-- O parser atual é manual, com precedência de operadores; LR(1) continua sendo
-  uma direção de arquitetura, não a implementação presente.
+- O parser é híbrido: expressões infixas usam LR(2) canônico; declarações,
+  tipos, prefixos e postfixos ainda são manuais.
 - A IR possui tipos de registrador/slot e um validador compartilhado pelas
   fronteiras da VM e do backend nativo.
 - A VM executa a IR diretamente. `BytecodeEmitter` ainda é uma representação
@@ -135,7 +197,7 @@ status do processo e o Unix preserva somente seus oito bits inferiores.
 Arquivos também podem executar, pela VM e pelo backend x86-64/Linux:
 
 - classes concretas sem bases, campos tipados e identidade por referência;
-- campos `var` inicializados uma vez em `construct`, campos `var mut` e valores
+- campos `let` inicializados uma vez em `construct`, campos `let mut` e valores
   padrão; sem `construct` explícito, todos os campos exigem inicializador;
 - construtores `construct(...)`, criação com `new Tipo(...)`, métodos com
   `this` e acesso implícito a campos;
@@ -179,7 +241,7 @@ só podem ser aninhados. `class A with B, C` contém instâncias exclusivas e de
 métodos públicos, sem criar subtipagem; colisões exigem resolução explícita.
 `data` também gera `hashCode()` e `toString()`. O guia descreve construção,
 permissões e limitações do modelo de memória.
-Referências ligadas a métodos, `static` e genéricos continuam pendentes.
+`static` e genéricos continuam pendentes.
 
 O REPL pode chamar funções de ordem superior em uma entrada, mas não preserva
 objetos nem closures em variáveis entre entradas e rejeita essas declarações
@@ -192,7 +254,7 @@ assembly montado externamente.
 
 A partir de 27/10/2026, `init(...)` é rejeitado: o único nome de construtor é
 `construct(...)`, sem compatibilidade com a sintaxe antiga. Propriedades exigem
-um getter com corpo; setters exigem `var mut` e usam o parâmetro implícito
+um getter com corpo; setters exigem `let mut` e usam o parâmetro implícito
 `value` ou o nome escrito em `setter(nome)`. Não há acessores automáticos nem
 visibilidade independente por acessor. Propriedades sem setter são somente
 leitura. Elas não exigem inicialização em `construct`, pois não armazenam estado.
@@ -211,7 +273,7 @@ antes da chamada; métodos podem ser chamados por `obj?.metodo(...)`.
 
 O REPL preserva opcionais numéricos/bool e o estado anterior após entradas
 com erro. Continua rejeitando persistência de strings, objetos, arrays e
-closures. Arrays multidimensionais, redimensionamento, slices/views, `[T; N]`
+closures. Redimensionamento de arrays, slices/views, `[T; N]`
 e `for` permanecem pendentes. Herança e interfaces agora integram o lowering;
 `protocol` foi substituído por `data`.
 
@@ -302,7 +364,7 @@ avisar claramente, não falhar de um jeito misterioso.
 #### 2. Fechar os tipos que os programas realmente usam
 
 Hoje, o núcleo numérico executável é pequeno; `string` funciona em arquivos,
-mas `char` ainda não funciona e strings não persistem entre entradas do REPL.
+e `char` já executa; strings ainda não persistem entre entradas do REPL.
 Para um MVP amplo, precisamos:
 
 - guardar e passar strings entre variáveis, parâmetros, retornos e chamadas;
@@ -525,7 +587,7 @@ mas completo dentro das promessas que faz.
 
 Não bloqueiam este MVP inicial: classes e herança, interfaces completas,
 genéricos, ponteiros raw, FFI, exceções, async/await, otimizações avançadas,
-bytecode persistente, cross-compilation e backends ARM64/RISC-V/AVR. Cada um
+bytecode persistente, expansão de cross-compilation e backends ARM64/RISC-V. Cada um
 precisa de uma especificação e testes próprios antes de ser anunciado como
 suportado.
 
@@ -586,7 +648,7 @@ executáveis estão em [ArgosLang MVP](#mvp-poo-e-funções-como-valores-26-de-o
       e recuperação após erro de runtime.
 - [x] Conformidade de saída e efeitos entre VM, binário nativo e assembly.
 - [ ] Persistência de opcionais de strings, objetos, arrays e closures no REPL.
-- [ ] Arrays multidimensionais, crescimento, slices/views, `[T; N]` e `for`.
+- [ ] Crescimento de arrays, slices/views, `[T; N]` e `for`.
 - [x] Integração executável com herança, interfaces e tipos-base — 29/10/2026.
 
 O [capítulo de opcionais](guide/11-null-safety-e-opcionais.md) define tipos,
@@ -688,9 +750,9 @@ O próximo exemplo mostra variáveis, cálculo e saída:
 
 ```argos
 function main() -> void {
-    var a: int = 8
-    var b: int = 9
-    var mut c: int
+    let a: int = 8
+    let b: int = 9
+    let mut c: int
 
     c = a + b
     print("O resultado é: ", c)
@@ -743,7 +805,7 @@ Olá, Argos!
 >>> :quit
 ```
 
-O REPL executa expressões e instruções comuns, como `var`, atribuições, `if`,
+O REPL executa expressões e instruções comuns, como `let`, atribuições, `if`,
 `while` e `print(...)`, sem que seja necessário escrever `main`. Cada entrada
 passa por lexer, parser, AST e análise semântica antes da interpretação.
 Variáveis tipadas e inicializadas, bem como declarações de função, ficam
@@ -818,12 +880,12 @@ Blocos usam chaves. O lexer pode inserir terminadores em quebras de linha
 elegíveis, por isso estes dois estilos são aceitos pelo subconjunto atual:
 
 ```argos
-var value: int = 1
+let value: int = 1
 value = value + 1
 ```
 
 ```argos
-var value: int = 1;
+let value: int = 1;
 value = value + 1;
 ```
 
@@ -843,9 +905,9 @@ O subconjunto executável usa `int`, `bool`, `float`, `double`, `string`,
 classes concretas, funções como valores e seus opcionais. Literais básicos:
 
 ```argos
-var answer: int = 42
-var enabled: bool = true
-var disabled: bool = false
+let answer: int = 42
+let enabled: bool = true
+let disabled: bool = false
 ```
 
 O tipo opcional usa `?`; `nil` representa ausência explícita. Um tipo
@@ -853,8 +915,8 @@ não-opcional **nunca** pode conter `nil`: a tentativa é erro semântico
 `ARGOS-S0101` em declarações ou `ARGOS-S0331` em reatribuições, detectado em `check`.
 
 ```argos
-var nome: string? = nil          // válido: string? admite nil
-var outro: string = nil          // ARGOS-S0101: tipo incompatível
+let nome: string? = nil          // válido: string? admite nil
+let outro: string = nil          // ARGOS-S0101: tipo incompatível
 ```
 
 `null` ainda é aceito como apelido temporário de `nil` e será removido em
@@ -916,7 +978,7 @@ A precedência segue pós-fixados, prefixos, aritmética, relações, igualdade,
 Escritas em ramos puláveis não estabelecem inicialização definida.
 O REPL executa os operadores e preserva opcionais numéricos/bool, inclusive
 aninhados. Persistência de strings, objetos, arrays e closures continua
-indisponível, assim como arrays multidimensionais, crescimento, slices/views,
+indisponível, assim como crescimento de arrays, slices/views,
 `[T; N]` e `for`.
 
 A representação usa boxes na arena e zero somente para a ausência externa,
@@ -937,13 +999,13 @@ Não use o status de processo para testar retornos maiores que 255.
 
 ### Variáveis e mutabilidade
 
-`var` declara uma variável **imutável por padrão**. Use `var mut` para uma
+`let` declara uma variável **imutável por padrão**. Use `let mut` para uma
 variável reatribuível:
 
 ```argos
 function main() -> int {
-    var base: int = 10
-    var mut total: int = base
+    let base: int = 10
+    let mut total: int = base
     total = total + 5
     return total
 }
@@ -953,8 +1015,8 @@ function main() -> int {
 semântico; o compilador aponta o identificador e pode apresentar uma sugestão
 de inicialização.
 
-Não há inferência de mutabilidade: uma variável declarada com `var` nunca se
-torna reatribuível por ter recebido uma atribuição posterior. Declare `var mut`
+Não há inferência de mutabilidade: uma variável declarada com `let` nunca se
+torna reatribuível por ter recebido uma atribuição posterior. Declare `let mut`
 na origem quando esse for o propósito.
 
 <a id="referencia-funções"></a>
@@ -991,9 +1053,9 @@ argumentos explícitos.
 Estão disponíveis no subconjunto executável:
 
 ```argos
-var result: int = 6 * 7 + 1
-var comparison: bool = result >= 42
-var negative: int = -result
+let result: int = 6 * 7 + 1
+let comparison: bool = result >= 42
+let negative: int = -result
 ```
 
 Operadores incluem aritmética (`+`, `-`, `*`, `/`, `%`), comparação (`==`,
@@ -1005,7 +1067,7 @@ vêm depois; atribuição associa à direita. Use parênteses quando a intençã
 for óbvia:
 
 ```argos
-var result: int = (base + offset) * scale
+let result: int = (base + offset) * scale
 ```
 
 <a id="referencia-fluxo-de-controle"></a>
@@ -1035,8 +1097,8 @@ if enabled return 7 else return 0
 #### while, break e continue
 
 ```argos
-var mut index: int = 0
-var mut total: int = 0
+let mut index: int = 0
+let mut total: int = 0
 
 while index < 5 {
     index = index + 1
@@ -1076,7 +1138,7 @@ no uso, não na função inteira:
 arquivo.argos:4:12: error[ARGOS-S0301]: variável "answer" usada antes da inicialização
   return answer
          ^
-  ajuda: inicialize-a antes do uso: var answer: int = 0
+  ajuda: inicialize-a antes do uso: let answer: int = 0
 ```
 
 Para erros de parser, corrija primeiro o diagnóstico de menor linha/coluna;
@@ -1089,7 +1151,7 @@ mensagens seguintes podem ser consequência da estrutura incompleta.
 | Arquivo | Uso |
 | --- | --- |
 | `hello_return.argos` | programa mínimo que retorna 42 |
-| `variables.argos` | `var` e `var mut` |
+| `variables.argos` | `let` e `let mut` |
 | `functions_parameters.argos` | parâmetros e chamadas |
 | `control_flow.argos` | `if`, `while`, `break`, `continue` |
 | `minimal_break.argos` | saída antecipada de laço |
@@ -1113,8 +1175,8 @@ continuam pendentes.
 arrays opcionais inspirado no Dart. O REPL preserva opcionais numéricos/bool;
 veja os limites no [capítulo 11](guide/11-null-safety-e-opcionais.md).
 
-`byte`, `char` e os demais tipos inteiros estreitos ou sem sinal ainda não são
-executáveis. `float` e `double` usam representação binary64.
+`byte`, `sbyte`, `short`, `ushort` e `char` executam. `uint`, `long`, `ulong`,
+`usize` e `isize` ainda não possuem lowering executável completo. `float` arredonda para binary32; `double` usa binary64.
 
 Também não há biblioteca padrão estável, concatenação de strings, mapas ou conjuntos,
 interoperabilidade C exposta ao usuário, geração de objeto própria, cross
@@ -1154,15 +1216,15 @@ primitivos em minúsculas. `null` ainda é aceito como apelido temporário de
 arquivo .argos
   -> SourceManager
   -> Lexer
-  -> Parser descendente recursivo + Pratt parser de expressões
+  -> Parser híbrido: declarações manuais + expressões infixas LR(2)
   -> AST
   -> SemanticAnalyzer
   -> IR executável
   -> VM (`run`) ou x86-64/Linux (`compile`)
 ```
 
-O parser não é LR/LALR/SLR gerado. Declarações e instruções usam parser manual;
-expressões usam Pratt parsing para precedência e associatividade. O frontend
+Declarações, instruções, tipos, prefixos e postfixos usam parser manual;
+expressões infixas usam tabelas geradas por um motor LR(2) canônico. O frontend
 guarda intervalos de origem para alimentar os diagnósticos.
 
 
@@ -1175,13 +1237,13 @@ guarda intervalos de origem para alimentar os diagnósticos.
 ## Especificação da Gramática e Arquitetura da ArgosLang
 
 > Especificação de evolução — 14 de setembro de 2026
-> Parser-alvo: LR canônico com um símbolo de lookahead, LR(1).
+> Parser-alvo: LR canônico com dois símbolos de lookahead, LR(2).
 
 > **Estado do compilador (22 de outubro de 2026):** o parser implementado é
-> manual, com precedência de operadores; não é LR(1). Esta especificação
+> manual, com precedência de operadores; não é LR(2). Esta especificação
 > descreve o desenho futuro e não deve ser usada como lista de recursos
 > executáveis. Para o subconjunto que funciona hoje, consulte [ArgosLang MVP](#mvp).
-> A grafia canônica é `function`, `var`/`var mut`, `nil` e tipos primitivos em
+> A grafia canônica é `function`, `let`/`let mut`, `nil` e tipos primitivos em
 > minúsculas (`int`, `bool`, `string`). As formas `func` e tipos com inicial
 > maiúscula não fazem parte da sintaxe aceita.
 
@@ -1223,7 +1285,7 @@ Ela possui:
 ### 3. Pipeline
 
 ```text
-Fonte → Lexer → tokens → Parser LR(1) → CST/AST → HIR tipada → IR Argos
+Fonte → Lexer → tokens → Parser LR(2) → CST/AST → HIR tipada → IR Argos
                                                              ├─→ Bytecode → VM
                                                              └─→ Machine IR → máquina
 ```
@@ -1264,9 +1326,9 @@ Isso substitui o predicado `&"}"` da versão antiga, pois ele é sintaxe de PEG,
 
 <a id="gramatica-5-contrato-lr1"></a>
 
-### 5. Contrato LR(1)
+### 5. Contrato LR(2)
 
-O parser é LR(1) canônico. Estados com contextos diferentes não devem ser fundidos como em LALR. Recursão à esquerda é permitida e preferida para operadores e listas associativas à esquerda.
+O parser é LR(2) canônico. Estados com contextos diferentes não devem ser fundidos como em LALR. Recursão à esquerda é permitida e preferida para operadores e listas associativas à esquerda.
 
 O gerador deve terminar com zero conflitos shift/reduce e reduce/reduce. Precedência só pode resolver um conflito quando a regra for normativa. Recuperação deve sincronizar em `SEMI`, `}`, início de declaração e palavras-chave de fluxo.
 
@@ -1342,11 +1404,11 @@ ClassMember ::= FieldDecl | PropertyDecl | ConstructorDecl
               | NestedTypeDecl | ForeignDecl | EmptyDecl ;
 
 FieldDecl ::= AttributeList? Visibility? MemberModifier*
-              "var" ("mut")? Identifier ":" Type
+              "let" ("mut")? Identifier ":" Type
               ("=" Expression)? SEMI ;
 
 PropertyDecl ::= AttributeList? Visibility? MemberModifier*
-                 "var" ("mut")? Identifier ":" Type PropertyBody ;
+                 "let" ("mut")? Identifier ":" Type PropertyBody ;
 PropertyBody ::= "{" PropertyAccessor+ "}" ;
 PropertyAccessor ::= "getter" "(" ")" (SEMI | FunctionBody)
                    | "setter" "(" Identifier? ")" (SEMI | FunctionBody) ;
@@ -1361,7 +1423,7 @@ MethodDecl ::= AttributeList? Visibility? MemberModifier*
                FunctionSignature (FunctionBody | SEMI) ;
 
 ComputedPropertyDecl ::= AttributeList? Visibility? MemberModifier*
-                         "var" ("mut")? Identifier ":" Type PropertyBody ;
+                         "let" ("mut")? Identifier ":" Type PropertyBody ;
 NestedTypeDecl ::= ClassDecl | DataDecl | InterfaceDecl | EnumDecl
                  | TypeAliasDecl ;
 OperatorDecl ::= AttributeList? Visibility? MemberModifier*
@@ -1396,11 +1458,11 @@ DataComponent ::= Identifier ":" Type ;
 A forma com componentes gera campos privados e imutáveis com autorização `permited` e `construct`
 público com os mesmos nomes como rótulos de parâmetros. Apenas o próprio tipo e
 as entidades nominais listadas em `permited` acessam diretamente os campos. Componentes `nome: tipo;` no corpo também geram construtor canônico; campos
-explícitos com `var` seguem as regras de inicialização. O corpo permite métodos e conformidade
+explícitos com `let` seguem as regras de inicialização. O corpo permite métodos e conformidade
 de interfaces. `data` é sempre final, concreto e não estende classes.
 
 Campos podem conter escalares, strings, opcionais desses tipos e outros `data`.
-São rejeitados `var mut`, propriedades computadas, arrays, closures, referências
+São rejeitados `let mut`, propriedades computadas, arrays, closures, referências
 a classes comuns e grafos recursivos. `==`, `!=` e `?==` com tipo estático `data`
 comparam os campos recursivamente. O armazenamento atual ainda usa objetos;
 conversão para interface conserva identidade de referência. `hashCode()`, `toString()` e impressão estrutural são gerados automaticamente.
@@ -1430,7 +1492,7 @@ InterfaceMember ::= InterfaceMethodRequirement
 InterfaceMethodRequirement ::= AttributeList? Visibility?
                                FunctionSignature SEMI ;
 InterfacePropertyRequirement ::= AttributeList? Visibility?
-                                 "var" ("mut")? Identifier ":" Type
+                                 "let" ("mut")? Identifier ":" Type
                                  "{" AccessorRequirementList "}" ;
 AccessorRequirementList ::= GetterRequirement SetterRequirement?
                           | SetterRequirement GetterRequirement ;
@@ -1515,7 +1577,7 @@ ParameterList ::= Parameter ("," Parameter)* ","? ;
 Parameter ::= AttributeList? ParameterLabel? Identifier ":" Type
               ParameterModifier* DefaultArgument? ;
 ParameterLabel ::= Identifier | "_" ;
-ParameterModifier ::= "var" | "mut" | "inout" ;
+ParameterModifier ::= "let" | "mut" | "inout" ;
 DefaultArgument ::= "=" Expression ;
 ```
 
@@ -1556,7 +1618,7 @@ Capturas são imutáveis por padrão. Captura mutável é explícita e deve resp
 VariableDecl ::= AttributeList? Visibility? StorageModifier?
                  BindingKind Pattern VariableType?
                  VariableInitializer? SEMI ;
-BindingKind ::= "var" ("mut")? ;
+BindingKind ::= "let" ("mut")? ;
 StorageModifier ::= "static" | "thread_local" ;
 VariableType ::= ":" Type ;
 VariableInitializer ::= "=" Expression ;
@@ -1574,7 +1636,7 @@ EnumPattern ::= QualifiedName ("(" PatternList? ")")? ;
 LiteralPattern ::= Literal ;
 ```
 
-Sem tipo escrito, a declaração requer inicializador inferível. Sem inicializador, requer tipo e prova de inicialização antes do uso. `var` recebe valor uma vez; `var mut` pode ser reatribuída.
+Sem tipo escrito, a declaração requer inicializador inferível. Sem inicializador, requer tipo e prova de inicialização antes do uso. `let` recebe valor uma vez; `let mut` pode ser reatribuída.
 
 <a id="gramatica-16-sistema-de-tipos"></a>
 
@@ -1903,13 +1965,13 @@ Sucesso silencioso é proibido.
 
 ```argos
 public interface Identifiable<TId> {
-    public var id: TId { getter(); }
+    public let id: TId { getter(); }
 }
 
 sealed class Account<TId> by Identifiable<TId>
 where TId: Hashable {
-    public var id: TId;
-    private var mut balance: long;
+    public let id: TId;
+    private let mut balance: long;
 
     public construct(id: TId, initialBalance: long = 0) {
         this.id = id;
@@ -1959,7 +2021,7 @@ unsafe function writeRegister(address: usize, value: byte) -> void {
 ### 27. Embarcados
 
 ```text
-Argos → Lexer → Parser LR(1) → AST/HIR → IR Argos
+Argos → Lexer → Parser LR(2) → AST/HIR → IR Argos
                                       ├─→ Bytecode → VM
                                       └─→ Machine IR → objeto/máquina
 ```
@@ -1992,7 +2054,7 @@ Recursos posteriores falham explicitamente até possuírem semântica e lowering
 
 ### 30. Conformidade
 
-Uma construção é suportada somente quando possui produção LR(1) sem conflitos, CST/AST, análise semântica, HIR/IR, backend explícito e testes positivos, negativos, de recuperação e de equivalência VM/nativo.
+Uma construção é suportada somente quando possui produção LR(2) sem conflitos, CST/AST, análise semântica, HIR/IR, backend explícito e testes positivos, negativos, de recuperação e de equivalência VM/nativo.
 
 Reconhecer sintaxe não significa implementar a linguagem.
 
@@ -2044,7 +2106,7 @@ continua sendo `new Tipo(...)`; `construct` não pode ser chamado como método d
 uma instância. Sem construtor explícito, todos os campos armazenados precisam
 de valor padrão. `deinit` permanece um recurso planejado independente.
 
-Propriedades computadas exigem tipo e `getter()`. Uma propriedade `var mut`
+Propriedades computadas exigem tipo e `getter()`. Uma propriedade `let mut`
 pode declarar `setter()` ou `setter(nome)`. O parâmetro do setter tem o tipo da
 propriedade e chama-se `value` quando omitido. O getter tem retorno igual ao
 tipo da propriedade; o setter retorna `void`. Propriedades não armazenam um
@@ -2083,8 +2145,8 @@ incluindo VM, compilador nativo, REPL, diagnósticos e conformidade — consulte
 
 ### Regras básicas
 
-- Tipos e palavras-chave são minúsculos: `int`, `string`, `bool`, `nil`, `var`.
-- `var` é imutável por padrão; `var mut` permite reatribuição. `let` não faz
+- Tipos e palavras-chave são minúsculos: `int`, `string`, `bool`, `nil`, `let`.
+- `let` é imutável por padrão; `let mut` permite reatribuição. `let` não faz
   parte da sintaxe nova.
 - `int` é assinado. Os equivalentes sem sinal são `uint`, `ushort`, `ulong` e
   `usize`; não haverá o erro de grafia `usigned` como palavra-chave.
@@ -2188,7 +2250,7 @@ func delayMs(milliseconds: USize) -> Void {
 }
 
 func readRegister(address: USize) -> Byte {
-    var result: Byte = 0;
+    let result: Byte = 0;
     c_function("""
         volatile uint8_t *ptr = (volatile uint8_t *)(uintptr_t)address;
         result = *ptr;
@@ -2276,7 +2338,7 @@ func soma(a: Int, b: Int) -> Int {
 }
 
 func loop(n: Int) -> Void {
-    var i: Int = 0;
+    let i: Int = 0;
     while i < n {   // emite: CMP_LT + JMP_IF_FALSE
         i = i + 1;  // emite: ADD + STORE_VAR
     }
@@ -2343,8 +2405,8 @@ Os dois modos podem coexistir no mesmo arquivo `.argos`. A camada `unsafe { }` d
 ```swift
 // Lógica de alto nível no Modo VM (seguro, portável)
 func calcularChecksum(dados: [Byte], tamanho: USize) -> Byte {
-    var soma: Byte = 0;
-    var i: USize = 0;
+    let soma: Byte = 0;
+    let i: USize = 0;
     while i < tamanho {
         soma = soma + dados[i];
         i = i + 1;
@@ -2470,7 +2532,7 @@ Para manipulação direta de registradores, instruções especiais de CPU ou ace
 ```swift
 // Lê o registrador de status da CPU (flags)
 func readStatusRegister() -> Byte {
-    var result: Byte = 0;
+    let result: Byte = 0;
     asm_block("""
         in %[out], __SREG__
         : [out] "=r" (result)
@@ -2488,7 +2550,7 @@ func enableInterrupts() -> Void {
 
 **Regras:**
 - O bloco `asm_block` emite código AT&T ou Intel Syntax dependendo da plataforma alvo.
-- Variáveis ArgosLang podem ser referenciadas dentro do bloco usando a sintaxe de *constraint* do GCC Inline Assembly (`[nome] "=r" (var)`).
+- Variáveis ArgosLang podem ser referenciadas dentro do bloco usando a sintaxe de *constraint* do GCC Inline Assembly (`[nome] "=r" (let)`).
 - Somente permitido dentro de blocos `unsafe { }`.
 
 ---
@@ -2519,7 +2581,7 @@ Permite chamar código C++ moderno (RAII, templates, STL, bibliotecas como Eigen
 ```swift
 // Interop com STL: conversão de string C++ para ArgosLang
 func intToString(value: Int) -> String {
-    var result: String = "";
+    let result: String = "";
     cpp_function("""
         #include <string>
         std::string cpp_str = std::to_string(value);
@@ -2666,7 +2728,7 @@ func formatDate(timestamp: Long) -> String;
 
 // Embutir código Swift diretamente (modo interpretado ou compilado para Darwin/Linux)
 func greet(name: String) -> String {
-    var result: String = "";
+    let result: String = "";
     swift_function("""
         import Foundation
         let greeting = "Olá, \\(name)! Hora atual: \\(Date())"
@@ -2721,7 +2783,7 @@ public func formatDate(timestamp: Int64) -> UnsafePointer<CChar> {
 ## Testar a ArgosLang e o compilador
 
 Este guia descreve o pipeline que existe hoje. A sintaxe canônica usa
-`function`, `var`/`var mut`, `nil` e tipos primitivos em minúsculas. O escopo
+`function`, `let`/`let mut`, `nil` e tipos primitivos em minúsculas. O escopo
 executável está detalhado em [ArgosLang MVP](#mvp).
 
 <a id="testes-1-construir-e-testar"></a>
@@ -2777,13 +2839,13 @@ Um exemplo mínimo usa a forma canônica:
 
 ```argos
 function main() -> int {
-    var answer: int = 6 * 7
+    let answer: int = 6 * 7
     print(answer)
     return 0
 }
 ```
 
-`var` é imutável por padrão. Use `var mut` quando o valor precisar mudar.
+`let` é imutável por padrão. Use `let mut` quando o valor precisar mudar.
 Chamadas, laços, `break` e `continue` funcionam nas duas rotas para o
 subconjunto descrito em [ArgosLang MVP](#mvp).
 
@@ -2791,8 +2853,7 @@ subconjunto descrito em [ArgosLang MVP](#mvp).
 
 ### 4. Estado atual das fases
 
-- O parser em execução é manual, com precedência de operadores; LR(1) é uma
-  direção futura documentada, não o parser atual.
+- Expressões infixas usam LR(2) canônico; o restante do parser ainda é manual.
 - A semântica alimenta uma IR com tipos explícitos e validação compartilhada
   pela VM e pelo backend nativo.
 - A VM executa essa IR diretamente. `BytecodeEmitter` ainda imprime texto de
@@ -2802,8 +2863,8 @@ subconjunto descrito em [ArgosLang MVP](#mvp).
   `int`/`bool` entre entradas.
 - Strings armazenadas, opcionais, arrays homogêneos, classes concretas e
   closures já executam na VM e no nativo. Herança, interfaces, `super`,
-  overload/override e `data` também executam. Backends ARM64/RISC-V/AVR e
-  cross-compilation continuam pendentes.
+  overload/override e `data` também executam. AVR gera assembly do perfil
+  escalar para ATmega328P; ARM64/RISC-V e os demais perfis continuam pendentes.
   A matriz completa está no [MVP](#mvp).
 
 Uma construção aceita por `check` ainda pode não ser executável. Nesses casos,
@@ -2889,7 +2950,7 @@ Os problemas variam desde desencontros de declaração de *namespaces* e conven�
 #### 2.6. Falha na Sincronização e Recuperação de Erros de Sintaxe
 - **Arquivo:** `compiler/src/parser/parser.cpp`
 - **Descrição:** Nos loops de `parse_program()` e `parse_block_statement()`, ao encontrar um erro, o parser apenas invocava `advance()`.
-- **Impacto:** Ausência de uma rotina de sincronização (`synchronize()`) para descartar tokens até o próximo delimitador de instrução (ex.: `;`, `}`, `let`, `var`, `func`, `if`), gerando uma cascata de diagnósticos redundantes para um único erro.
+- **Impacto:** Ausência de uma rotina de sincronização (`synchronize()`) para descartar tokens até o próximo delimitador de instrução (ex.: `;`, `}`, `let`, `let`, `func`, `if`), gerando uma cascata de diagnósticos redundantes para um único erro.
 
 <a id="parser-27-omissão-do-parser-no-sistema-de-build-cmakeliststxt"></a>
 
@@ -3236,7 +3297,7 @@ add_library(argos_frontend STATIC
 #### 3.5. Adição da Suíte de Testes do Parser (`tests/parser/parser_tests.cpp`)
 
 Criar o arquivo `tests/parser/parser_tests.cpp` para validar as construções da linguagem:
-- Declaração de variáveis (`let x: Int = 10;`, `var y: String?;`)
+- Declaração de variáveis (`let x: Int = 10;`, `let y: String?;`)
 - Declaração de funções (`func soma(a: Int, b: Int) -> Int { return a + b; }`)
 - Expressões condicionais (`if`, `else`)
 - Precedência de operadores aritméticos e de *null safety* (`?.`, `??`, `!!`, `?=`)
@@ -3388,6 +3449,6 @@ lifetimes, destruição por escopo e `deinit`. Também faltam modos de alocaçã
 com ponteiros e sua exclusão estática em relação ao modo de ownership; esta etapa
 não introduziu esses modos. `with &T` e `with shared T` não estão disponíveis.
 
-Outros limites atuais: métodos ligados como valores, `static`, genéricos, captura
+Outros limites atuais: `static`, genéricos, captura
 mutável, `copy`/`componentN` e serialização automática de `data`. Não há busca
 automática de imports: os arquivos do programa são informados ao driver.

@@ -30,6 +30,7 @@ enum class TypeKind : std::uint8_t {
   double_type,
   char_type,
   string_type,
+  raw_pointer,
   nominal_type,
   function_type,
   array_type,
@@ -260,6 +261,8 @@ private:
   std::vector<Scope> scopes_;
   std::vector<FunctionContext> functions_;
   std::size_t loop_depth_{0};
+  std::size_t unsafe_depth_{0};
+  bool manual_memory_used_{false}, arena_memory_used_{false};
   std::unordered_map<const ast::Expression *, Type> expression_types_;
   std::unordered_map<const ast::Expression *, Type> expression_coercions_;
   std::unordered_map<const ast::Expression *, SymbolId> expression_symbols_;

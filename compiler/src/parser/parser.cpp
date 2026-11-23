@@ -1,4 +1,6 @@
 #include "argos/parser/parser.hpp"
+#include "argos/parser/lr2.hpp"
+#include <functional>
 #include "argos/diagnostics/diagnostic_catalog.hpp"
 
 #include <algorithm>
@@ -224,7 +226,7 @@ void Parser::synchronize() {
         }
 
         switch (current().kind) {
-            case lexer::TokenKind::KwVar:
+            case lexer::TokenKind::KwLet:
             case lexer::TokenKind::KwFunction:
             case lexer::TokenKind::KwIf:
             case lexer::TokenKind::KwWhile:
@@ -292,7 +294,7 @@ ast::BlockItemPtr Parser::parse_block_item() {
     const auto modifier_start = index_;
     const auto modifiers = parse_modifiers();
     ast::BlockItemPtr declaration;
-    if (match(lexer::TokenKind::KwVar))
+    if (match(lexer::TokenKind::KwLet))
         declaration = parse_variable_declaration(previous());
     else if (match(lexer::TokenKind::KwFunction))
         declaration = parse_function_declaration(previous());
@@ -324,6 +326,10 @@ ast::BlockItemPtr Parser::parse_block_item() {
 
     if (index_ != modifier_start) report(current(), "modificador exige declaração compatível");
     switch (current().kind) {
+    case lexer::TokenKind::KwVar:
+      report(current(), "var foi removido; use let ou let mut");
+      skip_unsupported_construct();
+      return nullptr;
     case lexer::TokenKind::KwClass:
     case lexer::TokenKind::KwInterface:
     case lexer::TokenKind::KwEnum:
@@ -522,7 +528,7 @@ ast::BlockItemPtr Parser::parse_class_declaration(const lexer::Token &keyword) {
       bare_components.push_back(field.get());
       member = std::move(field);
       consume_statement_terminator("componente de data");
-    } else if (match(lexer::TokenKind::KwVar))
+    } else if (match(lexer::TokenKind::KwLet))
       member = parse_variable_declaration(previous());
     else if (match(lexer::TokenKind::KwFunction))
       member = parse_function_declaration(previous());
@@ -671,7 +677,7 @@ ast::BlockItemPtr Parser::parse_variable_declaration(
                           name.span, "palavra reservada '" + name.lexeme + "' não pode ser nome de variável");
     } else {
         name = consume(lexer::TokenKind::Identifier,
-                       "esperado nome após 'var' ou 'var mut'");
+                       "esperado nome após 'let' ou 'let mut'");
     }
 
     ast::TypeSyntaxPtr type;
@@ -740,7 +746,7 @@ void Parser::parse_accessors(ast::VariableDeclaration& property) {
     property.span.end = consume(lexer::TokenKind::RightBrace, "esperado '}' após acessores").span.end;
     if (!property.getter) report(previous(), "propriedade exige getter()");
     if (property.setter && property.mutability != ast::Mutability::mutable_)
-        report(previous(), "setter exige propriedade var mut");
+        report(previous(), "setter exige propriedade let mut");
 }
 
 
@@ -1132,12 +1138,35 @@ ast::TypeSyntaxPtr Parser::parse_type() {
     );
 }
 
-ast::ExpressionPtr Parser::parse_expression(
-    std::uint8_t minimum_binding_power
-) {
-    auto left = parse_prefix_expression();
-
-    while (!is_at_end()) {
+ast::ExpressionPtr Parser::parse_expression(std::uint8_t minimum_binding_power) {
+    using K = lexer::TokenKind;
+    constexpr int atom = 1000, first_level = 2000;
+    static const lr2::Table table = [] {
+      std::vector<lr2::Production> grammar;
+      const std::vector<std::vector<K>> operators{
+        {K::Equal, K::PlusEqual, K::MinusEqual, K::StarEqual, K::SlashEqual,
+         K::PercentEqual, K::ForceUnwrapAssign, K::SafeAssign, K::NullCoalescingAssign},
+        {K::NullCoalescing}, {K::PipePipe}, {K::AmpAmp},
+        {K::EqualEqual, K::BangEqual, K::SafeEqualityAssign},
+        {K::Less, K::LessEqual, K::Greater, K::GreaterEqual},
+        {K::Plus, K::Minus}, {K::Star, K::Slash, K::Percent}};
+      for (std::size_t n = 0; n < operators.size(); ++n) {
+        const auto level = first_level + static_cast<int>(n);
+        grammar.push_back({level, {level + 1}});
+        for (const auto op : operators[n])
+          grammar.push_back({level, n < 2
+            ? std::vector<int>{level + 1, static_cast<int>(op), level}
+            : std::vector<int>{level, static_cast<int>(op), level + 1}});
+      }
+      grammar.push_back({first_level + static_cast<int>(operators.size()), {atom}});
+      return lr2::Table{first_level, std::move(grammar)};
+    }();
+    std::vector<int> input;
+    std::vector<ast::ExpressionPtr> operands;
+    std::vector<K> operations;
+    for (;;) {
+      auto left = parse_prefix_expression();
+      while (!is_at_end()) {
       if ((check(lexer::TokenKind::LeftBracket) ||
            check(lexer::TokenKind::QuestionLeftBracket)) &&
           postfix_precedence >= minimum_binding_power) {
@@ -1182,40 +1211,33 @@ ast::ExpressionPtr Parser::parse_expression(
             continue;
         }
 
-        const auto binding = infix_binding_power(current().kind);
-
-        if (
-            !binding.has_value()
-            || binding->left < minimum_binding_power
-        ) {
-            break;
-        }
-
-        const lexer::Token operation = advance();
-        auto right = parse_expression(binding->right);
-        const auto expression_span = span_from(
-            left->span.begin,
-            right->span.end
-        );
-
-        if (is_assignment_operator(operation.kind)) {
-            left = std::make_unique<ast::AssignmentExpression>(
-                std::move(left),
-                assignment_operator(operation.kind),
-                std::move(right),
-                expression_span
-            );
-        } else {
-            left = std::make_unique<ast::BinaryExpression>(
-                std::move(left),
-                binary_operator(operation.kind),
-                std::move(right),
-                expression_span
-            );
-        }
+        break;
+      }
+      input.push_back(atom);
+      operands.push_back(std::move(left)); operations.push_back(K::Invalid);
+      const auto binding = infix_binding_power(current().kind);
+      if (!binding || binding->left < minimum_binding_power) break;
+      const auto operation = advance();
+      input.push_back(static_cast<int>(operation.kind));
+      operands.push_back(nullptr); operations.push_back(operation.kind);
     }
-
-    return left;
+    auto parsed = table.parse(input);
+    if (!parsed.root) {
+      report(current(), "expressão rejeitada pela gramática LR(2)");
+      return std::make_unique<ast::ErrorExpression>(current().span);
+    }
+    const auto build = [&](const auto &self, const lr2::Node &node) -> ast::ExpressionPtr {
+      if (!node.production) return std::move(operands[node.token]);
+      if (node.children.size() == 1) return self(self, *node.children.front());
+      auto left = self(self, *node.children[0]);
+      auto right = self(self, *node.children[2]);
+      const auto operation = operations[node.children[1]->token];
+      const auto span = span_from(left->span.begin, right->span.end);
+      if (is_assignment_operator(operation))
+        return std::make_unique<ast::AssignmentExpression>(std::move(left), assignment_operator(operation), std::move(right), span);
+      return std::make_unique<ast::BinaryExpression>(std::move(left), binary_operator(operation), std::move(right), span);
+    };
+    return build(build, *parsed.root);
 }
 
 ast::ExpressionPtr Parser::parse_prefix_expression() {

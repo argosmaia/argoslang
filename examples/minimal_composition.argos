@@ -1,5 +1,5 @@
 class Motor {
-    private var mut starts: int;
+    private let mut starts: int;
     public construct() { starts = 0; }
     public overload construct(_ initial: int) { starts = initial; }
     public function ligar() -> int { starts += 1; return starts; }
@@ -24,16 +24,16 @@ class Carro: Veiculo with Motor, GPS, Radio {
     public function callback() -> () -> int { return () => Motor.ligar(); }
 }
 function main() -> int {
-    var a = new Carro(4);
-    var b = new Carro();
+    let a = new Carro(4);
+    let b = new Carro();
     print(a.ligar(), a.qualified(), b.ligar());
     print(a.localizar(), a.tocar());
     a.iniciar();
-    var vehicle: Veiculo = a;
+    let vehicle: Veiculo = a;
     print(vehicle.dirigir());
-    var callback = a.callback();
+    let callback = a.callback();
     print(callback());
-    var optional: Carro? = a;
+    let optional: Carro? = a;
     print(optional?.ligar(2) ?? 0);
     return 0;
 }

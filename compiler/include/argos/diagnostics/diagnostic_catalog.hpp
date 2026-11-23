@@ -41,6 +41,10 @@ inline constexpr DiagnosticDefinition incomplete_keyword{
 } // namespace parser
 
 namespace compiler {
+inline constexpr DiagnosticDefinition invalid_ir{
+    "ARGOS-C0003", Severity::error, "IR executável inválida",
+    "O resultado interno do lowering não satisfaz as regras de execução.",
+    "Informe o trecho ao mantenedor do compilador; a IR inválida não será executada."};
 inline constexpr DiagnosticDefinition unsupported_lowering{
     "ARGOS-C0001", Severity::error, "construção ainda não é compilável",
     "O compilador entendeu o trecho, mas ainda não aprendeu a executá-lo.",
@@ -54,8 +58,8 @@ inline constexpr DiagnosticDefinition invalid_entry_point{
 namespace runtime {
 inline constexpr DiagnosticDefinition execution_failure{
     "ARGOS-R0001", Severity::error, "erro durante a execução",
-    "O programa tentou fazer uma conta que não pode terminar com segurança, como dividir por zero.",
-    "Confira os valores usados nessa conta e veja se o divisor não é zero."};
+    "A execução encontrou uma operação inválida, como unwrap de nil, índice inválido ou acesso a memória liberada.",
+    "Confira o detalhe do erro e os valores usados pela operação indicada."};
 } // namespace runtime
 
 namespace warning {
@@ -66,6 +70,20 @@ inline constexpr DiagnosticDefinition legacy_null_keyword{
 } // namespace warning
 
 namespace semantic {
+namespace memory {
+inline constexpr DiagnosticDefinition requires_unsafe{
+    "ARGOS-S0700", Severity::error, "operação exige unsafe",
+    "Acesso a memória manual precisa de autorização explícita no próprio corpo executado.",
+    "Coloque a operação dentro de unsafe { ... }; lambdas não herdam essa autorização."};
+inline constexpr DiagnosticDefinition invalid_intrinsic{
+    "ARGOS-S0701", Severity::error, "intrínseco de memória inválido",
+    "As operações raw possuem nomes e assinaturas reservados.",
+    "Use raw_alloc(int), raw_free(ptr), raw_load(ptr, int) ou raw_store(ptr, int, byte)."};
+inline constexpr DiagnosticDefinition mixed_modes{
+    "ARGOS-S0702", Severity::error, "modos de memória incompatíveis",
+    "Um módulo não pode combinar alocação manual raw e alocações da arena gerenciada.",
+    "Escolha um modo para o programa, incluindo todos os arquivos informados ao driver."};
+}
 constexpr DiagnosticDefinition semantic_error(std::string_view code,
                                               std::string_view title,
                                               std::string_view help) {
@@ -248,7 +266,7 @@ inline constexpr DiagnosticDefinition missing_implementation{"ARGOS-S0609", Seve
 inline constexpr DiagnosticDefinition invalid_parameter{"ARGOS-S0610", Severity::error, "tipo de parâmetro inválido", "Parâmetros precisam de tipos habitáveis.", "Use um tipo diferente de void ou never."};
 inline constexpr DiagnosticDefinition inaccessible_member{"ARGOS-S0611", Severity::error, "membro inacessível", "A visibilidade restringe o acesso ao membro.", "Use a API pública do tipo."};
 inline constexpr DiagnosticDefinition lambda_annotation{"ARGOS-S0612", Severity::error, "tipo de lambda não inferível", "Esta lambda precisa de uma anotação explícita.", "Anote os parâmetros e, quando necessário, o retorno."};
-inline constexpr DiagnosticDefinition invalid_capture{"ARGOS-S0613", Severity::error, "captura de lambda inválida", "Capturas exigem bindings locais imutáveis inicializados.", "Capture um binding var já inicializado; captura mutável ainda não está disponível."};
+inline constexpr DiagnosticDefinition invalid_capture{"ARGOS-S0613", Severity::error, "captura de lambda inválida", "Capturas exigem bindings locais imutáveis inicializados.", "Capture um binding let já inicializado; captura mutável ainda não está disponível."};
 inline constexpr DiagnosticDefinition field_initialization{"ARGOS-S0614", Severity::error, "inicialização de campo inválida", "O estado da instância deve ser inicializado antes de ser utilizado.", "Inicialize cada campo em todos os caminhos de construct antes de retornar."};
 inline constexpr DiagnosticDefinition invalid_overload{
     "ARGOS-S0620", Severity::error, "sobrecarga inválida",
@@ -268,7 +286,7 @@ inline constexpr DiagnosticDefinition invalid_super{
 inline constexpr DiagnosticDefinition immutable_data{
     "ARGOS-S0623", Severity::error, "data exige imutabilidade",
     "Um data é final e seus campos devem ser transitivamente imutáveis.",
-    "Use var com tipos escalares ou outros data; arrays, closures, referências "
+    "Use let com tipos escalares ou outros data; arrays, closures, referências "
     "mutáveis e ciclos são proibidos."};
 inline constexpr DiagnosticDefinition sealed_permission{
     "ARGOS-S0624", Severity::error, "entidade sealed não autorizada",
@@ -356,6 +374,9 @@ find_definition(std::string_view code) noexcept {
       &symbols::unknown_declaration,
       &symbols::unknown_statement,
       &symbols::unknown_expression,
+      &memory::requires_unsafe,
+      &memory::invalid_intrinsic,
+      &memory::mixed_modes,
       &symbols::unknown_identifier,
       &symbols::uninitialized_variable,
       &symbols::type_used_as_value,

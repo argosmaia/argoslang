@@ -6,15 +6,15 @@ data ReadingValue(value: int) by Reading {
     public function read() -> int { return value; }
 }
 function main() -> int {
-    var a = new Box(point: new Point(x: 1, label: "value"));
-    var b = new Box(point: new Point(x: 1, label: "value"));
-    var c = new Box(point: new Point(x: 2, label: "value"));
+    let a = new Box(point: new Point(x: 1, label: "value"));
+    let b = new Box(point: new Point(x: 1, label: "value"));
+    let c = new Box(point: new Point(x: 2, label: "value"));
     print(a == b, a != b, a == c);
-    var p: Point? = new Point(x: 3, label: nil);
-    var q: Point? = new Point(x: 3, label: nil);
+    let p: Point? = new Point(x: 3, label: nil);
+    let q: Point? = new Point(x: 3, label: nil);
     print(p ?== q, p ?== nil);
     print(new Empty() == new Empty());
-    var reading: Reading = new ReadingValue(value: 8);
+    let reading: Reading = new ReadingValue(value: 8);
     print(reading.read());
     return 0;
 }

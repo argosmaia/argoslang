@@ -8,7 +8,7 @@ com `if` e repetição com `while`.
 `if` faz uma escolha. A condição precisa ser `bool`:
 
 ```argos
-var temperature: int = 25
+let temperature: int = 25
 if temperature > 20 {
     print("Está quentinho")
 } else {
@@ -39,7 +39,7 @@ if temperature > 20 print("Está quentinho")
 `while` repete o bloco enquanto sua condição for verdadeira:
 
 ```argos
-var mut count: int = 1
+let mut count: int = 1
 while count < 5 {
     print(count)
     count = count + 1
@@ -50,7 +50,7 @@ while count < 5 {
 condição de novo:
 
 ```argos
-var mut number: int = 0
+let mut number: int = 0
 while number < 5 {
     number = number + 1
     if number == 2 continue

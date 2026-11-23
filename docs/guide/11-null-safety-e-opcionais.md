@@ -12,22 +12,22 @@ Não há conversão implícita de `T?` para `T`. Converter `T` para `T?` cria
 presença e preserva inclusive `0`, `false`, texto vazio e valores reais.
 
 ```argos
-var number: int? = 0
-var missing: int? = nil
-var name: string? = ""
-var flag: bool? = false
+let number: int? = 0
+let missing: int? = nil
+let name: string? = ""
+let flag: bool? = false
 ```
 
 `null_type` é o tipo interno do literal `nil`, não um nome de tipo para declarar
-variáveis. `var x = nil` exige anotação (`ARGOS-S0102`). Inicializar `int` com
+variáveis. `let x = nil` exige anotação (`ARGOS-S0102`). Inicializar `int` com
 `nil` é `ARGOS-S0101`; reatribuir `nil` a `int` é `ARGOS-S0331`.
 `null` permanece um alias temporário com aviso; use `nil`.
 
 `void?` e `never?` são rejeitados. Opcionais não tornam executáveis os tipos-base
-que ainda não têm backend, como `char` e inteiros estreitos. A profundidade
+que ainda não têm backend, como `long`, `ulong`, `uint`, `usize` e `isize`. A profundidade
 máxima representável nesta implementação é de 4095 camadas.
 
-Uma declaração sem inicializador, inclusive `var x: int?`, **não** recebe `nil`
+Uma declaração sem inicializador, inclusive `let x: int?`, **não** recebe `nil`
 automaticamente. Ela continua não inicializada e não pode ser lida.
 
 ## Opcionais aninhados
@@ -36,9 +36,9 @@ automaticamente. Ela continua não inicializada e não pode ser lida.
 uma ausência interna. `!!` e `??` removem exatamente uma camada:
 
 ```argos
-var inner: int? = nil
-var present: int?? = inner
-var absent: int?? = nil
+let inner: int? = nil
+let present: int?? = inner
+let absent: int?? = nil
 print(present ?== nil)       // false
 print(present!! ?== nil)     // true
 print(absent ?== present)    // false
@@ -51,7 +51,7 @@ Assinaturas de funções, campos, retornos e capturas preservam a profundidade.
 ## `??`: valor padrão com curto-circuito
 
 ```argos
-var value: int? = nil
+let value: int? = nil
 print(value ?? 9)    // 9
 ```
 
@@ -63,11 +63,11 @@ externa. Em `T?? ?? T?`, o resultado continua sendo `T?`.
 
 ```argos
 class Person {
-    public var name: string = "Argos"
+    public let name: string = "Argos"
     public function answer(_ n: int) -> int { return n; }
 }
 function main() -> int {
-    var person: Person? = nil
+    let person: Person? = nil
     print(person?.name ?? "Visitante")
     print(person?.answer(42) ?? 0)
     return 0
@@ -92,11 +92,11 @@ Arrays homogêneos usam `[T]` e literais `[a, b, c]`. `[T]?` é um array que pod
 estar ausente; `[T?]` é um array presente com elementos opcionais.
 
 ```argos
-var values: [int]? = [10, 20]
-var missing: [int]? = nil
+let values: [int]? = [10, 20]
+let missing: [int]? = nil
 print(values?[1] ?? 0)     // 20
 print(missing?[100] ?? 0)  // 0: nenhuma indexação acontece
-var items: [int?]? = [nil, 4]
+let items: [int?]? = [nil, 4]
 print(items?[0] ?? 8)      // 8
 ```
 
@@ -111,18 +111,18 @@ seu tipo. `?[` exige array com uma camada opcional; `[]` exige array presente.
 Não há indexação de strings por esse operador.
 
 ```argos
-var mut values: [int] = [1, 2]
+let mut values: [int] = [1, 2]
 values[0] = 3
 values[1] += 4
 ```
 
 Arrays têm tamanho fixado na criação, identidade por referência e armazenamento
-na arena da execução. A escrita exige base reatribuível (`var mut` ou campo
+na arena da execução. A escrita exige base reatribuível (`let mut` ou campo
 mutável); aliases conservam identidade. Literais são contextualizados por tipos
 de declarações, parâmetros, campos e retornos; `[]` e `[nil]` precisam desse
 contexto. Sem anotação, infere-se o tipo dos elementos; presença de `nil`
 acrescenta opcionalidade ao elemento. Tipos de arrays são invariantes.
-Arrays multidimensionais, redimensionamento, slices/views, `[T; N]` e iteração
+Redimensionamento de arrays, slices/views, `[T; N]` e iteração
 `for` continuam pendentes. Não é permitido escrever por `a?[i]`.
 
 ## Atribuições opcionais
@@ -139,12 +139,12 @@ acessados por indexação normal.
 | `alvo !!= fonte` | Fonte deve ser opcional. Remove uma camada e atribui; ausência gera erro antes da escrita. |
 
 ```argos
-var mut destination: int = 3
-var source: int? = nil
+let mut destination: int = 3
+let source: int? = nil
 destination ?= source      // mantém 3
 source = 7
 destination !!= source     // escreve 7
-var mut cache: int? = nil
+let mut cache: int? = nil
 cache ??= 9                // escreve 9
 cache ??= 10               // mantém 9
 ```
@@ -175,7 +175,7 @@ além de comparações com `nil`; também executam igualdade estrutural de camad
 ## `!!`: unwrap explícito
 
 ```argos
-var number: int? = 5
+let number: int? = 5
 print(number!!)     // 5
 ```
 

@@ -49,7 +49,7 @@ métodos de classes concretas. Consulte os exemplos e os limites de execução e
 | O que falta para consolidar o MVP | [Roteiro de consolidação](../geral.md#roadmap) |
 | Referência compacta v0.0.1 | [ArgosLang v0.0.1](../geral.md#referencia) |
 
-> A linguagem usa `function`, `var`, `var mut`, tipos em minúsculas e `nil`.
+> A linguagem usa `function`, `let`, `let mut`, tipos em minúsculas e `nil`.
 > `func` não é uma palavra-chave. `null` ainda é aceito como apelido temporário
 > de `nil`.
 

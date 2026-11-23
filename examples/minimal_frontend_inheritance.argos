@@ -6,6 +6,6 @@ final class Constant : Source {
     public override function read() -> int { return 42; }
 }
 function main() -> int {
-    var source: Readable = new Constant();
+    let source: Readable = new Constant();
     return source.read();
 }

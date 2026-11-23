@@ -896,6 +896,8 @@ TokenKind Lexer::keyword_kind(std::string_view lexeme) noexcept {
       std::pair{"never", TokenKind::KwNever},
   };
   for (const auto &[word, kind] : keywords) if (lexeme == word) return kind;
+  if (lexeme == "let")
+    return TokenKind::KwLet;
   if (lexeme == "var")
     return TokenKind::KwVar;
   if (lexeme == "function")

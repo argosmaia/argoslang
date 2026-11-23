@@ -6,15 +6,15 @@ function loadUser() -> User? {
 }
 
 function displayName(user: User?) -> string {
-    var name: string = user?.getProfile()?.getName() ?? "Anonymous";
+    let name: string = user?.getProfile()?.getName() ?? "Anonymous";
     return name;
 }
 
 function main() -> int {
-var mut cachedUser: User? = nil;
+let mut cachedUser: User? = nil;
 cachedUser ??= loadUser();
 
-var mut preferredName: string = "Unknown";
+let mut preferredName: string = "Unknown";
 preferredName ?= cachedUser?.getProfile()?.getName();
 
     print(displayName(user: cachedUser));

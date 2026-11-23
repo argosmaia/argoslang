@@ -74,7 +74,7 @@ O nome da saída é o nome do fonte sem a extensão `.argos`. O arquivo precisa 
 
 ```argos
 function main() -> int {
-    var answer: int = 6 * 7
+    let answer: int = 6 * 7
     return answer
 }
 ```
@@ -99,7 +99,7 @@ Nesse caso o status esperado é `14`. O linker escreve uma saída temporária e 
 tipada/validada com a VM. Strings, opcionais, arrays homogêneos, classes
 concretas e closures fazem parte da execução, dentro dos limites do
 [MVP](geral.md#mvp). `/` produz `double`; `%` é inteiro e falhas de módulo
-encerram com status 70. `float` e `double` usam binary64. O backend emite
+encerram com status 70. `float` arredonda para binary32, armazenado em uma palavra binary64; `double` usa binary64. O backend emite
 assembly e usa `cc` para montar e ligar, sem transpilar ArgosLang para C.
 
 `examples/null_safety.argos` usa `data` e possui `main()`: executa na VM e no
@@ -131,7 +131,7 @@ O caminho executável atual e a arquitetura-alvo estão descritos em
 [architecture.md](architecture.md):
 
 ```text
-.argos -> lexer -> parser manual -> semântica -> IR tipada e validada
+.argos -> lexer -> parser híbrido (expressões LR(2)) -> semântica -> IR validada
        -> VM (direto da IR) ou assembly x86-64 -> cc (montagem/link)
 ```
 
@@ -172,7 +172,7 @@ executável. Arquivos suportam funções, strings, classes concretas, closures,
 opcionais e arrays homogêneos. O REPL mantém funções e valores numéricos/bool,
 inclusive opcionais; strings, arrays, objetos e closures não persistem entre
 entradas. A matriz completa está no [MVP](geral.md#mvp). `/` sempre produz
-`double`; `float` e `double` usam binary64 nesta versão.
+`double`; `float` arredonda para binary32, armazenado em uma palavra binary64; `double` usa binary64 nesta versão.
 
 <a id="interpretar-compilar-não-é-interpretar"></a>
 
@@ -303,7 +303,7 @@ O caminho planejado é distribuir bytecode ArgosLang e uma VM **implementada par
 
 ### Programa ArgosLang: binário nativo
 
-O primeiro backend nativo já recebe a IR do subconjunto e emite assembly x86-64/Linux, que `cc` monta e liga. Veja o comando completo em [Compilar ArgosLang](#compilar). Arquitetura de CPU, sistema operacional, formato de objeto, ABI, runtime e linker fazem parte do alvo: esse binário não roda automaticamente em ARM/macOS ou AVR. Os módulos ARM64, RISC-V64 e AVR ainda são esboços.
+O primeiro backend nativo já recebe a IR do subconjunto e emite assembly x86-64/Linux, que `cc` monta e liga. Veja o comando completo em [Compilar ArgosLang](#compilar). Arquitetura de CPU, sistema operacional, formato de objeto, ABI, runtime e linker fazem parte do alvo: esse binário não roda automaticamente em ARM/macOS ou AVR. ARM64 e RISC-V64 ainda são esboços. AVR tem um perfil escalar para ATmega328P, selecionado com `--target=avr`; a montagem pode ser feita com LLVM e a ligação exige `avr-gcc`. Esse perfil não suporta heap, ponto flutuante nem I/O.
 
 Para uma placa ou máquina diferente do host, será preciso implementar a toolchain de **cross-compilation**, incluindo geração de objeto, relocação, linkagem, entry point e suporte de runtime adequado. No caso de bare metal, também serão necessários mapa de memória, startup code e interfaces com periféricos. Não há procedimento de flash ou imagem de firmware ArgosLang disponível neste estágio.
 

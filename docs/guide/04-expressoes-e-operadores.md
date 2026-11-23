@@ -3,16 +3,16 @@
 Expressões produzem valores. Operadores aritméticos trabalham com números:
 
 ```argos
-var value: int = 6 * 7 + 1
-var average: double = (2.5 + 3.5) / 2.0
-var half: double = 1 / 2
+let value: int = 6 * 7 + 1
+let average: double = (2.5 + 3.5) / 2.0
+let half: double = 1 / 2
 ```
 
 Comparações produzem `bool`:
 
 ```argos
-var valid: bool = value >= 42
-var same: bool = "a" == "a"
+let valid: bool = value >= 42
+let same: bool = "a" == "a"
 ```
 
 ## Contas e comparações
@@ -26,10 +26,10 @@ inteiros. Multiplicação e divisão têm precedência maior que soma e subtraç
 parênteses quando a intenção não for evidente:
 
 ```argos
-var base: int = 3
-var offset: int = 2
-var scale: int = 4
-var result: int = (base + offset) * scale
+let base: int = 3
+let offset: int = 2
+let scale: int = 4
+let result: int = (base + offset) * scale
 ```
 
 ## Verdadeiro e falso
@@ -39,7 +39,7 @@ significa “e”; `||` significa “ou”. Eles param cedo quando já sabem a r
 em `false && ...`, o segundo lado não roda; em `true || ...`, também não.
 
 ```argos
-var hasTicket: bool = true
+let hasTicket: bool = true
 if hasTicket {
     print("Pode entrar")
 } else {
@@ -51,8 +51,8 @@ O frontend também entende `??`, que escolhe um valor quando um opcional está
 vazio, mas opcionais ainda não fazem parte da execução completa do MVP:
 
 ```argos
-var nickname: string? = nil
-var displayName: string = nickname ?? "Visitante"
+let nickname: string? = nil
+let displayName: string = nickname ?? "Visitante"
 ```
 
 Outros operadores de opcionais (`?.`, `?=`, `?==` e `!!`) também não fazem

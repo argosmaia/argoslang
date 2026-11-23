@@ -9,7 +9,7 @@ class IrGenerator final {
 public:
   IrGenerator(diagnostics::DiagnosticEngine &diagnostics,
               const semantics::SemanticAnalyzer &semantics);
-  [[nodiscard]] argos::ir::Module generate(const argos::ast::Program &program);
+  [[nodiscard]] argos::ir::Module generate(const argos::ast::Program &program, bool optimize = true);
 
 private:
   diagnostics::DiagnosticEngine &diagnostics_;

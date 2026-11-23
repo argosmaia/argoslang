@@ -39,14 +39,14 @@ TEST_CASE("lexes Swift-like null-safety chain") {
     argos::diagnostics::DiagnosticEngine diagnostics;
 
     const auto kinds = kinds_of(
-        R"(var name: string = user?.profile?.name ?? "Anonymous")",
+        R"(let name: string = user?.profile?.name ?? "Anonymous")",
         diagnostics
     );
 
     REQUIRE_FALSE(diagnostics.has_errors());
 
     REQUIRE(kinds == std::vector{
-        argos::lexer::TokenKind::KwVar,
+        argos::lexer::TokenKind::KwLet,
         argos::lexer::TokenKind::Identifier,
         argos::lexer::TokenKind::Colon,
         argos::lexer::TokenKind::KwString,
@@ -99,14 +99,14 @@ TEST_CASE("supports nested block comments") {
     argos::diagnostics::DiagnosticEngine diagnostics;
 
     const auto kinds = kinds_of(
-        "var /* outer /* inner */ outer */ value = nil",
+        "let /* outer /* inner */ outer */ value = nil",
         diagnostics
     );
 
     REQUIRE_FALSE(diagnostics.has_errors());
 
     REQUIRE(kinds == std::vector{
-        argos::lexer::TokenKind::KwVar,
+        argos::lexer::TokenKind::KwLet,
         argos::lexer::TokenKind::Identifier,
         argos::lexer::TokenKind::Equal,
         argos::lexer::TokenKind::KwNull,
@@ -116,7 +116,7 @@ TEST_CASE("supports nested block comments") {
 
 TEST_CASE("treats newlines inside block comments as eligible terminators") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto kinds = kinds_of("var x = 1 /* note\n continued */ var y = 2", diagnostics);
+    const auto kinds = kinds_of("let x = 1 /* note\n continued */ let y = 2", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     REQUIRE(std::count(kinds.begin(), kinds.end(), argos::lexer::TokenKind::Semicolon) == 1);
 }
@@ -136,7 +136,7 @@ TEST_CASE("reports unterminated strings") {
 TEST_CASE("lexes Unicode identifiers and new literal forms") {
     argos::diagnostics::DiagnosticEngine diagnostics;
     const auto kinds = kinds_of(
-        "var café = 1.25e2; var letter: char = 'á'; var text = \"\"\"a\nb\"\"\";",
+        "let café = 1.25e2; let letter: char = 'á'; let text = \"\"\"a\nb\"\"\";",
         diagnostics
     );
     REQUIRE_FALSE(diagnostics.has_errors());
@@ -148,7 +148,7 @@ TEST_CASE("lexes Unicode identifiers and new literal forms") {
 
 TEST_CASE("inserts terminators only at eligible newlines") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto kinds = kinds_of("var x = (1 +\n 2)\nvar y = 3", diagnostics);
+    const auto kinds = kinds_of("let x = (1 +\n 2)\nlet y = 3", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     REQUIRE(std::count(kinds.begin(), kinds.end(), argos::lexer::TokenKind::Semicolon) == 1);
 }
@@ -179,7 +179,7 @@ TEST_CASE("accepts only canonical function keyword and lowercase primitive types
 
 TEST_CASE("rejects malformed UTF-8 identifiers") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto kinds = kinds_of(std::string{"var "} + static_cast<char>(0xC3) + " = 1", diagnostics);
+    const auto kinds = kinds_of(std::string{"let "} + static_cast<char>(0xC3) + " = 1", diagnostics);
     REQUIRE(diagnostics.has_errors());
     REQUIRE(std::find(kinds.begin(), kinds.end(), argos::lexer::TokenKind::Invalid) != kinds.end());
 }

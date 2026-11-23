@@ -28,11 +28,21 @@ argos::ast::Program parse(
 
 } // namespace
 
+TEST_CASE("let replaces var and mutability remains explicit", "[parser]") {
+  argos::diagnostics::DiagnosticEngine diagnostics;
+  auto program = parse("let a = 1; let mut b = 2;", diagnostics);
+  REQUIRE_FALSE(diagnostics.has_errors());
+  REQUIRE(program.items.size() == 2);
+  argos::diagnostics::DiagnosticEngine legacy;
+  (void)parse("var a = 1;", legacy);
+  REQUIRE(legacy.has_errors());
+}
+
 TEST_CASE("parses variable declarations") {
     argos::diagnostics::DiagnosticEngine diagnostics;
 
     const auto program = parse(
-        "var x: int = 42;\nvar mut y: string? = nil;",
+        "let x: int = 42;\nlet mut y: string? = nil;",
         diagnostics
     );
 
@@ -87,7 +97,7 @@ TEST_CASE("parses operator precedence and null-safety operators") {
     argos::diagnostics::DiagnosticEngine diagnostics;
 
     const auto program = parse(
-        "var res: string = user?.profile?.name ?? \"Default\";",
+        "let res: string = user?.profile?.name ?? \"Default\";",
         diagnostics
     );
 
@@ -109,12 +119,12 @@ TEST_CASE("parses while loops and unsafe blocks") {
 
     const auto program = parse(
         "function main() -> void {\n"
-        "    var mut i: byte = 0;\n"
+        "    let mut i: byte = 0;\n"
         "    while i < 10 {\n"
         "        i = i + 1;\n"
         "    }\n"
         "    unsafe {\n"
-        "        var ptr: usize = 0x24;\n"
+        "        let ptr: usize = 0x24;\n"
         "    }\n"
         "}",
         diagnostics
@@ -138,7 +148,7 @@ TEST_CASE("parses while loops and unsafe blocks") {
 
 TEST_CASE("uses normative coalescing precedence") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto program = parse("var result = left || right ?? fallback;", diagnostics);
+    const auto program = parse("let result = left || right ?? fallback;", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     const auto *decl = dynamic_cast<const argos::ast::VariableDeclaration *>(program.items[0].get());
     REQUIRE(decl != nullptr);
@@ -152,13 +162,13 @@ TEST_CASE("uses normative coalescing precedence") {
 
 TEST_CASE("rejects legacy postfix bang") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    (void)parse("var plain = optional!;", diagnostics);
+    (void)parse("let plain = optional!;", diagnostics);
     REQUIRE(diagnostics.has_errors());
 }
 
 TEST_CASE("parses classes without losing following declarations") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto program = parse("class User {} var x: int = 2;", diagnostics);
+    const auto program = parse("class User {} let x: int = 2;", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     REQUIRE(program.items.size() == 2);
     REQUIRE(program.items[0]->kind == argos::ast::NodeKind::class_declaration);
@@ -166,7 +176,7 @@ TEST_CASE("parses classes without losing following declarations") {
 
 TEST_CASE("reports unsupported match statements") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto program = parse("match value { default => 1; } var x: int = 2;", diagnostics);
+    const auto program = parse("match value { default => 1; } let x: int = 2;", diagnostics);
     REQUIRE(diagnostics.has_errors());
     REQUIRE(program.items.size() == 1);
 }
@@ -191,7 +201,7 @@ TEST_CASE("parses immutable data and rejects removed protocol") {
 
 TEST_CASE("accepts escaped identifiers in declarations") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto program = parse("var `class`: int = 1;", diagnostics);
+    const auto program = parse("let `class`: int = 1;", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     const auto *decl = dynamic_cast<const argos::ast::VariableDeclaration *>(program.items[0].get());
     REQUIRE(decl != nullptr);
@@ -200,7 +210,7 @@ TEST_CASE("accepts escaped identifiers in declarations") {
 
 TEST_CASE("semicolon is optional before a closing brace or EOF") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    const auto program = parse("function f() -> int { return 1 }\nvar x: int = 1", diagnostics);
+    const auto program = parse("function f() -> int { return 1 }\nlet x: int = 1", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
     REQUIRE(program.items.size() == 2);
 }
@@ -209,7 +219,7 @@ TEST_CASE("single statement bodies may omit braces") {
     argos::diagnostics::DiagnosticEngine diagnostics;
     const auto program = parse(
         "function choose(flag: bool) -> int if flag return 1 else return 2\n"
-        "function count() -> int { var mut x: int = 0; while x < 3 x = x + 1; return x }",
+        "function count() -> int { let mut x: int = 0; while x < 3 x = x + 1; return x }",
         diagnostics
     );
     REQUIRE_FALSE(diagnostics.has_errors());
@@ -218,7 +228,7 @@ TEST_CASE("single statement bodies may omit braces") {
 
 TEST_CASE("same-line statements still require a separator") {
     argos::diagnostics::DiagnosticEngine diagnostics;
-    (void)parse("function f() -> int { var x: int = 1 return x }", diagnostics);
+    (void)parse("function f() -> int { let x: int = 1 return x }", diagnostics);
     REQUIRE(diagnostics.has_errors());
 }
 
@@ -227,11 +237,11 @@ TEST_CASE("parses computed properties and typed accessor signatures") {
     const auto program = parse(R"(
       class Account {
         construct(_ initial: int) {}
-        public var mut balance: int {
+        public let mut balance: int {
           getter() { return 1; }
           setter(incoming) { print(incoming); }
         }
-        var mut flag: bool { getter() { return true; } setter() { print(value); } }
+        let mut flag: bool { getter() { return true; } setter() { print(value); } }
       }
     )", diagnostics);
     REQUIRE_FALSE(diagnostics.has_errors());
@@ -253,14 +263,14 @@ TEST_CASE("parses computed properties and typed accessor signatures") {
 TEST_CASE("rejects old constructors and malformed accessor syntax") {
     for (const auto& source : {
         "class A { init() {} }", "class A { public init() {} }",
-        "class A { var x: int { get { return 1; } } }",
-        "class A { var mut x: int { setter() {} } }",
-        "class A { var x: int { getter() { return 1; } setter() {} } }",
-        "class A { var x: int { getter() { return 1; } getter() { return 2; } } }",
-        "class A { var x: int { getter(value) { return 1; } } }",
-        "class A { var mut x: int { getter() { return 1; } setter(a, b) {} } }",
-        "class A { var x: int = 0 { getter() { return 1; } } }",
-        "var x: int { getter() { return 1; } }"
+        "class A { let x: int { get { return 1; } } }",
+        "class A { let mut x: int { setter() {} } }",
+        "class A { let x: int { getter() { return 1; } setter() {} } }",
+        "class A { let x: int { getter() { return 1; } getter() { return 2; } } }",
+        "class A { let x: int { getter(value) { return 1; } } }",
+        "class A { let mut x: int { getter() { return 1; } setter(a, b) {} } }",
+        "class A { let x: int = 0 { getter() { return 1; } } }",
+        "let x: int { getter() { return 1; } }"
     }) {
         CAPTURE(source);
         argos::diagnostics::DiagnosticEngine diagnostics;

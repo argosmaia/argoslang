@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <vector>
+#include <optional>
 
 namespace argos::vm {
 
@@ -36,6 +37,7 @@ private:
   };
   mutable std::vector<Object> objects_;
   mutable std::vector<std::string> strings_;
+  mutable std::vector<std::optional<std::vector<std::uint8_t>>> raw_allocations_;
   const argos::ir::Module *module_{nullptr};
   std::ostream *output_{nullptr};
 };

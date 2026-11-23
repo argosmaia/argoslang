@@ -11,7 +11,7 @@ function multiply(_ left: int, _ right: int) -> int {
 O `_` torna o parâmetro posicional, portanto a chamada é:
 
 ```argos
-var result: int = multiply(6, 7)
+let result: int = multiply(6, 7)
 ```
 
 Uma função que não devolve valor usa `void`:
@@ -51,7 +51,7 @@ function makeAdder(_ amount: int) -> (int) -> int {
 }
 
 function main() -> int {
-    var add = makeAdder(10);
+    let add = makeAdder(10);
     print(apply(add, 3)); // 13
     return 0;
 }
@@ -59,6 +59,6 @@ function main() -> int {
 
 Os parâmetros da lambda são tipados. O retorno de um corpo de expressão é
 inferido; um corpo de bloco que retorna valor exige `-> Tipo`. Capturas usam
-bindings `var` imutáveis e já inicializados. `var mut` não pode ser capturado
+bindings `let` imutáveis e já inicializados. `let mut` não pode ser capturado
 nesta etapa. A closure pode escapar da função que a criou. Chamadas por valores
 de função usam argumentos posicionais e aceitam até cinco argumentos.

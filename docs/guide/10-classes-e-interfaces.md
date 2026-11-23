@@ -42,7 +42,7 @@ automática de imports. A cláusula é `class Carro with Motor`, nunca `with cla
 
 ```argos
 class Counter {
-    private var mut stored: int;
+    private let mut stored: int;
     public construct(initial: int) { stored = initial; }
     public function add(_ amount: int) -> int {
         stored += amount;
@@ -50,14 +50,14 @@ class Counter {
     }
 }
 function main() -> int {
-    var counter = new Counter(initial: 1);
-    var alias = counter;
+    let counter = new Counter(initial: 1);
+    let alias = counter;
     print(alias.add(2)); // 3; ambos referem-se ao mesmo objeto
     return 0;
 }
 ```
 
-Campos precisam de tipo. `var` permite uma única inicialização; `var mut`
+Campos precisam de tipo. `let` permite uma única inicialização; `let mut`
 permite alterações. O construtor deve inicializar cada campo obrigatório em
 todos os caminhos. Inicializadores de campos não acessam a instância: use
 `construct` para dependências entre campos. Durante o construtor, `this` não pode escapar, invocar métodos/acessores comuns
@@ -81,7 +81,7 @@ selecionados por `new`. `init(...)` foi removido.
 ```argos
 interface Readable { function read() -> int; }
 class Source {
-    protected var value: int;
+    protected let value: int;
     public construct(_ value: int) { this.value = value; }
     public virtual function read() -> int { return value; }
 }
@@ -90,9 +90,9 @@ class Constant: Source by Readable {
     public override function read() -> int { return super.read() + 1; }
 }
 function main() -> int {
-    var concrete = new Constant(41);
-    var source: Source = concrete;
-    var readable: Readable = concrete;
+    let concrete = new Constant(41);
+    let source: Source = concrete;
+    let readable: Readable = concrete;
     print(source.read(), readable.read()); // 4242
     return 0;
 }
@@ -157,7 +157,7 @@ não pode ser capturado por lambda.
 
 ```argos
 class Motor {
-    private var mut giros: int = 0;
+    private let mut giros: int = 0;
     public function ligar() -> int { giros += 1; return giros; }
 }
 class GPS {
@@ -168,7 +168,7 @@ class Radio {
 }
 class Carro with Motor, GPS, Radio {}
 function main() -> int {
-    var carro = new Carro();
+    let carro = new Carro();
     print(carro.ligar(), carro.localizar(), carro.tocar());
     return 0;
 }
@@ -237,19 +237,19 @@ marcados `final` não podem ser sobrescritos.
 
 ```argos
 class Account {
-    private var mut storedBalance: int = 0;
-    public virtual var mut balance: int {
+    private let mut storedBalance: int = 0;
+    public virtual let mut balance: int {
         getter() { return storedBalance; }
         setter() { storedBalance = value; }
     }
-    public var doubled: int {
+    public let doubled: int {
         getter() { return balance * 2; }
     }
 }
 ```
 
 `getter()` devolve o tipo da propriedade. `setter()` recebe `value` desse tipo
-e retorna `void`; `setter(incoming)` permite outro nome. O setter exige `var mut`.
+e retorna `void`; `setter(incoming)` permite outro nome. O setter exige `let mut`.
 Sem setter, a propriedade é somente leitura. Propriedades são computadas, sem
 armazenamento nem inicializador próprios.
 
@@ -257,8 +257,8 @@ armazenamento nem inicializador próprios.
 chama setter. O resultado é o valor enviado ao setter, sem segunda leitura.
 Os operadores opcionais conservam suas regras de curto-circuito.
 
-Interfaces declaram `var name: string { getter(); }` ou
-`var mut name: string { getter(); setter(); }`. A implementação deve preservar
+Interfaces declaram `let name: string { getter(); }` ou
+`let mut name: string { getter(); setter(); }`. A implementação deve preservar
 todos os acessores exigidos. Propriedades `virtual`/`abstract` aceitam
 `override`; getter e setter despacham pelo objeto real, inclusive por interface.
 Ainda não há acessores automáticos nem visibilidade individual por acessor.
@@ -269,8 +269,8 @@ Ainda não há acessores automáticos nem visibilidade individual por acessor.
 data Point(x: int, label: string?);
 data Box(point: Point);
 function main() -> int {
-    var a = new Box(point: new Point(x: 1, label: nil));
-    var b = new Box(point: new Point(x: 1, label: nil));
+    let a = new Box(point: new Point(x: 1, label: nil));
+    let b = new Box(point: new Point(x: 1, label: nil));
     print(a == b); // true
     // a.point.x = 2; // erro: acesso a campo sealed não autorizado
     return 0;
@@ -305,7 +305,7 @@ respeitando a visibilidade do tipo e dos construtores.
 
 Todo `data` é final e não estende classes. A imutabilidade é transitiva:
 campos armazenam escalares, strings, opcionais desses tipos ou outros `data`.
-`var mut`, propriedades computadas, arrays, closures, referências a classes
+`let mut`, propriedades computadas, arrays, closures, referências a classes
 comuns e grafos recursivos de dados são rejeitados nesta etapa. Atribuição a
 campos já inicializados é erro, inclusive dentro dos métodos do próprio `data`.
 
@@ -373,13 +373,14 @@ O [catálogo](12-diagnosticos.md) inclui explicações e correções. Exemplos c
 Objetos e closures sobrevivem ao retorno da função criadora, com armazenamento
 liberado ao final da execução. Ownership/borrow, destruição por escopo e
 `deinit` ainda não estão implementados. O REPL não preserva variáveis de objeto
-ou closure. Também continuam pendentes métodos ligados como valores, `static`,
+ou closure. Também continuam pendentes `static`,
 genéricos e captura mutável. O limite atual é de seis argumentos de
 máquina, contando `this` ou o ambiente da closure.
 
 ## Validação desta implementação
 
-A bateria atual contém 239 testes, aprovados com GCC e Clang em Linux x86-64.
+A contagem e a aprovação dos testes devem ser verificadas com `ctest`; a suíte
+inclui testes de POO na VM e no backend x86-64/Linux.
 Ela cobre parser, análise semântica, diagnósticos, validação de IR, execução na
 VM, geração de assembly e execução nativa. Os cenários incluem composição
 múltipla, conflitos de assinaturas, separação de estados, inicialização exclusiva,
@@ -389,3 +390,11 @@ A compilação local em `build/` também foi reconstruída.
 Os métodos gerados de `data` foram executados por referência de interface nos
 dois backends. A faixa de `uint_8` foi verificada dinamicamente: incrementar 255
 encerra a execução com erro 70 antes de armazenar o resultado inválido.
+
+Referências ligadas a métodos preservam o receptor e o despacho virtual:
+
+```argos
+let instance = new Value()
+let read = instance.read
+let result = read()
+```

@@ -12,15 +12,17 @@ FetchContent_MakeAvailable(Catch2)
 add_executable(argos_tests
     diagnostics/diagnostic_tests.cpp
     ir/ir_tests.cpp
+    ir/optimizer_tests.cpp
     lexer/lexer_tests.cpp
     parser/parser_tests.cpp
+    parser/lr2_tests.cpp
     repl/repl_tests.cpp
     semantics/semantic_tests.cpp
 )
 
 target_link_libraries(argos_tests
     PRIVATE
-        argos_frontend
+        argos_native
         argos_project_options
         argos_project_warnings
         Catch2::Catch2WithMain
@@ -29,6 +31,32 @@ target_link_libraries(argos_tests
 list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
 include(Catch)
 catch_discover_tests(argos_tests)
+
+set(ARGOS_TEST_NATIVE OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
+    set(ARGOS_TEST_NATIVE ON)
+endif()
+add_test(NAME manual_memory_runtime_safety
+    COMMAND "${CMAKE_COMMAND}" "-DARGOSC=$<TARGET_FILE:argosc>"
+        "-DBINARY=${CMAKE_BINARY_DIR}/bin/raw-memory-safety" "-DNATIVE=${ARGOS_TEST_NATIVE}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/raw_memory.cmake")
+foreach(example IN ITEMS minimal_extended_values minimal_raw_memory minimal_avr)
+    add_test(NAME "${example}_optimization_parity"
+        COMMAND "${CMAKE_COMMAND}" "-DARGOSC=$<TARGET_FILE:argosc>"
+            "-DSOURCE=${PROJECT_SOURCE_DIR}/examples/${example}.argos"
+            "-DBINARY=${CMAKE_BINARY_DIR}/bin/${example}-optimization"
+            "-DNATIVE=${ARGOS_TEST_NATIVE}" -P "${CMAKE_CURRENT_SOURCE_DIR}/optimization_parity.cmake")
+endforeach()
+
+find_program(ARGOS_AVR_LLVM_MC NAMES llvm-mc-18 llvm-mc)
+if(ARGOS_AVR_LLVM_MC)
+    add_test(NAME avr_scalar_assembly
+        COMMAND "${CMAKE_COMMAND}" "-DARGOSC=$<TARGET_FILE:argosc>"
+            "-DSOURCE=${PROJECT_SOURCE_DIR}/examples/minimal_avr.argos"
+            "-DBINARY=${CMAKE_BINARY_DIR}/bin/avr-scalar-test"
+            "-DLLVM_MC=${ARGOS_AVR_LLVM_MC}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/avr_assembly.cmake")
+endif()
 
 foreach(example IN ITEMS
     minimal_literal
@@ -85,6 +113,10 @@ add_test(
 
 foreach(example_expected IN ITEMS
     "minimal_literal:42"
+    "minimal_frontend_bound_method:42"
+    "minimal_extended_values:0"
+    "minimal_raw_memory:0"
+    "minimal_postfix:0"
     "minimal_optional:9"
     "minimal_null_safety:0"
     "minimal_optional_arrays:0"
@@ -120,7 +152,9 @@ foreach(example_expected IN ITEMS
     list(GET example_parts 0 example)
     list(GET example_parts 1 expected)
     set(expected_stdout "")
-    if(example STREQUAL "minimal_polymorphism")
+    if(example STREQUAL "minimal_extended_values")
+        set(expected_stdout "🚀'")
+    elseif(example STREQUAL "minimal_polymorphism")
         set(expected_stdout "base\nderived\n191919\n202036\n34\n0\neffect\n37\ndefault\n2\n2.5\n79\n12\n3420")
     elseif(example STREQUAL "minimal_composition")
         set(expected_stdout "571\nRio de Janeiromusica\nGPS ativo\nRadio ativo\n8\n9\n11")
@@ -173,6 +207,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
     find_program(ARGOS_ASSEMBLY_CC cc REQUIRED)
     foreach(example_expected IN ITEMS
         "minimal_literal:42"
+    "minimal_frontend_bound_method:42"
+    "minimal_extended_values:0"
+    "minimal_raw_memory:0"
+    "minimal_postfix:0"
         "minimal_optional:9"
         "minimal_null_safety:0"
         "minimal_optional_arrays:0"
@@ -208,7 +246,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
         list(GET example_parts 0 example)
         list(GET example_parts 1 expected)
         set(expected_stdout "")
-        if(example STREQUAL "minimal_polymorphism")
+        if(example STREQUAL "minimal_extended_values")
+        set(expected_stdout "🚀'")
+    elseif(example STREQUAL "minimal_polymorphism")
             set(expected_stdout "base\nderived\n191919\n202036\n34\n0\neffect\n37\ndefault\n2\n2.5\n79\n12\n3420")
         elseif(example STREQUAL "minimal_composition")
             set(expected_stdout "571\nRio de Janeiromusica\nGPS ativo\nRadio ativo\n8\n9\n11")
@@ -278,16 +318,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
             "-DSHORT_FORM=ON"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/compile_example.cmake"
     )
-    foreach(example IN ITEMS minimal_frontend_bound_method)
-        add_test(
-            NAME "example_${example}_native_rejected"
-            COMMAND "${CMAKE_COMMAND}"
-                "-DARGOSC=$<TARGET_FILE:argosc>"
-                "-DSOURCE=${PROJECT_SOURCE_DIR}/examples/${example}.argos"
-                "-DBINARY=${CMAKE_BINARY_DIR}/bin/${example}-unsupported-test"
-                -P "${CMAKE_CURRENT_SOURCE_DIR}/compile_rejection.cmake"
-        )
-    endforeach()
     add_test(
         NAME example_minimal_modulo_by_zero_native
         COMMAND "${CMAKE_COMMAND}"

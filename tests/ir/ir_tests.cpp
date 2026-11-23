@@ -103,6 +103,11 @@ TEST_CASE("rejects malformed closure and object IR", "[ir][oop][functional]") {
   function.blocks[0].instructions.front() = field;
   REQUIRE(validate_module(module).has_value()); // field out of bounds
   function.blocks[0].instructions.front().count = 0;
+  Instruction object;
+  object.opcode = Opcode::new_object;
+  object.dst = 1;
+  object.constant = 0;
+  function.blocks[0].instructions.insert(function.blocks[0].instructions.begin(), object);
   REQUIRE_FALSE(validate_module(module).has_value());
   function.register_types[0] = ValueType::string;
   REQUIRE(validate_module(module).has_value());
@@ -128,6 +133,10 @@ TEST_CASE("optional IR rejects forged wrapping and unwrapping",
   REQUIRE(validate_module(module));
   f.blocks[0].instructions[1].src1 = 1;
   f.blocks[0].instructions[1].dst = 0;
+  Instruction nil;
+  nil.opcode = Opcode::make_nil;
+  nil.dst = 1;
+  f.blocks[0].instructions.insert(f.blocks[0].instructions.begin() + 1, nil);
   REQUIRE_FALSE(validate_module(module));
   f.register_types[1] = with_depth(ValueType::void_type, 1);
   REQUIRE(validate_module(module));
@@ -149,18 +158,22 @@ TEST_CASE("array IR verifies element and index types",
   f.blocks[0].instructions.insert(f.blocks[0].instructions.begin() + 1, array);
   REQUIRE(validate_module(module));
   f.blocks[0].instructions[1].arguments = {2};
+  Instruction nil;
+  nil.opcode = Opcode::make_nil;
+  nil.dst = 2;
+  f.blocks[0].instructions.insert(f.blocks[0].instructions.begin() + 1, nil);
   REQUIRE_FALSE(validate_module(module));
   Instruction index;
   index.opcode = Opcode::array_load;
   index.dst = 2;
   index.src1 = 1;
   index.src2 = 0;
-  f.blocks[0].instructions.insert(f.blocks[0].instructions.begin() + 2, index);
+  f.blocks[0].instructions.insert(f.blocks[0].instructions.begin() + 3, index);
   REQUIRE_FALSE(validate_module(module));
-  f.blocks[0].instructions[2].dst = 0;
+  f.blocks[0].instructions[3].dst = 0;
   REQUIRE(validate_module(module));
-  f.blocks[0].instructions[2].dst = 2;
-  f.blocks[0].instructions[2].src2 = 2;
+  f.blocks[0].instructions[3].dst = 2;
+  f.blocks[0].instructions[3].src2 = 2;
   REQUIRE(validate_module(module));
 }
 
@@ -198,6 +211,18 @@ TEST_CASE("validates virtual tables and inherited field prefixes",
   }
   SECTION("invalid ancestor") {
     module.objects.back().ancestors.front() = 99;
+    REQUIRE(validate_module(module));
+  }
+  SECTION("duplicate ancestor") {
+    module.objects.back().ancestors = {0, 0};
+    REQUIRE(validate_module(module));
+  }
+  SECTION("cyclic ancestors") {
+    module.objects.front().ancestors = {1};
+    REQUIRE(validate_module(module));
+  }
+  SECTION("incomplete transitive ancestry") {
+    module.objects.push_back({"C", module.objects.back().fields, {1}, {1}});
     REQUIRE(validate_module(module));
   }
   SECTION("invalid virtual call slot") {

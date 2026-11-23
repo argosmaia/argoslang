@@ -25,6 +25,7 @@ namespace {
 } // namespace
 
 std::int32_t VM::run() const {
+  raw_allocations_.clear();
   arrays_.clear();
   optionals_.clear();
   closures_.clear();
@@ -36,6 +37,7 @@ std::int32_t VM::run() const {
     decltype(closures_)& closures;
     decltype(objects_)& objects;
     decltype(strings_) &strings;
+    decltype(raw_allocations_) &raw;
     ~HeapReset() {
       arrays.clear();
       optionals.clear();
@@ -43,8 +45,9 @@ std::int32_t VM::run() const {
       while (!objects.empty())
         objects.pop_back();
       strings.clear();
+      raw.clear();
     }
-  } reset{arrays_, optionals_, closures_, objects_, strings_};
+  } reset{arrays_, optionals_, closures_, objects_, strings_, raw_allocations_};
   if (module_ == nullptr)
     throw std::runtime_error("nenhum módulo foi carregado na VM");
   if (const auto error = argos::ir::validate_module(*module_))
@@ -140,6 +143,42 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
 
     using argos::ir::Opcode;
     switch (instruction.opcode) {
+    case Opcode::check_narrow: {
+      const auto value = integer_value(instruction.src1);
+      const auto bits = instruction.count & 255u;
+      const auto low = instruction.count & 256u ? 0 : -(1 << (bits - 1));
+      const auto high = instruction.count & 256u ? (1 << bits) - 1 : (1 << (bits - 1)) - 1;
+      if (value < low || value > high) throw std::runtime_error("inteiro fora do intervalo do tipo");
+      set_register(instruction.dst, register_value(instruction.src1));
+      break;
+    }
+    case Opcode::raw_alloc: {
+      const auto size = integer_value(instruction.src1);
+      if (size <= 0) throw std::runtime_error("raw_alloc exige tamanho positivo");
+      raw_allocations_.emplace_back(std::vector<std::uint8_t>(static_cast<std::size_t>(size), 0));
+      set_register(instruction.dst, raw_allocations_.size());
+      break;
+    }
+    case Opcode::raw_free:
+    case Opcode::raw_load:
+    case Opcode::raw_store: {
+      const auto pointer = register_value(instruction.src1);
+      if (!pointer || pointer > raw_allocations_.size() || !raw_allocations_[pointer - 1])
+        throw std::runtime_error("ponteiro manual inválido ou já liberado");
+      auto &memory = raw_allocations_[pointer - 1];
+      if (instruction.opcode == Opcode::raw_free) { memory.reset(); set_register(instruction.dst, 0); break; }
+      const auto index = integer_value(instruction.src2);
+      if (index < 0 || static_cast<std::size_t>(index) >= memory->size())
+        throw std::runtime_error("acesso manual fora dos limites");
+      if (instruction.opcode == Opcode::raw_load) set_register(instruction.dst, (*memory)[static_cast<std::size_t>(index)]);
+      else {
+        const auto value = integer_value(instruction.arguments.front());
+        if (value < 0 || value > 255) throw std::runtime_error("raw_store exige byte no intervalo 0..255");
+        (*memory)[static_cast<std::size_t>(index)] = static_cast<std::uint8_t>(value);
+        set_register(instruction.dst, 0);
+      }
+      break;
+    }
     case Opcode::check_uint8:
       if (integer_value(instruction.src1) < 0 ||
           integer_value(instruction.src1) > 255)
@@ -352,16 +391,18 @@ std::uint64_t VM::execute(argos::ir::FunctionId function_id,
                                           -double_value(instruction.src1)));
       } else {
         const auto value = integer_value(instruction.src1);
-        if (value == std::numeric_limits<std::int32_t>::min())
-          throw std::runtime_error("overflow aritmético na VM");
-        set_register(instruction.dst, static_cast<std::uint64_t>(
-                                          static_cast<std::int64_t>(-value)));
+        const auto negated = std::bit_cast<std::int32_t>(0u - static_cast<std::uint32_t>(value));
+        set_register(instruction.dst, static_cast<std::uint64_t>(static_cast<std::int64_t>(negated)));
       }
       break;
     }
     case Opcode::int_to_double:
       set_register(instruction.dst, std::bit_cast<std::uint64_t>(
                                         static_cast<double>(integer_value(instruction.src1))));
+      break;
+    case Opcode::round_float:
+      set_register(instruction.dst, std::bit_cast<std::uint64_t>(
+          static_cast<double>(static_cast<float>(double_value(instruction.src1)))));
       break;
     case Opcode::logical_not:
       set_register(instruction.dst,
